@@ -1,0 +1,70 @@
+# ==============================================================================
+# Auto Line Ending Normalization
+# ==============================================================================
+* text=auto
+
+# ==============================================================================
+# Text Files (Unix line endings - LF)
+# ==============================================================================
+*.py text eol=lf
+*.sh text eol=lf
+*.bash text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.jsonc text eol=lf
+*.toml text eol=lf
+*.ini text eol=lf
+*.cfg text eol=lf
+*.conf text eol=lf
+*.txt text eol=lf
+*.md text eol=lf
+*.rst text eol=lf
+Makefile text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+.dockerignore text eol=lf
+.env.example text eol=lf
+
+# ==============================================================================
+# Windows Scripts (CRLF for Windows)
+# ==============================================================================
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# ==============================================================================
+# Binary Files
+# ==============================================================================
+*.pyc binary
+*.pyo binary
+*.egg-info/ binary
+*.so binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.7z binary
+*.rar binary
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.gif binary
+*.ico binary
+*.mov binary
+*.mp4 binary
+*.mp3 binary
+*.flv binary
+*.fla binary
+*.swf binary
+
+# ==============================================================================
+# Documentation
+# ==============================================================================
+*.pdf diff=binary
+
+# ==============================================================================
+# Diff Settings (Helpful for code reviews)
+# ==============================================================================
+*.json diff=json
+*.xml diff=xml
+*.py diff=python

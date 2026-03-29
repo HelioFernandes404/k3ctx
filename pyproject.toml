@@ -1,0 +1,39 @@
+[project]
+name = "k9s-setup"
+version = "0.2.0"
+description = "K9s Multi-Context Manager - Gerenciador de múltiplos clusters Kubernetes com túneis SSH seguros"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "paramiko>=3.0.0",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0.0",
+    "questionary>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-mock>=3.10.0",
+    "mypy>=1.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
