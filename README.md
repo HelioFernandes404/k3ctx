@@ -21,7 +21,8 @@ make status
 ## Como funciona no `systemframe`
 
 - O inventario vem de `/home/helio/Work/systemframe/ansible/inventory`
-- A configuracao local fica em `config.yaml`
+- A configuracao local fica em `config.yaml` e nao deve ser versionada
+- Use `.k9s-config-example/config.yaml` como base para criar seu arquivo local
 - O script atualiza o inventario antes de listar empresas e hosts
 - O contexto final e mesclado em `~/.kube/config`
 - Os PIDs dos tuneis ficam em `~/.local/state/k9s-tunnels`
@@ -59,7 +60,7 @@ make test
 
 ## Ajustes comuns
 
-Edite `config.yaml` se precisar alterar:
+Copie `.k9s-config-example/config.yaml` para `config.yaml` e edite:
 
 - `inventory_path`
 - `ssh_key_path`
