@@ -1,10 +1,13 @@
 """Unit tests for CLI module."""
 
-import pytest
 import tempfile
-import yaml
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from typing import Any, cast
+from unittest.mock import patch
+
+import pytest
+import yaml
+from _pytest.capture import CaptureFixture
 from src.cli import (
     NonInteractiveTerminalError,
     confirm_action,
@@ -16,14 +19,14 @@ from src.cli import (
 class TestSelectCompany:
     """Tests for select_company function."""
 
-    def test_prompts_user_and_returns_selection(self):
+    def test_prompts_user_and_returns_selection(self) -> None:
         """Prompts user to select company and returns choice."""
         with tempfile.TemporaryDirectory() as tmpdir:
             inv_dir = Path(tmpdir)
 
             # Create inventory files
-            for company in ["company1", "company2"]:
-                inv_file = inv_dir / f"{company}_hosts.yml"
+            for company_name in ["company1", "company2"]:
+                inv_file = inv_dir / f"{company_name}_hosts.yml"
                 with open(inv_file, 'w') as f:
                     yaml.dump({"all": {}}, f)
 
@@ -35,10 +38,12 @@ class TestSelectCompany:
                 company, inv_data = select_company(inv_dir)
 
             assert company == "company1"
+            assert inv_data is not None
             assert isinstance(inv_data, dict)
 
-    def test_handles_cancellation(self):
+    def test_handles_cancellation(self) -> None:
         """Returns None when user cancels selection."""
+        inv_data: dict[str, Any] | None
         with tempfile.TemporaryDirectory() as tmpdir:
             inv_dir = Path(tmpdir)
 
@@ -56,7 +61,7 @@ class TestSelectCompany:
             assert company is None
             assert inv_data is None
 
-    def test_exits_when_no_inventories_found(self):
+    def test_exits_when_no_inventories_found(self) -> None:
         """Exits with error when no inventory files exist."""
         with tempfile.TemporaryDirectory() as tmpdir:
             inv_dir = Path(tmpdir)
@@ -66,7 +71,10 @@ class TestSelectCompany:
 
             assert exc_info.value.code == 1
 
-    def test_reports_the_inventory_path_when_none_are_found(self, capsys):
+    def test_reports_the_inventory_path_when_none_are_found(
+        self,
+        capsys: CaptureFixture[str],
+    ) -> None:
         """Includes the searched inventory path in the error output."""
         with tempfile.TemporaryDirectory() as tmpdir:
             inv_dir = Path(tmpdir)
@@ -77,7 +85,7 @@ class TestSelectCompany:
             captured = capsys.readouterr()
             assert str(inv_dir) in captured.err
 
-    def test_fails_fast_without_interactive_terminal(self):
+    def test_fails_fast_without_interactive_terminal(self) -> None:
         """Raises clear error when no interactive terminal is available."""
         with tempfile.TemporaryDirectory() as tmpdir:
             inv_dir = Path(tmpdir)
@@ -95,7 +103,7 @@ class TestSelectCompany:
 class TestSelectHost:
     """Tests for select_host function."""
 
-    def test_prompts_user_and_returns_host(self):
+    def test_prompts_user_and_returns_host(self) -> None:
         """Prompts user to select host and returns choice."""
         inv_data = {
             "all": {
@@ -118,10 +126,11 @@ class TestSelectHost:
             host_name, host_info = select_host("test", inv_data)
 
         assert host_name == "host1"
+        assert host_info is not None
         assert host_info["group"] == "k3s_cluster"
         assert host_info["config"]["ansible_host"] == "1.2.3.4"
 
-    def test_displays_vpn_indicator_when_required(self):
+    def test_displays_vpn_indicator_when_required(self) -> None:
         """Displays [VPN] indicator for hosts requiring VPN."""
         inv_data = {
             "all": {
@@ -147,10 +156,10 @@ class TestSelectHost:
 
         # Verify that the choice label contains [VPN]
         call_args = mock_autocomplete.call_args
-        choices = call_args[1]['choices']
+        choices = cast(list[str], call_args.kwargs['choices'])
         assert any("[VPN]" in choice for choice in choices)
 
-    def test_displays_sshuttle_indicator_for_private_ip(self):
+    def test_displays_sshuttle_indicator_for_private_ip(self) -> None:
         """Displays [sshuttle] indicator for private IPs."""
         inv_data = {
             "all": {
@@ -172,12 +181,12 @@ class TestSelectHost:
 
         # Verify that the choice label contains [sshuttle]
         call_args = mock_autocomplete.call_args
-        choices = call_args[1]['choices']
+        choices = cast(list[str], call_args.kwargs['choices'])
         assert any("[sshuttle" in choice for choice in choices)
 
-    def test_handles_cancellation(self):
+    def test_handles_cancellation(self) -> None:
         """Returns None when user cancels selection."""
-        inv_data = {
+        inv_data: dict[str, Any] = {
             "all": {
                 "children": {
                     "k3s_cluster": {
@@ -198,9 +207,9 @@ class TestSelectHost:
         assert host_name is None
         assert host_info is None
 
-    def test_exits_when_no_hosts_found(self):
+    def test_exits_when_no_hosts_found(self) -> None:
         """Exits with error when inventory has no hosts."""
-        inv_data = {
+        inv_data: dict[str, Any] = {
             "all": {
                 "children": {
                     "k3s_cluster": {}
@@ -213,9 +222,9 @@ class TestSelectHost:
 
         assert exc_info.value.code == 1
 
-    def test_fails_fast_without_interactive_terminal(self):
+    def test_fails_fast_without_interactive_terminal(self) -> None:
         """Raises clear error when no interactive terminal is available."""
-        inv_data = {
+        inv_data: dict[str, Any] = {
             "all": {
                 "children": {
                     "k3s_cluster": {
@@ -236,7 +245,7 @@ class TestSelectHost:
 class TestConfirmAction:
     """Tests for confirmation prompts."""
 
-    def test_prompts_user_and_returns_confirmation(self):
+    def test_prompts_user_and_returns_confirmation(self) -> None:
         """Returns the confirmation value from questionary."""
         with patch('src.cli.sys.stdin.isatty', return_value=True), \
              patch('src.cli.sys.stdout.isatty', return_value=True), \
@@ -245,7 +254,7 @@ class TestConfirmAction:
 
             assert confirm_action("Continue?") is True
 
-    def test_fails_fast_without_interactive_terminal(self):
+    def test_fails_fast_without_interactive_terminal(self) -> None:
         """Raises clear error when confirm prompt runs without TTY."""
         with patch('src.cli.sys.stdin.isatty', return_value=False), \
              patch('src.cli.sys.stdout.isatty', return_value=False):

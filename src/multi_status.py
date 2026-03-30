@@ -1,85 +1,62 @@
-"""
-Status display for multi-cluster connections.
+"""Status display for multi-cluster connections."""
 
-Shows status of all connected clusters, active tunnels, and network requirements.
-"""
-
-import os
-import subprocess
 from pathlib import Path
-from typing import List, Dict, Any, Optional
-from .tunnel import is_tunnel_running, get_tunnel_pid_file, TUNNEL_STATE_DIR
-from .network_validator import get_network_metadata
+from typing import Any, Dict, List, Optional
+
+from .models import EffectiveConfig
 from .logging_config import get_logger
+from .network_validator import get_network_metadata, validate_context_network_details
+from .status_runtime import (
+    get_current_context,
+    get_tunnel_pid,
+    get_tunnel_port,
+    list_all_context_names,
+    load_status_config,
+)
+from .tunnel import TUNNEL_STATE_DIR, is_tunnel_running
 
 logger = get_logger()
+ContextStatus = Dict[str, Any]
+GREEN = '\033[0;32m'
+RED = '\033[0;31m'
+YELLOW = '\033[1;33m'
+NC = '\033[0m'
 
 
-def get_current_context() -> Optional[str]:
-    """
-    Get current kubectl context from kubeconfig.
-
-    Returns:
-        str|None: Current context name or None if not set
-    """
-    try:
-        result = subprocess.run(
-            ["kubectl", "config", "current-context"],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        if result.returncode == 0:
-            return result.stdout.strip()
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        pass
-    return None
+def _build_context_status(
+    context_name: str,
+    config: EffectiveConfig,
+    state_dir: Path,
+) -> ContextStatus:
+    tunnel_running = is_tunnel_running(context_name, state_dir)
+    return {
+        'name': context_name,
+        'tunnel_running': tunnel_running,
+        'tunnel_pid': get_tunnel_pid(context_name, state_dir) if tunnel_running else None,
+        'local_port': get_tunnel_port(context_name, config),
+        'network_metadata': get_network_metadata(context_name, state_dir),
+        'network_validation': validate_context_network_details(context_name, state_dir),
+    }
 
 
-def get_tunnel_pid(context_name: str, state_dir: Optional[Path] = None) -> Optional[int]:
-    """
-    Get PID of running tunnel for context.
+def _format_network_warning(
+    network_meta: Dict[str, Any],
+    network_validation: Dict[str, Any],
+) -> str:
+    warning_message = str(network_validation.get('warning') or "").lower()
 
-    Args:
-        context_name: Kubernetes context name
-        state_dir: Custom state directory
+    if "could not be read safely" in warning_message:
+        return f" {YELLOW}⚠ network metadata unreadable{NC}"
+    if not network_validation.get('ok', True):
+        if network_meta.get('needs_vpn') or "vpn" in warning_message:
+            return f" {YELLOW}⚠ requires VPN{NC}"
+        if network_meta.get('network_type') == 'sshuttle' or "sshuttle" in warning_message:
+            return f" {YELLOW}⚠ requires sshuttle{NC}"
 
-    Returns:
-        int|None: PID if tunnel is running, None otherwise
-    """
-    if state_dir is None:
-        state_dir = TUNNEL_STATE_DIR
-
-    pid_file = get_tunnel_pid_file(context_name, state_dir)
-    if not pid_file.exists():
-        return None
-
-    try:
-        with open(pid_file) as f:
-            pid = int(f.read().strip())
-        # Verify process is still running
-        os.kill(pid, 0)
-        return pid
-    except (ValueError, ProcessLookupError, OSError):
-        return None
+    return ""
 
 
-def get_tunnel_port(context_name: str) -> Optional[int]:
-    """
-    Extract local port from tunnel process.
-
-    Args:
-        context_name: Kubernetes context name
-
-    Returns:
-        int|None: Local port number or None if not found
-    """
-    from .tunnel import get_unique_port
-    # Port is deterministic based on context name
-    return get_unique_port(context_name)
-
-
-def list_all_contexts(state_dir: Optional[Path] = None) -> List[Dict[str, Any]]:
+def list_all_contexts(state_dir: Optional[Path] = None) -> List[ContextStatus]:
     """
     List all configured contexts with tunnel status.
 
@@ -101,29 +78,14 @@ def list_all_contexts(state_dir: Optional[Path] = None) -> List[Dict[str, Any]]:
     if state_dir is None:
         state_dir = TUNNEL_STATE_DIR
 
-    if not state_dir.exists():
-        return []
+    config = load_status_config()
+    contexts: List[ContextStatus] = []
 
-    contexts = []
-
-    # Find all .pid files
-    for pid_file in state_dir.glob("*.pid"):
-        context_name = pid_file.stem
-        tunnel_running = is_tunnel_running(context_name, state_dir)
-        pid = get_tunnel_pid(context_name, state_dir) if tunnel_running else None
-        port = get_tunnel_port(context_name)
-        network_meta = get_network_metadata(context_name, state_dir)
-
-        contexts.append({
-            'name': context_name,
-            'tunnel_running': tunnel_running,
-            'tunnel_pid': pid,
-            'local_port': port,
-            'network_metadata': network_meta
-        })
+    for context_name in list_all_context_names(state_dir):
+        contexts.append(_build_context_status(context_name, config, state_dir))
 
     # Sort by name
-    contexts.sort(key=lambda x: x['name'])
+    contexts.sort(key=lambda context: str(context["name"]))
     return contexts
 
 
@@ -134,12 +96,6 @@ def show_status(state_dir: Optional[Path] = None) -> None:
     Args:
         state_dir: Custom state directory
     """
-    # ANSI color codes
-    GREEN = '\033[0;32m'
-    RED = '\033[0;31m'
-    YELLOW = '\033[1;33m'
-    NC = '\033[0m'  # No Color
-
     contexts = list_all_contexts(state_dir)
     current_context = get_current_context()
 
@@ -151,41 +107,36 @@ def show_status(state_dir: Optional[Path] = None) -> None:
 
     print(f"{GREEN}Connected clusters:{NC}")
 
-    # Collect network requirements
-    network_requirements = []
+    network_requirements: list[dict[str, Any]] = []
 
     for ctx in contexts:
         name = ctx['name']
         is_current = (name == current_context)
         current_marker = " (active)" if is_current else ""
+        network_validation = ctx.get('network_validation') or {}
+        network_meta = ctx.get('network_metadata') or {}
+        network_warning = _format_network_warning(network_meta, network_validation)
+
+        if (
+            not network_validation.get('ok', True)
+            and network_meta.get('network_type') == 'sshuttle'
+        ):
+            network_requirements.append(network_meta)
 
         if ctx['tunnel_running']:
             port = ctx['local_port']
             pid = ctx['tunnel_pid']
             status_icon = f"{GREEN}✓{NC}"
 
-            # Check network metadata
-            network_meta = ctx['network_metadata']
-            network_warning = ""
-            if network_meta:
-                network_type = network_meta.get('network_type')
-                if network_type == 'sshuttle':
-                    network_warning = f" {YELLOW}⚠ requires sshuttle{NC}"
-                    network_requirements.append(network_meta)
-                elif network_meta.get('needs_vpn'):
-                    network_warning = f" {YELLOW}⚠ requires VPN{NC}"
-
             print(f"  {status_icon} {name} (localhost:{port}) [PID: {pid}]{network_warning}{current_marker}")
         else:
-            print(f"  {RED}✗{NC} {name} (tunnel down){current_marker}")
+            print(f"  {RED}✗{NC} {name} (tunnel down){network_warning}{current_marker}")
 
-    # Show current context
     if current_context:
         print(f"\n{GREEN}Current context:{NC} {current_context}")
     else:
         print(f"\n{YELLOW}No current context set{NC}")
 
-    # Show active network requirements
     if network_requirements:
         print(f"\n{YELLOW}Active network requirements:{NC}")
         shown_commands = set()

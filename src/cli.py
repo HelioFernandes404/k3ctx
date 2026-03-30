@@ -6,9 +6,11 @@ Handles interactive prompts for selecting companies and hosts from inventories.
 
 import sys
 from pathlib import Path
-from typing import Tuple, Dict, Any, Optional
+from typing import Any, Dict, Optional, Tuple, cast
+
 import questionary
 from questionary import Style
+
 from .inventory import load_inventories, extract_hosts_from_inventory
 from .network import check_vpn_requirement, check_network_requirement
 
@@ -32,6 +34,42 @@ class NonInteractiveTerminalError(RuntimeError):
     """Raised when an interactive prompt is attempted without a TTY."""
 
 
+def _autocomplete(
+    message: str,
+    choices: list[str],
+) -> Optional[str]:
+    return cast(
+        Optional[str],
+        questionary.autocomplete(
+            message,
+            choices=choices,
+            match_middle=True,
+            style=custom_style,
+        ).ask(),
+    )
+
+
+def _build_host_choice(
+    host_name: str,
+    host_info: Dict[str, Any],
+    inv_data: Dict[str, Any],
+) -> str:
+    group = host_info["group"]
+    needs_vpn = check_vpn_requirement(inv_data, group, host_name)
+    network_type, network_range = check_network_requirement(host_name, host_info)
+
+    indicators: list[str] = []
+    if needs_vpn:
+        indicators.append("[VPN]")
+    if network_type == "sshuttle":
+        indicators.append(f"[sshuttle {network_range}]")
+
+    label = f"{host_name} ({group})"
+    if indicators:
+        return f"{label} {' '.join(indicators)}"
+    return label
+
+
 def _is_interactive_terminal() -> bool:
     """Return True when stdin/stdout support interactive prompts."""
     stdin_isatty = getattr(sys.stdin, "isatty", lambda: False)()
@@ -52,7 +90,10 @@ def require_interactive_terminal() -> None:
 def confirm_action(message: str, default: bool = False) -> Optional[bool]:
     """Prompt for confirmation using the shared questionary style."""
     require_interactive_terminal()
-    return questionary.confirm(message, default=default, style=custom_style).ask()
+    return cast(
+        Optional[bool],
+        questionary.confirm(message, default=default, style=custom_style).ask(),
+    )
 
 
 def select_company(inventory_path: Path) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
@@ -79,15 +120,9 @@ def select_company(inventory_path: Path) -> Tuple[Optional[str], Optional[Dict[s
     try:
         require_interactive_terminal()
 
-        # Use autocomplete for searchable list
-        company = questionary.autocomplete(
-            "Select company (type to search):",
-            choices=companies,
-            match_middle=True,  # Allow matching anywhere in the string
-            style=custom_style
-        ).ask()
+        company = _autocomplete("Select company (type to search):", companies)
 
-        if company is None:  # ESC or Ctrl+C
+        if company is None:
             return None, None
 
         return company, inventories[company]
@@ -117,45 +152,25 @@ def select_host(company: str, inv_data: Dict[str, Any]) -> Tuple[Optional[str], 
         print(f"No hosts found in {company} inventory.", file=sys.stderr)
         sys.exit(1)
 
-    # Build choices with indicators - autocomplete needs string labels
-    choices = []
-    label_to_host = {}  # Map display label -> host_name
+    choices: list[str] = []
+    label_to_host: dict[str, str] = {}
 
     for host_name in sorted(hosts.keys()):
-        group = hosts[host_name]["group"]
         host_info = hosts[host_name]
-
-        needs_vpn = check_vpn_requirement(inv_data, group, host_name)
-        network_type, network_range = check_network_requirement(host_name, host_info)
-
-        indicators = []
-        if needs_vpn:
-            indicators.append("[VPN]")
-        if network_type == "sshuttle":
-            indicators.append(f"[sshuttle {network_range}]")
-
-        label = f"{host_name} ({group})"
-        if indicators:
-            label += " " + " ".join(indicators)
-
+        label = _build_host_choice(host_name, host_info, inv_data)
         choices.append(label)
         label_to_host[label] = host_name
 
     try:
         require_interactive_terminal()
-
-        # Use autocomplete for searchable/filterable list
-        selected_label = questionary.autocomplete(
+        selected_label = _autocomplete(
             f"Select host in {company} (type to search):",
-            choices=choices,
-            match_middle=True,  # Allow matching anywhere in the string
-            style=custom_style
-        ).ask()
+            choices,
+        )
 
-        if selected_label is None:  # ESC or Ctrl+C
+        if selected_label is None:
             return None, None
 
-        # Map label back to host_name
         host_name = label_to_host[selected_label]
         return host_name, hosts[host_name]
     except KeyboardInterrupt:

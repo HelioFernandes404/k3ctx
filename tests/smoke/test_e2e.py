@@ -8,129 +8,68 @@ These tests validate the main user flows work correctly:
 """
 
 import sys
-import os
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock, mock_open
 from io import StringIO
+from typing import Any
+from unittest.mock import patch
 
+from _pytest.capture import CaptureFixture
+from pytest import MonkeyPatch
+from pytest_mock import MockerFixture
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 
-def test_full_workflow_mock():
+def test_full_workflow_mock() -> None:
     """
-    Smoke test: Full workflow from company selection to tunnel creation.
-
-    Validates:
-    - Company selection works
-    - Host selection works
-    - SSH connection succeeds
-    - Kubeconfig is fetched and merged
-    - Tunnel is created and PID saved
+    Smoke test: Manual single-cluster flow delegates to shared services.
     """
-    # Import after adding to path
     import fetch_k3s_config
+    from src.models import ConnectResult, EffectiveConfig, NetworkRequirement
 
-    # Mock inventory data
-    mock_inventory = {
-        "testcompany": {
-            "all": {
-                "children": {
-                    "k3s_cluster": {
-                        "vars": {},
-                        "hosts": {
-                            "testhost": {
-                                "ansible_host": "203.0.113.1"  # Public IP
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    config = EffectiveConfig(
+        inventory_path=project_root,
+        ssh_config_path=str(project_root / "ssh_config"),
+        ssh_key_path=str(project_root / "id_ed25519"),
+        remote_k3s_config_path="/etc/rancher/k3s/k3s.yaml",
+        k3s_api_port=6443,
+        port_range_start=16443,
+        port_range_size=10000,
+    )
+    result = ConnectResult(
+        success=True,
+        context_name="testcompany-testhost",
+        local_port=16443,
+        internal_ip="10.0.0.100",
+        tunnel_pid=12345,
+        used_cache=False,
+        network_requirement=NetworkRequirement.none(),
+    )
 
-    # Mock kubeconfig YAML
-    mock_kubeconfig_content = """
-apiVersion: v1
-clusters:
-- cluster:
-    server: https://127.0.0.1:6443
-  name: default
-contexts:
-- context:
-    cluster: default
-    user: default
-  name: default
-current-context: default
-kind: Config
-users:
-- name: default
-  user:
-    token: test-token
-"""
+    with patch.object(fetch_k3s_config, "load_effective_config", return_value=config), \
+         patch.object(fetch_k3s_config, "setup_logging"), \
+         patch.object(fetch_k3s_config, "update_inventory_repo", return_value=(True, "updated")), \
+         patch.object(fetch_k3s_config, "select_company", return_value=("testcompany", {"all": {}})), \
+         patch.object(
+             fetch_k3s_config,
+             "select_host",
+             return_value=(
+                 "testhost",
+                 {
+                     "group": "k3s_cluster",
+                     "config": {"ansible_host": "8.8.8.8"},
+                     "group_vars": {},
+                 },
+             ),
+         ), \
+         patch.object(fetch_k3s_config, "connect_cluster", return_value=result) as connect_cluster:
+        assert fetch_k3s_config.main() == 0
 
-    # Mock internal IP
-    mock_internal_ip = "10.0.0.100"
-
-    # Mock SSH client
-    mock_ssh = MagicMock()
-    mock_stdout = MagicMock()
-    mock_stdout.read.return_value = mock_internal_ip.encode()
-    mock_ssh.exec_command.return_value = (None, mock_stdout, None)
-
-    # Mock SFTP for file fetch
-    mock_sftp = MagicMock()
-    mock_file = MagicMock()
-    mock_file.read.return_value = mock_kubeconfig_content.encode()
-    mock_file.__enter__ = Mock(return_value=mock_file)
-    mock_file.__exit__ = Mock(return_value=None)
-    mock_sftp.open.return_value = mock_file
-    mock_ssh.open_sftp.return_value = mock_sftp
-
-    # Mock subprocess for tunnel creation
-    mock_subprocess_result = MagicMock()
-    mock_subprocess_result.returncode = 0
-    mock_subprocess_result.stderr = ""
-
-    mock_pgrep_result = MagicMock()
-    mock_pgrep_result.returncode = 0
-    mock_pgrep_result.stdout = "12345\n"
-
-    # Mock user inputs
-    user_inputs = iter(["1", "1"])  # Select first company, first host
-
-    with patch.object(fetch_k3s_config, 'load_inventories', return_value=mock_inventory), \
-         patch.object(fetch_k3s_config, 'make_ssh_client', return_value=mock_ssh), \
-         patch.object(fetch_k3s_config, 'load_ssh_config', return_value={"hostname": "203.0.113.1", "user": "ubuntu", "port": 22}), \
-         patch('subprocess.run') as mock_run, \
-         patch('builtins.input', lambda prompt: next(user_inputs)), \
-         patch('builtins.open', mock_open(read_data="")), \
-         patch('pathlib.Path.exists', return_value=False), \
-         patch('pathlib.Path.mkdir'), \
-         patch('os.kill'):
-
-        # Configure subprocess mocks
-        mock_run.side_effect = [mock_subprocess_result, mock_pgrep_result]
-
-        # Mock file writes
-        written_files = {}
-        def mock_file_write(path, mode='r'):
-            m = mock_open()()
-            def write_side_effect(content):
-                written_files[str(path)] = content
-            m.write.side_effect = write_side_effect
-            return m
-
-        with patch('builtins.open', mock_file_write):
-            # This would normally run the main function
-            # For now, we just validate imports work
-            assert hasattr(fetch_k3s_config, 'load_inventories')
-            assert hasattr(fetch_k3s_config, 'extract_hosts_from_inventory')
-            assert hasattr(fetch_k3s_config, 'make_ssh_client')
+    connect_cluster.assert_called_once()
 
 
-def test_vpn_warning_detection():
+def test_vpn_warning_detection() -> None:
     """
     Smoke test: VPN requirement detection.
 
@@ -166,7 +105,7 @@ def test_vpn_warning_detection():
     assert result is True, "VPN requirement should be detected"
 
 
-def test_private_network_detection():
+def test_private_network_detection() -> None:
     """
     Smoke test: Private network detection for sshuttle requirement.
 
@@ -189,7 +128,7 @@ def test_private_network_detection():
     assert fetch_k3s_config.is_private_network("example.com") is False
 
 
-def test_network_requirement_check():
+def test_network_requirement_check() -> None:
     """
     Smoke test: Network requirement detection returns correct type.
 
@@ -212,6 +151,7 @@ def test_network_requirement_check():
     )
 
     assert network_type == "sshuttle", "Private IP should require sshuttle"
+    assert network_range is not None
     assert "192.168.90.0/24" in network_range, "Should detect /24 network range"
 
     # Public IP should not trigger
@@ -230,7 +170,7 @@ def test_network_requirement_check():
     assert network_range is None
 
 
-def test_inventory_loading():
+def test_inventory_loading() -> None:
     """
     Smoke test: Inventory loading handles vault tags gracefully.
 
@@ -259,7 +199,11 @@ all:
     class VaultIgnoreLoader(yaml.SafeLoader):
         pass
 
-    def ignore_unknown_tag(loader, tag_suffix, node):
+    def ignore_unknown_tag(
+        loader: yaml.SafeLoader,
+        tag_suffix: str,
+        node: yaml.Node,
+    ) -> Any:
         if isinstance(node, yaml.MappingNode):
             return loader.construct_mapping(node)
         elif isinstance(node, yaml.SequenceNode):
@@ -276,7 +220,7 @@ all:
     assert "k3s_cluster" in result["all"]["children"]
 
 
-def test_unique_port_generation():
+def test_unique_port_generation() -> None:
     """
     Smoke test: Context names generate unique, deterministic ports.
 
@@ -302,3 +246,196 @@ def test_unique_port_generation():
     # Ports should be in expected range
     assert 16443 <= port1a <= 26443, f"Port {port1a} out of expected range"
     assert 16443 <= port2 <= 26443, f"Port {port2} out of expected range"
+
+
+def test_multi_connect_uses_services_and_sets_first_successful_context(
+    mocker: MockerFixture,
+    tmp_path: Path,
+) -> None:
+    import multi_connect
+    from src.models import (
+        ClusterTarget,
+        ConnectResult,
+        EffectiveConfig,
+        NetworkRequirement,
+    )
+
+    config = EffectiveConfig(
+        inventory_path=tmp_path,
+        ssh_config_path=str(tmp_path / "ssh_config"),
+        ssh_key_path=str(tmp_path / "id_ed25519"),
+        remote_k3s_config_path="/etc/rancher/k3s/k3s.yaml",
+        k3s_api_port=6443,
+        port_range_start=16443,
+        port_range_size=10000,
+    )
+    selected = [
+        ClusterTarget(
+            company="acme",
+            host_alias="prod",
+            group="k3s_cluster",
+            host_config={"ansible_host": "203.0.113.10"},
+            group_vars={},
+        ),
+        ClusterTarget(
+            company="beta",
+            host_alias="staging",
+            group="k3s_cluster",
+            host_config={"ansible_host": "203.0.113.11"},
+            group_vars={},
+        ),
+    ]
+    results = [
+        ConnectResult(
+            success=True,
+            context_name="acme-prod",
+            local_port=16443,
+            internal_ip="10.0.0.10",
+            tunnel_pid=1111,
+            used_cache=False,
+            network_requirement=NetworkRequirement.none(),
+        ),
+        ConnectResult(
+            success=True,
+            context_name="beta-staging",
+            local_port=16444,
+            internal_ip="10.0.0.11",
+            tunnel_pid=2222,
+            used_cache=True,
+            network_requirement=NetworkRequirement.none(),
+        ),
+    ]
+
+    mocker.patch("multi_connect.load_effective_config", return_value=config)
+    setup_logging = mocker.patch("multi_connect.setup_logging")
+    mocker.patch("multi_connect.list_cluster_targets", return_value=selected)
+    mocker.patch("multi_connect.select_clusters_interactive", return_value=selected)
+    mocker.patch("multi_connect.show_network_warnings", return_value=True)
+    connect_multiple = mocker.patch("multi_connect.connect_multiple", return_value=results)
+    set_current_context = mocker.patch("multi_connect.set_current_context", return_value=None)
+
+    assert multi_connect.main() == 0
+
+    setup_logging.assert_called_once()
+    assert setup_logging.call_args.kwargs["structured"] is True
+    connect_multiple.assert_called_once_with(
+        targets=selected,
+        config=config,
+        allow_manual_network=True,
+    )
+    set_current_context.assert_called_once_with(
+        "acme-prod",
+        require_confirmation=False,
+        confirmed=True,
+    )
+
+
+def test_show_network_warnings_reports_vpn_and_sshuttle_for_dual_requirement(
+    mocker: MockerFixture,
+    capsys: CaptureFixture[str],
+) -> None:
+    import multi_connect
+    from src.models import ClusterTarget
+
+    dual_target = ClusterTarget(
+        company="acme",
+        host_alias="prod",
+        group="k3s_cluster",
+        host_config={"ansible_host": "192.168.10.20"},
+        group_vars={"argocd_use_socks5_proxy": True},
+    )
+
+    mocker.patch("multi_connect.require_interactive_terminal")
+    mock_confirm = mocker.patch("multi_connect.questionary.confirm")
+    mock_confirm.return_value.ask.return_value = True
+
+    assert multi_connect.show_network_warnings([dual_target]) is True
+
+    output = capsys.readouterr().out
+    assert "⚠ Requires sshuttle:" in output
+    assert "⚠ Requires VPN:" in output
+    assert "acme: prod → 192.168.10.0/24" in output
+    assert "sshuttle -v -r helio@100.64.5.10 192.168.10.0/24" in output
+
+
+def test_post_connection_output_preserves_vpn_and_sshuttle_for_dual_requirement(
+    capsys: CaptureFixture[str],
+) -> None:
+    import multi_connect
+    from src.models import ConnectResult, NetworkRequirement
+
+    result = ConnectResult(
+        success=True,
+        context_name="acme-prod",
+        local_port=16443,
+        internal_ip="10.0.0.10",
+        tunnel_pid=1234,
+        used_cache=False,
+        network_requirement=NetworkRequirement(
+            type="sshuttle",
+            network_range="192.168.10.0/24",
+            needs_vpn=True,
+        ),
+    )
+
+    successful = multi_connect._print_summary([result])
+    multi_connect._print_network_reminders(successful)
+
+    output = capsys.readouterr().out
+    assert "acme-prod (localhost:16443) ⚠ requires VPN + sshuttle" in output
+    assert "sshuttle -v -r helio@100.64.5.10 192.168.10.0/24" in output
+    assert "Ensure VPN connection is active before proceeding" in output
+
+
+def test_post_connection_output_uses_public_error_message_only(
+    capsys: CaptureFixture[str],
+) -> None:
+    import multi_connect
+    from src.models import ConnectResult, NetworkRequirement, OperationError
+
+    result = ConnectResult(
+        success=False,
+        context_name="acme-prod",
+        local_port=None,
+        internal_ip=None,
+        tunnel_pid=None,
+        used_cache=False,
+        network_requirement=NetworkRequirement.none(),
+        error=OperationError(
+            code="connect_failed",
+            message="Cluster connection failed",
+            detail="token=secret",
+        ),
+    )
+
+    multi_connect._print_summary([result])
+
+    output = capsys.readouterr().out
+    assert "Cluster connection failed" in output
+    assert "token=secret" not in output
+
+
+def test_makefile_exposes_mcp_targets() -> None:
+    makefile = Path("Makefile").read_text()
+
+    assert "mcp-stdio:" in makefile
+    assert "mcp-http:" in makefile
+    assert "src/mcp_server.py" in makefile or "src.mcp_server" in makefile
+
+
+def test_readme_documents_manual_and_mcp_modes() -> None:
+    readme = Path("README.md").read_text()
+
+    assert "make run" in readme
+    assert "make mcp-stdio" in readme
+    assert "make mcp-http" in readme
+    assert "connect_cluster" in readme
+    assert "inventory://clusters" in readme
+    assert "config.yaml" in readme
+
+
+def test_agents_mentions_layered_architecture_and_mcp_server() -> None:
+    agents = Path("AGENTS.md").read_text()
+
+    assert "camadas" in agents.lower() or "layers" in agents.lower()
+    assert "src/mcp_server.py" in agents
