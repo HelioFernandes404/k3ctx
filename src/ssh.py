@@ -12,7 +12,7 @@ from pathlib import Path
 from paramiko import SSHConfig, SSHClient
 from paramiko.proxy import ProxyCommand
 import paramiko
-from typing import Dict, Any, Optional, Union, List
+from typing import Dict, Any, Optional, Union, List, Mapping
 from .logging_config import get_logger
 
 logger = get_logger()
@@ -66,6 +66,36 @@ def choose_first(lst: Any, default: Any = None) -> Any:
     if isinstance(lst, (list, tuple)):
         return lst[0]
     return lst
+
+
+def resolve_ssh_connection_target(
+    host_alias: str,
+    ssh_config: Mapping[str, Any],
+    *,
+    ssh_key_path: Optional[str] = None,
+    host_config: Optional[Mapping[str, Any]] = None,
+) -> tuple[str, str, Optional[str], int, Optional[str]]:
+    """
+    Resolve the final SSH target using inventory host overrides and SSH config.
+    """
+    host_data = host_config or {}
+    inventory_host = host_data.get("ansible_host")
+    hostname = str(inventory_host or ssh_config.get("hostname", host_alias))
+    username = str(ssh_config.get("user", "ubuntu"))
+    port = int(ssh_config.get("port", 22))
+    proxycmd = choose_first(ssh_config.get("proxycommand"))
+
+    identity_files = ssh_config.get("identityfile")
+    configured_key = choose_first(identity_files)
+    keyfile: Optional[str]
+    if configured_key:
+        keyfile = os.path.expanduser(str(configured_key))
+    elif ssh_key_path:
+        keyfile = os.path.expanduser(ssh_key_path)
+    else:
+        keyfile = None
+
+    return hostname, username, keyfile, port, proxycmd
 
 
 def make_ssh_client(
@@ -139,13 +169,18 @@ def make_ssh_client(
             if attempt == max_retries:
                 logger.error(f"✗ SSH connection failed after {max_retries} attempts")
                 logger.error(f"  Target: {username}@{hostname}:{port}")
-                logger.error(f"  Error: {e}")
-                logger.error(f"  Error type: {type(e).__name__}")
+                logger.error(
+                    "  SSH connection error recorded",
+                    extra={"error_type": type(e).__name__},
+                )
                 raise
 
             # Exponential backoff: 1s, 2s, 4s
             wait_time = 2 ** (attempt - 1)
-            logger.warning(f"SSH connection failed (attempt {attempt}/{max_retries}): {e}")
+            logger.warning(
+                f"SSH connection failed (attempt {attempt}/{max_retries})",
+                extra={"error_type": type(e).__name__},
+            )
             logger.debug(f"Retrying in {wait_time}s...")
             time.sleep(wait_time)
 
@@ -217,12 +252,20 @@ def fetch_remote_file(ssh: SSHClient, path: str, max_retries: int = 2) -> str:
                 sftp.close()
         except (OSError, IOError, paramiko.ssh_exception.SSHException) as e:
             if attempt == max_retries:
-                logger.error(f"SFTP fetch failed after {max_retries} attempts: {path}: {e}")
+                logger.error(
+                    f"SFTP fetch failed after {max_retries} attempts: {path}",
+                    extra={"error_type": type(e).__name__},
+                )
                 raise
 
             wait_time = 2 ** (attempt - 1)
-            logger.warning(f"SFTP fetch failed (attempt {attempt}): {e}. Retrying in {wait_time}s...")
+            logger.warning(
+                f"SFTP fetch failed (attempt {attempt}). Retrying in {wait_time}s...",
+                extra={"error_type": type(e).__name__},
+            )
             time.sleep(wait_time)
+
+    raise RuntimeError(f"Failed to fetch remote file after {max_retries} attempts: {path}")
 
 
 def get_remote_file_hash(ssh: SSHClient, path: str) -> str:
@@ -251,9 +294,12 @@ def get_remote_file_hash(ssh: SSHClient, path: str) -> str:
             hash_output = stdout.read().decode().strip()
             if hash_output and len(hash_output) == 64:  # SHA256 is 64 hex chars
                 logger.debug(f"Remote file hash: {hash_output[:16]}...")
-                return hash_output
+                return str(hash_output)
         except Exception as e:
-            logger.debug(f"Hash command failed: {cmd}: {e}")
+            logger.debug(
+                f"Hash command failed: {cmd}",
+                extra={"error_type": type(e).__name__},
+            )
             continue
 
     raise RuntimeError(f"Could not calculate remote file hash for {path}")
@@ -281,7 +327,10 @@ def get_local_file_hash(file_path: Path) -> Optional[str]:
         logger.debug(f"Local file hash: {hash_str[:16]}...")
         return hash_str
     except Exception as e:
-        logger.warning(f"Failed to calculate local file hash: {e}")
+        logger.warning(
+            "Failed to calculate local file hash",
+            extra={"error_type": type(e).__name__},
+        )
         return None
 
 
@@ -314,7 +363,10 @@ def fetch_remote_file_cached(
     try:
         remote_hash = get_remote_file_hash(ssh, remote_path)
     except Exception as e:
-        logger.warning(f"Could not get remote hash, will download file: {e}")
+        logger.warning(
+            "Could not get remote hash, will download file",
+            extra={"error_type": type(e).__name__},
+        )
         # Fallback to direct fetch if hash fails
         content = fetch_remote_file(ssh, remote_path, max_retries)
         return content, False

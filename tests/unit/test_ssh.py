@@ -1,21 +1,22 @@
 """Unit tests for SSH module."""
 
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock
+
+import pytest
 from src.ssh import load_ssh_config, choose_first, get_internal_ip
 
 
 class TestLoadSshConfig:
     """Tests for load_ssh_config function."""
 
-    def test_returns_empty_dict_when_config_missing(self):
+    def test_returns_empty_dict_when_config_missing(self) -> None:
         """Returns empty dict when SSH config doesn't exist."""
         result = load_ssh_config("testhost", "/nonexistent/ssh/config")
         assert result == {}
 
-    def test_parses_ssh_config_file(self):
+    def test_parses_ssh_config_file(self) -> None:
         """Parses SSH config and returns host configuration."""
         with tempfile.NamedTemporaryFile(mode='w', suffix='_ssh_config', delete=False) as f:
             f.write("""
@@ -36,7 +37,7 @@ Host testhost
         finally:
             Path(config_path).unlink()
 
-    def test_returns_default_ssh_config_for_unknown_host(self):
+    def test_returns_default_ssh_config_for_unknown_host(self) -> None:
         """Returns default config for host not in SSH config."""
         with tempfile.NamedTemporaryFile(mode='w', suffix='_ssh_config', delete=False) as f:
             f.write("""
@@ -57,23 +58,23 @@ Host knownhost
 class TestChooseFirst:
     """Tests for choose_first helper function."""
 
-    def test_returns_first_element_of_list(self):
+    def test_returns_first_element_of_list(self) -> None:
         """Returns first element from list."""
         assert choose_first(["first", "second", "third"]) == "first"
 
-    def test_returns_first_element_of_tuple(self):
+    def test_returns_first_element_of_tuple(self) -> None:
         """Returns first element from tuple."""
         assert choose_first(("first", "second")) == "first"
 
-    def test_returns_value_if_not_list(self):
+    def test_returns_value_if_not_list(self) -> None:
         """Returns value itself if not a list or tuple."""
         assert choose_first("single_value") == "single_value"
 
-    def test_returns_default_for_empty_list(self):
+    def test_returns_default_for_empty_list(self) -> None:
         """Returns default value for empty list."""
         assert choose_first([], default="default") == "default"
 
-    def test_returns_default_for_none(self):
+    def test_returns_default_for_none(self) -> None:
         """Returns default value for None."""
         assert choose_first(None, default="default") == "default"
 
@@ -81,7 +82,7 @@ class TestChooseFirst:
 class TestGetInternalIp:
     """Tests for get_internal_ip function."""
 
-    def test_returns_first_valid_ipv4(self):
+    def test_returns_first_valid_ipv4(self) -> None:
         """Returns first non-loopback IPv4 address found."""
         mock_ssh = MagicMock()
 
@@ -95,7 +96,7 @@ class TestGetInternalIp:
 
         assert result == "10.0.0.100"
 
-    def test_tries_multiple_commands_until_success(self):
+    def test_tries_multiple_commands_until_success(self) -> None:
         """Tries multiple detection commands until one succeeds."""
         mock_ssh = MagicMock()
 
@@ -116,7 +117,7 @@ class TestGetInternalIp:
         assert result == "192.168.1.50"
         assert mock_ssh.exec_command.call_count == 2
 
-    def test_skips_loopback_addresses(self):
+    def test_skips_loopback_addresses(self) -> None:
         """Skips loopback addresses (127.x.x.x)."""
         mock_ssh = MagicMock()
 
@@ -135,7 +136,7 @@ class TestGetInternalIp:
 
         assert result == "10.0.0.1"
 
-    def test_handles_multiple_ips_from_command(self):
+    def test_handles_multiple_ips_from_command(self) -> None:
         """Handles command returning multiple IPs (takes first)."""
         mock_ssh = MagicMock()
 
@@ -148,7 +149,7 @@ class TestGetInternalIp:
 
         assert result == "10.0.0.1"
 
-    def test_raises_error_when_no_ip_found(self):
+    def test_raises_error_when_no_ip_found(self) -> None:
         """Raises RuntimeError when no valid IP is detected."""
         mock_ssh = MagicMock()
 

@@ -1,16 +1,19 @@
 """Unit tests for kubeconfig module."""
 
-import pytest
 import tempfile
-import yaml
 from pathlib import Path
+from typing import Any
 from src.kubeconfig import update_kubeconfig_server, merge_kubeconfig
+from unittest.mock import patch
+
+import pytest
+import yaml
 
 
 class TestUpdateKubeconfigServer:
     """Tests for update_kubeconfig_server function."""
 
-    def test_updates_server_with_direct_ip(self):
+    def test_updates_server_with_direct_ip(self) -> None:
         """Updates server URL with direct IP and port."""
         kubeconfig_yaml = """
 apiVersion: v1
@@ -24,7 +27,7 @@ clusters:
         data = yaml.safe_load(result)
         assert data["clusters"][0]["cluster"]["server"] == "https://10.0.0.1:6443"
 
-    def test_updates_server_with_localhost_tunnel(self):
+    def test_updates_server_with_localhost_tunnel(self) -> None:
         """Updates server URL to use localhost tunnel."""
         kubeconfig_yaml = """
 apiVersion: v1
@@ -44,7 +47,7 @@ clusters:
         data = yaml.safe_load(result)
         assert data["clusters"][0]["cluster"]["server"] == "https://127.0.0.1:16443"
 
-    def test_raises_error_for_invalid_kubeconfig(self):
+    def test_raises_error_for_invalid_kubeconfig(self) -> None:
         """Raises RuntimeError for YAML without clusters key."""
         invalid_yaml = """
 apiVersion: v1
@@ -53,7 +56,7 @@ kind: Config
         with pytest.raises(RuntimeError, match="no 'clusters' key"):
             update_kubeconfig_server(invalid_yaml, "10.0.0.1", 6443)
 
-    def test_preserves_other_kubeconfig_fields(self):
+    def test_preserves_other_kubeconfig_fields(self) -> None:
         """Preserves other fields in kubeconfig."""
         kubeconfig_yaml = """
 apiVersion: v1
@@ -78,7 +81,7 @@ contexts:
 class TestMergeKubeconfig:
     """Tests for merge_kubeconfig function."""
 
-    def test_creates_new_kubeconfig_when_missing(self):
+    def test_creates_new_kubeconfig_when_missing(self) -> None:
         """Creates new kubeconfig file when it doesn't exist."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Override HOME to use temp directory
@@ -112,7 +115,7 @@ users:
             assert data["current-context"] == "test-context"
             assert data["clusters"][0]["name"] == "test-context"
 
-    def test_merges_into_existing_kubeconfig(self):
+    def test_merges_into_existing_kubeconfig(self) -> None:
         """Merges new context into existing kubeconfig."""
         with tempfile.TemporaryDirectory() as tmpdir:
             kube_dir = Path(tmpdir) / ".kube"
@@ -160,7 +163,7 @@ users:
             assert len(merged["contexts"]) == 2
             assert merged["current-context"] == "new-context"
 
-    def test_replaces_existing_context_with_same_name(self):
+    def test_replaces_existing_context_with_same_name(self) -> None:
         """Replaces existing context if name matches."""
         with tempfile.TemporaryDirectory() as tmpdir:
             kube_dir = Path(tmpdir) / ".kube"
@@ -205,7 +208,7 @@ users:
             assert len(merged["clusters"]) == 1
             assert merged["clusters"][0]["cluster"]["server"] == "https://127.0.0.1:16443"
 
-    def test_creates_backup_of_existing_config(self):
+    def test_creates_backup_of_existing_config(self) -> None:
         """Creates backup file before overwriting kubeconfig."""
         with tempfile.TemporaryDirectory() as tmpdir:
             kube_dir = Path(tmpdir) / ".kube"
@@ -242,8 +245,6 @@ users:
 
 
 # Helper to patch HOME environment variable
-from unittest.mock import patch
-
-def patch_home(tmpdir):
+def patch_home(tmpdir: str) -> Any:
     """Context manager to temporarily override HOME directory."""
     return patch.dict('os.environ', {'HOME': str(tmpdir)})

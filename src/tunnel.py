@@ -20,6 +20,16 @@ logger = get_logger()
 TUNNEL_STATE_DIR = Path.home() / ".local" / "state" / "k9s-tunnels"
 
 
+def build_sshuttle_command(
+    network_type: Optional[str],
+    network_range: Optional[str],
+) -> Optional[str]:
+    """Build the suggested sshuttle command for private-network clusters."""
+    if network_type != "sshuttle" or not network_range:
+        return None
+    return f"sshuttle -v -r helio@100.64.5.10 {network_range}"
+
+
 def get_unique_port(
     context_name: str,
     port_range_start: int = 16443,
@@ -137,15 +147,29 @@ def kill_all_tunnels(state_dir: Optional[Path] = None) -> None:
         kill_tunnel(context_name, state_dir)
 
 
-def create_tunnel(ssh_host: str, internal_ip: str, local_port: int, remote_port: int = 6443) -> Optional[int]:
+def create_tunnel(
+    ssh_host: str,
+    internal_ip: str,
+    local_port: int,
+    remote_port: int = 6443,
+    *,
+    username: Optional[str] = None,
+    key_filename: Optional[str] = None,
+    port: int = 22,
+    proxycmd: Optional[str] = None,
+) -> Optional[int]:
     """
     Create SSH tunnel in background and return PID.
 
     Args:
-        ssh_host: SSH host alias (from ~/.ssh/config)
+        ssh_host: SSH host alias or resolved hostname
         internal_ip: Internal IP of the K3s server
         local_port: Local port to listen on
         remote_port: Remote K3s API port (default: 6443)
+        username: SSH username override
+        key_filename: SSH private key path
+        port: SSH port
+        proxycmd: SSH ProxyCommand string
 
     Returns:
         int|None: PID of tunnel process, or None if couldn't determine
@@ -157,9 +181,19 @@ def create_tunnel(ssh_host: str, internal_ip: str, local_port: int, remote_port:
         "ssh", "-f", "-N",
         "-o", "ExitOnForwardFailure=yes",
         "-o", "ServerAliveInterval=60",
-        "-L", f"{local_port}:{internal_ip}:{remote_port}",
-        ssh_host
     ]
+    if proxycmd:
+        cmd.extend(["-o", f"ProxyCommand={proxycmd}"])
+    if key_filename:
+        cmd.extend(["-i", key_filename])
+    if port != 22:
+        cmd.extend(["-p", str(port)])
+    if username:
+        cmd.extend(["-l", username])
+    cmd.extend([
+        "-L", f"{local_port}:{internal_ip}:{remote_port}",
+        ssh_host,
+    ])
 
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:

@@ -15,6 +15,11 @@ from .logging_config import get_logger
 logger = get_logger()
 
 
+def get_default_kubeconfig_path() -> Path:
+    """Return the canonical local kubeconfig path."""
+    return Path.home() / ".kube" / "config"
+
+
 def update_kubeconfig_server(
     yaml_text: str,
     ip: str,
@@ -76,7 +81,7 @@ def merge_kubeconfig(new_config_text: str, context_name: str) -> Path:
         - Creates ~/.kube directory if missing
         - Sets new context as current-context
     """
-    kubeconfig_path = Path.home() / ".kube" / "config"
+    kubeconfig_path = get_default_kubeconfig_path()
 
     # Ensure ~/.kube directory exists
     kubeconfig_path.parent.mkdir(parents=True, exist_ok=True)

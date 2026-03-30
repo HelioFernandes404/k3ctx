@@ -129,7 +129,7 @@ def extract_hosts_from_inventory(inv_data: Any) -> Dict[str, Dict[str, Any]]:
         inv_data: Parsed inventory YAML data
 
     Returns:
-        dict: {host_name: {"group": str, "config": dict}}
+        dict: {host_name: {"group": str, "config": dict, "group_vars": dict}}
     """
     hosts: Dict[str, Dict[str, Any]] = {}
     if not isinstance(inv_data, dict) or "all" not in inv_data:
@@ -139,15 +139,35 @@ def extract_hosts_from_inventory(inv_data: Any) -> Dict[str, Dict[str, Any]]:
     if "children" not in all_data:
         return hosts
 
+    def collect_group_hosts(
+        group_name: str,
+        group_data: Any,
+        inherited_vars: Dict[str, Any],
+    ) -> None:
+        if not isinstance(group_data, dict):
+            return
+
+        group_vars = dict(inherited_vars)
+        if isinstance(group_data.get("vars"), dict):
+            group_vars.update(group_data["vars"])
+
+        hosts_data = group_data.get("hosts")
+        if isinstance(hosts_data, dict):
+            for host_name, host_config in hosts_data.items():
+                hosts[host_name] = {
+                    "group": group_name,
+                    "config": host_config or {},
+                    "group_vars": dict(group_vars),
+                }
+
+        children = group_data.get("children")
+        if isinstance(children, dict):
+            for child_group_name, child_group_data in children.items():
+                collect_group_hosts(child_group_name, child_group_data, group_vars)
+
+    inherited_all_vars = all_data.get("vars")
+    root_vars = inherited_all_vars if isinstance(inherited_all_vars, dict) else {}
     for group_name, group_data in all_data["children"].items():
-        if isinstance(group_data, dict) and "hosts" in group_data:
-            # Check if hosts is not None and is a dict
-            hosts_data = group_data["hosts"]
-            if hosts_data and isinstance(hosts_data, dict):
-                for host_name, host_config in hosts_data.items():
-                    hosts[host_name] = {
-                        "group": group_name,
-                        "config": host_config or {}
-                    }
+        collect_group_hosts(group_name, group_data, root_vars)
 
     return hosts

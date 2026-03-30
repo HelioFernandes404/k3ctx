@@ -6,12 +6,51 @@ Numeric values (ports, ranges) are normalized to int type.
 """
 
 import os
-import yaml
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
+import yaml
+
 from .logging_config import get_logger
+from .models import EffectiveConfig
 
 logger = get_logger()
+
+DEFAULT_REMOTE_K3S_CONFIG_PATH = "/etc/rancher/k3s/k3s.yaml"
+DEFAULT_SSH_KEY_PATH = "~/.ssh/id_ed25519"
+DEFAULT_SSH_CONFIG_PATH = "~/.ssh/config"
+DEFAULT_K3S_API_PORT = 6443
+DEFAULT_PORT_RANGE_START = 16443
+DEFAULT_PORT_RANGE_SIZE = 10000
+NUMERIC_CONFIG_KEYS = ("k3s_api_port", "port_range_start", "port_range_size")
+ENV_VAR_MAPPING = {
+    "remote_k3s_config_path": "REMOTE_K3S_CONFIG_PATH",
+    "ssh_key_path": "SSH_KEY_PATH",
+    "k3s_api_port": "K3S_API_PORT",
+    "port_range_start": "PORT_RANGE_START",
+    "port_range_size": "PORT_RANGE_SIZE",
+    "inventory_path": "INVENTORY_PATH",
+}
+
+
+def _normalize_numeric_fields(config: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = dict(config)
+    for key in NUMERIC_CONFIG_KEYS:
+        if key not in normalized:
+            continue
+        try:
+            normalized[key] = int(normalized[key])
+        except (ValueError, TypeError):
+            continue
+    return normalized
+
+
+def _get_canonical_int(config: Dict[str, Any], key: str, default: int) -> int:
+    value = get_config_value(config, key, default)
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
 
 
 def load_config(config_path: str) -> Dict[str, Any]:
@@ -34,29 +73,13 @@ def load_config(config_path: str) -> Dict[str, Any]:
     if config_file.exists():
         try:
             with open(config_file) as f:
-                file_config = yaml.safe_load(f) or {}
-                # Normalize numeric fields from YAML to int type
-                for key in ['k3s_api_port', 'port_range_start', 'port_range_size']:
-                    if key in file_config:
-                        try:
-                            file_config[key] = int(file_config[key])
-                        except (ValueError, TypeError):
-                            pass  # Keep as-is if conversion fails
+                file_config = _normalize_numeric_fields(yaml.safe_load(f) or {})
                 config.update(file_config)
         except (yaml.YAMLError, OSError, IOError) as e:
             logger.warning(f"Failed to load config from {config_path}: {e}")
 
     # Override with environment variables
-    env_var_mapping = {
-        'remote_k3s_config_path': 'REMOTE_K3S_CONFIG_PATH',
-        'ssh_key_path': 'SSH_KEY_PATH',
-        'k3s_api_port': 'K3S_API_PORT',
-        'port_range_start': 'PORT_RANGE_START',
-        'port_range_size': 'PORT_RANGE_SIZE',
-        'inventory_path': 'INVENTORY_PATH',
-    }
-
-    for config_key, env_var in env_var_mapping.items():
+    for config_key, env_var in ENV_VAR_MAPPING.items():
         if env_var in os.environ:
             value = os.environ[env_var]
             # Safely convert to int with proper validation
@@ -122,3 +145,55 @@ def resolve_inventory_path(config: Dict[str, Any], project_dir: Path) -> Path:
         return configured_path
 
     return local_inventory
+
+
+def load_effective_config(
+    project_dir: Path,
+    config_path: str | Path | None = None,
+) -> EffectiveConfig:
+    """
+    Build the canonical typed configuration for the current project.
+
+    Args:
+        project_dir: Directory of the current tool/script
+        config_path: Optional config file path. Defaults to project_dir/config.yaml
+
+    Returns:
+        EffectiveConfig with env-over-file precedence preserved via load_config().
+    """
+    resolved_config_path = (
+        Path(config_path)
+        if config_path is not None
+        else project_dir / "config.yaml"
+    )
+    config = load_config(os.path.expanduser(str(resolved_config_path)))
+
+    return EffectiveConfig(
+        inventory_path=resolve_inventory_path(config, project_dir),
+        ssh_config_path=os.path.expanduser(DEFAULT_SSH_CONFIG_PATH),
+        ssh_key_path=os.path.expanduser(
+            str(get_config_value(config, "ssh_key_path", DEFAULT_SSH_KEY_PATH))
+        ),
+        remote_k3s_config_path=str(
+            get_config_value(
+                config,
+                "remote_k3s_config_path",
+                DEFAULT_REMOTE_K3S_CONFIG_PATH,
+            )
+        ),
+        k3s_api_port=_get_canonical_int(
+            config,
+            "k3s_api_port",
+            DEFAULT_K3S_API_PORT,
+        ),
+        port_range_start=_get_canonical_int(
+            config,
+            "port_range_start",
+            DEFAULT_PORT_RANGE_START,
+        ),
+        port_range_size=_get_canonical_int(
+            config,
+            "port_range_size",
+            DEFAULT_PORT_RANGE_SIZE,
+        ),
+    )

@@ -9,9 +9,58 @@ import subprocess
 import socket
 from typing import Optional, Dict, Any
 from pathlib import Path
+import yaml
 from .logging_config import get_logger
 
 logger = get_logger()
+
+CORRUPTED_METADATA_WARNING = (
+    "Network metadata file exists but could not be read safely"
+)
+
+
+def _resolve_state_dir(state_dir: Optional[Path]) -> Path:
+    if state_dir is None:
+        return Path.home() / ".local" / "state" / "k9s-tunnels"
+    return state_dir
+
+
+def _build_corrupted_metadata(error: str) -> Dict[str, Any]:
+    return {
+        "corrupted": True,
+        "warning": CORRUPTED_METADATA_WARNING,
+        "error": error,
+    }
+
+
+def _load_network_metadata(
+    context_name: str,
+    state_dir: Optional[Path] = None,
+) -> tuple[Optional[Dict[str, Any]], bool]:
+    resolved_state_dir = _resolve_state_dir(state_dir)
+    network_file = resolved_state_dir / f"{context_name}.network"
+    if not network_file.exists():
+        return None, False
+
+    try:
+        with open(network_file) as f:
+            metadata = yaml.safe_load(f)
+    except Exception as e:
+        logger.warning(f"Failed to load network metadata for {context_name}: {e}")
+        return _build_corrupted_metadata(str(e)), True
+
+    if metadata is None:
+        return {}, False
+
+    if not isinstance(metadata, dict):
+        logger.warning(
+            "Failed to load network metadata for %s: expected mapping, got %s",
+            context_name,
+            type(metadata).__name__,
+        )
+        return _build_corrupted_metadata("expected mapping metadata structure"), True
+
+    return metadata, False
 
 
 def check_sshuttle_active(network_range: str) -> bool:
@@ -95,20 +144,8 @@ def get_network_metadata(context_name: str, state_dir: Optional[Path] = None) ->
             'internal_ip': '192.168.90.10'
         }
     """
-    if state_dir is None:
-        state_dir = Path.home() / ".local" / "state" / "k9s-tunnels"
-
-    network_file = state_dir / f"{context_name}.network"
-    if not network_file.exists():
-        return None
-
-    try:
-        import yaml
-        with open(network_file) as f:
-            return yaml.safe_load(f)
-    except Exception as e:
-        logger.warning(f"Failed to load network metadata for {context_name}: {e}")
-        return None
+    metadata, _ = _load_network_metadata(context_name, state_dir)
+    return metadata
 
 
 def validate_context_network(context_name: str, state_dir: Optional[Path] = None) -> tuple[bool, Optional[str]]:
@@ -124,9 +161,15 @@ def validate_context_network(context_name: str, state_dir: Optional[Path] = None
             - (True, None) if network is properly configured
             - (False, "warning message") if network setup is missing
     """
-    metadata = get_network_metadata(context_name, state_dir)
+    metadata, corrupted = _load_network_metadata(context_name, state_dir)
 
     # No network requirements
+    if metadata is None:
+        return True, None
+
+    if corrupted:
+        return False, CORRUPTED_METADATA_WARNING
+
     if not metadata:
         return True, None
 
@@ -141,6 +184,9 @@ def validate_context_network(context_name: str, state_dir: Optional[Path] = None
         network_range = metadata.get('network_range')
         sshuttle_cmd = metadata.get('sshuttle_command', f'sshuttle -v -r <gateway> {network_range}')
 
+        if not isinstance(network_range, str) or not network_range:
+            return False, CORRUPTED_METADATA_WARNING
+
         if not check_sshuttle_active(network_range):
             warning = (
                 f"This cluster requires sshuttle for {network_range}\n"
@@ -149,3 +195,28 @@ def validate_context_network(context_name: str, state_dir: Optional[Path] = None
             return False, warning
 
     return True, None
+
+
+def validate_context_network_details(
+    context_name: str,
+    state_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """
+    Validate network requirements with structured read-only output.
+    """
+    metadata, corrupted = _load_network_metadata(context_name, state_dir)
+    if metadata is None:
+        ok = True
+        warning = None
+    elif corrupted:
+        ok = False
+        warning = CORRUPTED_METADATA_WARNING
+    else:
+        ok, warning = validate_context_network(context_name, state_dir)
+
+    return {
+        "context_name": context_name,
+        "ok": ok,
+        "warning": warning,
+        "network_metadata": metadata,
+    }

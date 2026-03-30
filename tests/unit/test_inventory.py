@@ -1,22 +1,25 @@
 """Unit tests for inventory module."""
 
-import pytest
 import tempfile
-import yaml
 from pathlib import Path
+from typing import Any
+
+import pytest
+import yaml
+from _pytest.capture import CaptureFixture
 from src.inventory import load_inventories, extract_hosts_from_inventory
 
 
 class TestLoadInventories:
     """Tests for load_inventories function."""
 
-    def test_loads_valid_inventory_file(self):
+    def test_loads_valid_inventory_file(self) -> None:
         """Loads a valid inventory YAML file."""
         with tempfile.TemporaryDirectory() as tmpdir:
             inv_dir = Path(tmpdir)
             inv_file = inv_dir / "test_hosts.yml"
 
-            inv_data = {
+            inv_data: dict[str, Any] = {
                 "all": {
                     "children": {
                         "k3s_cluster": {
@@ -36,7 +39,7 @@ class TestLoadInventories:
             assert "test" in result
             assert result["test"]["all"]["children"]["k3s_cluster"]["hosts"]["testhost"]["ansible_host"] == "1.2.3.4"
 
-    def test_ignores_vault_tags_in_yaml(self):
+    def test_ignores_vault_tags_in_yaml(self) -> None:
         """Loads YAML with !vault tags without crashing."""
         with tempfile.TemporaryDirectory() as tmpdir:
             inv_dir = Path(tmpdir)
@@ -62,12 +65,12 @@ all:
             assert "company" in result
             assert "k3s_cluster" in result["company"]["all"]["children"]
 
-    def test_returns_empty_dict_for_nonexistent_directory(self):
+    def test_returns_empty_dict_for_nonexistent_directory(self) -> None:
         """Returns empty dict when inventory directory doesn't exist."""
         result = load_inventories(Path("/nonexistent/path"))
         assert result == {}
 
-    def test_loads_multiple_inventory_files(self):
+    def test_loads_multiple_inventory_files(self) -> None:
         """Loads multiple *_hosts.yml files."""
         with tempfile.TemporaryDirectory() as tmpdir:
             inv_dir = Path(tmpdir)
@@ -75,7 +78,7 @@ all:
             # Create two inventory files
             for company in ["company1", "company2"]:
                 inv_file = inv_dir / f"{company}_hosts.yml"
-                inv_data = {"all": {"children": {"k3s_cluster": {"hosts": {}}}}}
+                inv_data: dict[str, Any] = {"all": {"children": {"k3s_cluster": {"hosts": {}}}}}
                 with open(inv_file, 'w') as f:
                     yaml.dump(inv_data, f)
 
@@ -84,7 +87,7 @@ all:
             assert "company1" in result
             assert "company2" in result
 
-    def test_skips_malformed_yaml_files(self, capsys):
+    def test_skips_malformed_yaml_files(self, capsys: CaptureFixture[str]) -> None:
         """Skips files with invalid YAML syntax."""
         with tempfile.TemporaryDirectory() as tmpdir:
             inv_dir = Path(tmpdir)
@@ -109,12 +112,18 @@ all:
 class TestExtractHostsFromInventory:
     """Tests for extract_hosts_from_inventory function."""
 
-    def test_extracts_hosts_from_valid_inventory(self):
-        """Extracts hosts with group and config."""
-        inv_data = {
+    def test_extracts_hosts_from_valid_inventory(self) -> None:
+        """Extracts hosts with group, config, and group vars."""
+        inv_data: dict[str, Any] = {
             "all": {
+                "vars": {
+                    "company": "acme"
+                },
                 "children": {
                     "k3s_cluster": {
+                        "vars": {
+                            "gateway": "bastion.example"
+                        },
                         "hosts": {
                             "host1": {"ansible_host": "1.2.3.4"},
                             "host2": {"ansible_host": "5.6.7.8"}
@@ -130,10 +139,12 @@ class TestExtractHostsFromInventory:
         assert "host1" in hosts
         assert hosts["host1"]["group"] == "k3s_cluster"
         assert hosts["host1"]["config"]["ansible_host"] == "1.2.3.4"
+        assert hosts["host1"]["group_vars"]["company"] == "acme"
+        assert hosts["host1"]["group_vars"]["gateway"] == "bastion.example"
 
-    def test_extracts_hosts_from_multiple_groups(self):
+    def test_extracts_hosts_from_multiple_groups(self) -> None:
         """Extracts hosts from multiple groups."""
-        inv_data = {
+        inv_data: dict[str, Any] = {
             "all": {
                 "children": {
                     "k3s_cluster": {
@@ -152,9 +163,9 @@ class TestExtractHostsFromInventory:
         assert hosts["host1"]["group"] == "k3s_cluster"
         assert hosts["host2"]["group"] == "monitoring"
 
-    def test_handles_none_host_config(self):
+    def test_handles_none_host_config(self) -> None:
         """Handles None host config as empty dict."""
-        inv_data = {
+        inv_data: dict[str, Any] = {
             "all": {
                 "children": {
                     "k3s_cluster": {
@@ -167,16 +178,53 @@ class TestExtractHostsFromInventory:
         hosts = extract_hosts_from_inventory(inv_data)
 
         assert hosts["host1"]["config"] == {}
+        assert hosts["host1"]["group_vars"] == {}
 
-    def test_returns_empty_for_invalid_inventory(self):
+    def test_extracts_group_vars_from_nested_group(self) -> None:
+        """Merges inherited vars for nested groups without breaking host config."""
+        inv_data: dict[str, Any] = {
+            "all": {
+                "vars": {
+                    "company": "acme"
+                },
+                "children": {
+                    "platform": {
+                        "vars": {
+                            "region": "us-east-1"
+                        },
+                        "children": {
+                            "k3s_cluster": {
+                                "vars": {
+                                    "gateway": "bastion.example"
+                                },
+                                "hosts": {
+                                    "host1": {"ansible_host": "1.2.3.4"}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        hosts = extract_hosts_from_inventory(inv_data)
+
+        assert hosts["host1"]["group"] == "k3s_cluster"
+        assert hosts["host1"]["group_vars"] == {
+            "company": "acme",
+            "region": "us-east-1",
+            "gateway": "bastion.example",
+        }
+
+    def test_returns_empty_for_invalid_inventory(self) -> None:
         """Returns empty dict for malformed inventory."""
         assert extract_hosts_from_inventory({}) == {}
         assert extract_hosts_from_inventory({"all": {}}) == {}
         assert extract_hosts_from_inventory(None) == {}
 
-    def test_returns_empty_when_no_hosts_section(self):
+    def test_returns_empty_when_no_hosts_section(self) -> None:
         """Returns empty dict when group has no hosts."""
-        inv_data = {
+        inv_data: dict[str, Any] = {
             "all": {
                 "children": {
                     "k3s_cluster": {}
