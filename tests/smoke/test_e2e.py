@@ -420,6 +420,7 @@ def test_makefile_exposes_mcp_targets() -> None:
 
     assert "mcp-stdio:" in makefile
     assert "mcp-http:" in makefile
+    assert "run_mcp_stdio.py" in makefile
     assert "src/mcp_server.py" in makefile or "src.mcp_server" in makefile
 
 

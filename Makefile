@@ -112,7 +112,7 @@ test:
 
 ## mcp-stdio: Start the MCP server over stdio
 mcp-stdio:
-	@uv run python -c "from src.mcp_server import build_mcp_server; build_mcp_server().run(transport='stdio', show_banner=False)"
+	@uv run python run_mcp_stdio.py
 
 ## mcp-http: Start the MCP server over HTTP
 mcp-http:

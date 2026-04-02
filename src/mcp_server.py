@@ -273,4 +273,11 @@ def build_mcp_server(
     return server
 
 
-__all__ = ["build_mcp_server"]
+mcp = build_mcp_server()
+
+
+if __name__ == "__main__":
+    mcp.run(show_banner=False)
+
+
+__all__ = ["build_mcp_server", "mcp"]

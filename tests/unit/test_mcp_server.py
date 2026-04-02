@@ -10,7 +10,7 @@ from typing import Any, cast
 from pytest_mock import MockerFixture
 
 from src.models import ClusterTarget, ConnectResult, EffectiveConfig, NetworkRequirement
-from src.mcp_server import build_mcp_server
+from src.mcp_server import build_mcp_server, mcp
 
 
 def build_config(tmp_path: Path) -> EffectiveConfig:
@@ -58,6 +58,10 @@ def test_build_mcp_server_registers_expected_tools_and_read_only_resources(
         and cast(Any, resource.annotations).readOnlyHint is True
         for resource in resources
     )
+
+
+def test_module_exports_default_mcp_server_instance() -> None:
+    assert mcp is not None
 
 
 def test_connect_cluster_tool_delegates_to_core(
