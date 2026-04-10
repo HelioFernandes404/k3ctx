@@ -1,4 +1,4 @@
-"""FastMCP server layer for the k9s setup core services."""
+"""FastMCP server layer for the k3s-context-tunnel-manager core services."""
 
 from __future__ import annotations
 
@@ -32,6 +32,9 @@ from src.tunnel import kill_tunnel as kill_tunnel_service
 
 def _default_project_dir() -> Path:
     return Path(__file__).resolve().parent.parent
+
+
+PROJECT_NAME = "k3s-context-tunnel-manager"
 
 
 def _to_jsonable(value: Any) -> Any:
@@ -117,7 +120,7 @@ def build_mcp_server(
     config_path: str | Path | None = None,
 ) -> FastMCP:
     resolved_project_dir = project_dir or _default_project_dir()
-    server = FastMCP("k9s-setup")
+    server = FastMCP(PROJECT_NAME)
 
     def current_config() -> EffectiveConfig:
         return load_effective_config(resolved_project_dir, config_path)

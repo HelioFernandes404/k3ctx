@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-The codebase is organized in layers. Core typed models live in `src/models.py`. Shared business logic lives in `src/services/` and handles inventory discovery, cluster connection, context switching, status inspection, and network validation. Infrastructure helpers in `src/` support config loading, SSH, tunnel lifecycle, kubeconfig merging, and logging. Manual entrypoints remain at the repository root in `fetch_k3s_config.py`, `multi_connect.py`, and shell helpers such as `k9s-with-tunnel.sh`. The MCP interface is isolated in [`src/mcp_server.py`](/home/helio/Obsidian/main/02-trabalho/systemframe/custom-tools/k9s_setup/src/mcp_server.py). Tests stay split between `tests/unit/` and `tests/smoke/`. Local defaults live in `config.yaml`.
+The codebase is organized in layers. Core typed models live in `src/models.py`. Shared business logic lives in `src/services/` and handles inventory discovery, cluster connection, context switching, status inspection, and network validation. Infrastructure helpers in `src/` support config loading, SSH, tunnel lifecycle, kubeconfig merging, and logging. Manual entrypoints remain at the repository root in `fetch_k3s_config.py`, `multi_connect.py`, and shell helpers such as `k9s-with-tunnel.sh`. The MCP interface is isolated in [`src/mcp_server.py`](/home/helio/Obsidian/work/02-trabalho/systemframe/custom-tools/k3s-context-tunnel-manager/src/mcp_server.py). Tests stay split between `tests/unit/` and `tests/smoke/`. Local defaults live in `config.yaml`.
 
 ## Build, Test, and Development Commands
 

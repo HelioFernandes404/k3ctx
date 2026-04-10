@@ -1,7 +1,7 @@
 [project]
-name = "k9s-setup"
+name = "k3s-context-tunnel-manager"
 version = "0.2.0"
-description = "K9s Multi-Context Manager - Gerenciador de múltiplos clusters Kubernetes com túneis SSH seguros"
+description = "Gerencia túneis SSH e contextos kubeconfig para acesso a clusters K3s"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

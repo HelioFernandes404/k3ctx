@@ -1,4 +1,4 @@
-"""Configuration management for k9s-config.
+"""Configuration management for k3s-context-tunnel-manager.
 
 Supports loading config from YAML files and merging with environment variables.
 Environment variables take precedence over file values.

@@ -643,7 +643,7 @@ wheels = [
 ]
 
 [[package]]
-name = "k9s-setup"
+name = "k3s-context-tunnel-manager"
 version = "0.2.0"
 source = { editable = "." }
 dependencies = [

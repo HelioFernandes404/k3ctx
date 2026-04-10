@@ -1,4 +1,4 @@
-# K9s Setup
+# K3s Context Tunnel Manager
 
 ## O que e
 
@@ -40,7 +40,7 @@ tests/               # testes unitarios e smoke
 ## Fluxo recomendado
 
 ```bash
-cd /home/helio/Work/systemframe/.custom-tools/k9s_setup
+cd /home/helio/Obsidian/work/02-trabalho/systemframe/custom-tools/k3s-context-tunnel-manager
 make help
 make run
 make multi-connect

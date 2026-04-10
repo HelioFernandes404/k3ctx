@@ -64,6 +64,22 @@ def test_module_exports_default_mcp_server_instance() -> None:
     assert mcp is not None
 
 
+def test_build_mcp_server_uses_public_project_name(
+    mocker: MockerFixture,
+    tmp_path: Path,
+) -> None:
+    mocker.patch(
+        "src.mcp_server.load_effective_config",
+        return_value=build_config(tmp_path),
+    )
+    mocker.patch("src.mcp_server.list_cluster_targets", return_value=[])
+    mocker.patch("src.mcp_server.list_context_status", return_value=[])
+
+    server = build_mcp_server(project_dir=tmp_path)
+
+    assert getattr(server, "name", None) == "k3s-context-tunnel-manager"
+
+
 def test_connect_cluster_tool_delegates_to_core(
     mocker: MockerFixture,
     tmp_path: Path,

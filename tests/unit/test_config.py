@@ -126,7 +126,7 @@ class TestResolveInventoryPath:
         """Finds ansible/inventory in an ancestor when configured path is stale."""
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
-            project_dir = root / ".custom-tools" / "k9s_setup"
+            project_dir = root / ".custom-tools" / "k3s-context-tunnel-manager"
             project_dir.mkdir(parents=True)
             ancestor_inventory = root / "ansible" / "inventory"
             ancestor_inventory.mkdir(parents=True)

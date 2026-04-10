@@ -1,11 +1,11 @@
-# K9s Setup
+# K3s Context Tunnel Manager
 
-Tool local do workspace `systemframe` para conectar clusters K3s por SSH, mesclar kubeconfig e expor o mesmo core via modo manual ou MCP.
+Tool local do workspace `systemframe` para gerenciar túneis SSH e contextos kubeconfig para acesso a clusters K3s, em modo manual ou MCP.
 
 ## Local certo
 
 ```bash
-cd /home/helio/Obsidian/main/02-trabalho/systemframe/custom-tools/k9s_setup
+cd /home/helio/Obsidian/work/02-trabalho/systemframe/custom-tools/k3s-context-tunnel-manager
 ```
 
 ## Modos de uso
@@ -26,7 +26,7 @@ Requer TTY para `make run` e `make multi-connect`.
 
 ### Modo MCP
 
-Servidor FastMCP sobre o core em [`src/mcp_server.py`](/home/helio/Obsidian/main/02-trabalho/systemframe/custom-tools/k9s_setup/src/mcp_server.py).
+Servidor FastMCP sobre o core em [`src/mcp_server.py`](/home/helio/Obsidian/work/02-trabalho/systemframe/custom-tools/k3s-context-tunnel-manager/src/mcp_server.py).
 
 ```bash
 make mcp-stdio
