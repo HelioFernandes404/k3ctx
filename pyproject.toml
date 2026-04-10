@@ -15,6 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
+context-tunnel-manager = "src.interfaces.cli.app:main"
 k3s-context-tunnel-manager = "src.interfaces.cli.app:main"
 k3s-context-tunnel-manager-http = "src.interfaces.http.app:main"
 

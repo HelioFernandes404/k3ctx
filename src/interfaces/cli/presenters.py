@@ -6,6 +6,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from src.domain.discovery import ClientPage, HostPage, HostResolutionResult
 from src.domain.models import ClusterTarget, ConnectResult
 from src.domain.network import detect_network_requirement
 from src.interfaces.cli.prompts import confirm_action, format_multi_target_label
@@ -210,6 +211,70 @@ def print_multi_usage() -> None:
     print("  make tunnel-list                   # List active tunnels")
 
 
+def print_client_page(page: ClientPage) -> None:
+    if not page.items:
+        print("No clients found.")
+        return
+
+    print("CLIENT".ljust(28) + "HOSTS")
+    for item in page.items:
+        print(f"{item.client:<28}{item.host_count}")
+
+    print(f"\nShowing {page.page.returned} of {page.page.total}")
+    if page.page.has_more and page.page.next_cursor is not None:
+        print(f"Next page: --cursor {page.page.next_cursor}")
+
+
+def print_host_page(page: HostPage) -> None:
+    if not page.items:
+        print("No hosts found.")
+        return
+
+    print("HOST NAME".ljust(24) + "SYSTEMFRAME ID".ljust(20) + "IP".ljust(18) + "GROUP")
+    for item in page.items:
+        print(
+            f"{item.host_name:<24}"
+            f"{(item.systemframe_id or '-'): <20}"
+            f"{(item.addr_ip or '-'): <18}"
+            f"{item.group}"
+        )
+
+    print(f"\nShowing {page.page.returned} of {page.page.total}")
+    if page.page.has_more and page.page.next_cursor is not None:
+        print(f"Next page: --cursor {page.page.next_cursor}")
+
+
+def print_host_resolution_failure(
+    result: HostResolutionResult,
+    *,
+    cli_name: str,
+) -> None:
+    print(result.hint or "Host resolution failed.")
+
+    if not result.matches:
+        return
+
+    print()
+    print("HOST NAME".ljust(24) + "SYSTEMFRAME ID".ljust(20) + "IP".ljust(18) + "CONTEXT")
+    for item in result.matches:
+        print(
+            f"{item.host_name:<24}"
+            f"{(item.systemframe_id or '-'): <20}"
+            f"{(item.addr_ip or '-'): <18}"
+            f"{item.context_name}"
+        )
+
+    if (
+        result.page.has_more
+        and result.page.next_cursor is not None
+        and result.query.client is not None
+    ):
+        print(
+            f"\nNext page: {cli_name} hosts "
+            f"{result.query.client} --cursor {result.page.next_cursor}"
+        )
+
+
 def _format_network_warning(
     network_meta: Mapping[str, Any],
     network_validation: Mapping[str, Any],
@@ -286,6 +351,9 @@ def print_status(
 
 
 __all__ = [
+    "print_client_page",
+    "print_host_page",
+    "print_host_resolution_failure",
     "format_multi_target_label",
     "print_multi_summary",
     "print_multi_usage",

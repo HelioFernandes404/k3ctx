@@ -2,10 +2,20 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
+from pytest import CaptureFixture
 from pytest_mock import MockerFixture
 
+from src.domain.discovery import (
+    ClientPage,
+    ClientSummary,
+    HostQuery,
+    HostRecord,
+    HostResolutionResult,
+    PageInfo,
+)
 from src.domain.models import ClusterTarget, ConnectResult, EffectiveConfig, NetworkRequirement
 from src.interfaces.cli.app import main
 
@@ -44,7 +54,203 @@ def build_success_result(context_name: str = "acme-prod") -> ConnectResult:
     )
 
 
-def test_single_command_uses_application_services(
+def test_clients_command_returns_json_payload(
+    mocker: MockerFixture,
+    tmp_path: Path,
+    capsys: CaptureFixture[str],
+) -> None:
+    config = build_config(tmp_path)
+    mocker.patch("src.interfaces.cli.app.load_effective_config", return_value=config)
+    mocker.patch("src.interfaces.cli.app.setup_logging")
+    mocker.patch("src.interfaces.cli.app.refresh_inventory_if_possible")
+    mocker.patch(
+        "src.interfaces.cli.app.list_client_summaries",
+        return_value=ClientPage(
+            items=(ClientSummary(client="acme", host_count=2),),
+            page=PageInfo(limit=20, returned=1, total=1, has_more=False, next_cursor=None),
+        ),
+    )
+
+    exit_code = main(["clients", "--json"])
+
+    assert exit_code == 0
+    assert json.loads(capsys.readouterr().out) == {
+        "ok": True,
+        "items": [{"client": "acme", "host_count": 2}],
+        "pagination": {
+            "limit": 20,
+            "returned": 1,
+            "total": 1,
+            "has_more": False,
+            "next_cursor": None,
+        },
+    }
+
+
+def test_hosts_command_uses_client_scope_and_search_filters(
+    mocker: MockerFixture,
+    tmp_path: Path,
+) -> None:
+    config = build_config(tmp_path)
+    mocker.patch("src.interfaces.cli.app.load_effective_config", return_value=config)
+    mocker.patch("src.interfaces.cli.app.setup_logging")
+    mocker.patch("src.interfaces.cli.app.refresh_inventory_if_possible")
+    search_hosts = mocker.patch("src.interfaces.cli.app.search_hosts")
+    mocker.patch("src.interfaces.cli.app.print_host_page")
+
+    exit_code = main(["hosts", "acme", "--host", "api"])
+
+    assert exit_code == 0
+    search_hosts.assert_called_once_with(
+        config.inventory_path,
+        mocker.ANY,
+        query=HostQuery(client="acme", host_name="api"),
+        limit=20,
+        cursor=None,
+    )
+
+
+def test_connect_command_resolves_before_connecting(
+    mocker: MockerFixture,
+    tmp_path: Path,
+) -> None:
+    config = build_config(tmp_path)
+    target = build_target()
+    resolution = HostResolutionResult(
+        status="unique",
+        query=HostQuery(client="acme", host_name="prod"),
+        matches=(
+            HostRecord(
+                client="acme",
+                host_name="prod",
+                systemframe_id=None,
+                addr_ip="203.0.113.10",
+                context_name="acme-prod",
+                group="k3s_cluster",
+            ),
+        ),
+        page=PageInfo(limit=10, returned=1, total=1, has_more=False, next_cursor=None),
+        context_name="acme-prod",
+        hint=None,
+    )
+
+    mocker.patch("src.interfaces.cli.app.load_effective_config", return_value=config)
+    mocker.patch("src.interfaces.cli.app.setup_logging")
+    mocker.patch("src.interfaces.cli.app.refresh_inventory_if_possible")
+    mocker.patch("src.interfaces.cli.app.load_host_records", return_value=list(resolution.matches))
+    mocker.patch("src.interfaces.cli.app.resolve_host", return_value=resolution)
+    mocker.patch("src.interfaces.cli.app.find_target_by_context_name", return_value=target)
+    mocker.patch("src.interfaces.cli.app.show_manual_network_warnings", return_value=True)
+    connect_cluster = mocker.patch(
+        "src.interfaces.cli.app.connect_cluster",
+        return_value=build_success_result(),
+    )
+
+    exit_code = main(["connect", "acme", "prod"])
+
+    assert exit_code == 0
+    connect_cluster.assert_called_once()
+
+
+def test_connect_command_rejects_empty_non_interactive_invocation(
+    mocker: MockerFixture,
+    capsys: CaptureFixture[str],
+) -> None:
+    mocker.patch("src.interfaces.cli.app.setup_logging")
+    mocker.patch("src.interfaces.cli.app._has_tty", return_value=False)
+
+    exit_code = main(["connect"])
+
+    assert exit_code == 4
+    assert "at least one identifier" in capsys.readouterr().err
+
+
+def test_connect_json_disables_manual_network_prompts(
+    mocker: MockerFixture,
+    tmp_path: Path,
+) -> None:
+    config = build_config(tmp_path)
+    target = build_target()
+    resolution = HostResolutionResult(
+        status="unique",
+        query=HostQuery(client="acme", host_name="prod"),
+        matches=(
+            HostRecord(
+                client="acme",
+                host_name="prod",
+                systemframe_id=None,
+                addr_ip="203.0.113.10",
+                context_name="acme-prod",
+                group="k3s_cluster",
+            ),
+        ),
+        page=PageInfo(limit=10, returned=1, total=1, has_more=False, next_cursor=None),
+        context_name="acme-prod",
+        hint=None,
+    )
+
+    mocker.patch("src.interfaces.cli.app.load_effective_config", return_value=config)
+    mocker.patch("src.interfaces.cli.app.setup_logging")
+    mocker.patch("src.interfaces.cli.app.refresh_inventory_if_possible")
+    mocker.patch("src.interfaces.cli.app.load_host_records", return_value=list(resolution.matches))
+    mocker.patch("src.interfaces.cli.app.resolve_host", return_value=resolution)
+    mocker.patch("src.interfaces.cli.app.find_target_by_context_name", return_value=target)
+    mocker.patch("src.interfaces.cli.app._has_tty", return_value=False)
+    prompt_warning = mocker.patch("src.interfaces.cli.app.show_manual_network_warnings")
+    connect_cluster = mocker.patch(
+        "src.interfaces.cli.app.connect_cluster",
+        return_value=build_success_result(),
+    )
+
+    exit_code = main(["connect", "--json", "acme", "prod"])
+
+    assert exit_code == 0
+    prompt_warning.assert_not_called()
+    connect_cluster.assert_called_once_with(
+        target=target,
+        config=config,
+        connector=mocker.ANY,
+        allow_manual_network=False,
+    )
+
+
+def test_connect_command_returns_ambiguous_exit_code_without_prompt(
+    mocker: MockerFixture,
+    tmp_path: Path,
+) -> None:
+    config = build_config(tmp_path)
+    resolution = HostResolutionResult(
+        status="ambiguous",
+        query=HostQuery(client="acme", host_name="api"),
+        matches=(
+            HostRecord(
+                client="acme",
+                host_name="api-01",
+                systemframe_id="sf-1",
+                addr_ip="10.0.0.10",
+                context_name="acme-api-01",
+                group="k3s_cluster",
+            ),
+        ),
+        page=PageInfo(limit=10, returned=1, total=2, has_more=True, next_cursor="acme-api-01"),
+        context_name=None,
+        hint="Multiple hosts matched. Refine with --ip, --id, or a more specific host name.",
+    )
+
+    mocker.patch("src.interfaces.cli.app.load_effective_config", return_value=config)
+    mocker.patch("src.interfaces.cli.app.setup_logging")
+    mocker.patch("src.interfaces.cli.app.refresh_inventory_if_possible")
+    mocker.patch("src.interfaces.cli.app.load_host_records", return_value=list(resolution.matches))
+    mocker.patch("src.interfaces.cli.app.resolve_host", return_value=resolution)
+    print_failure = mocker.patch("src.interfaces.cli.app.print_host_resolution_failure")
+
+    exit_code = main(["connect", "acme", "api"])
+
+    assert exit_code == 3
+    print_failure.assert_called_once()
+
+
+def test_single_command_keeps_guided_flow_compatibility(
     mocker: MockerFixture,
     tmp_path: Path,
 ) -> None:
@@ -66,42 +272,3 @@ def test_single_command_uses_application_services(
 
     assert exit_code == 0
     connect_cluster.assert_called_once()
-
-
-def test_multi_command_sets_first_successful_context(
-    mocker: MockerFixture,
-    tmp_path: Path,
-) -> None:
-    config = build_config(tmp_path)
-    first = build_target()
-    second = ClusterTarget(
-        company="beta",
-        host_alias="staging",
-        group="k3s_cluster",
-        host_config={"ansible_host": "203.0.113.11"},
-        group_vars={},
-    )
-    mocker.patch("src.interfaces.cli.app.load_effective_config", return_value=config)
-    mocker.patch("src.interfaces.cli.app.setup_logging")
-    mocker.patch("src.interfaces.cli.app.refresh_inventory_if_possible")
-    mocker.patch("src.interfaces.cli.app.list_cluster_targets", return_value=[first, second])
-    mocker.patch("src.interfaces.cli.app.select_multiple_targets", return_value=[first, second])
-    mocker.patch("src.interfaces.cli.app.show_network_warnings", return_value=True)
-    mocker.patch(
-        "src.interfaces.cli.app.connect_multiple",
-        return_value=[build_success_result("acme-prod"), build_success_result("beta-staging")],
-    )
-    set_current_context = mocker.patch(
-        "src.interfaces.cli.app.set_current_context",
-        return_value=None,
-    )
-
-    exit_code = main(["multi"])
-
-    assert exit_code == 0
-    set_current_context.assert_called_once_with(
-        "acme-prod",
-        switcher=mocker.ANY,
-        require_confirmation=False,
-        confirmed=True,
-    )
