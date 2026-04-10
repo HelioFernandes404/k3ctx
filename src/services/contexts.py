@@ -2,19 +2,14 @@
 
 from __future__ import annotations
 
-import subprocess
-
+from src.application.use_cases.contexts import (
+    set_current_context as set_current_context_use_case,
+)
+from src.bootstrap import build_service_container
 from src.logging_config import get_logger
 from src.models import OperationError
 
 logger = get_logger()
-
-
-def _build_public_context_error() -> OperationError:
-    return OperationError(
-        code="kubectl_context_failed",
-        message="Failed to switch kubectl context",
-    )
 
 
 def set_current_context(
@@ -32,7 +27,23 @@ def set_current_context(
             "confirmed": confirmed,
         },
     )
-    if require_confirmation and not confirmed:
+    services = build_service_container()
+    error = set_current_context_use_case(
+        context_name,
+        switcher=services.switcher,
+        require_confirmation=require_confirmation,
+        confirmed=confirmed,
+    )
+
+    if error is None:
+        logger.info(
+            "Kubectl context switched",
+            extra={
+                "event": "contexts.switch.finished",
+                "context_name": context_name,
+            },
+        )
+    elif error.code == "confirmation_required":
         logger.warning(
             "Context switch requires confirmation",
             extra={
@@ -40,47 +51,14 @@ def set_current_context(
                 "context_name": context_name,
             },
         )
-        return OperationError(
-            code="confirmation_required",
-            message="Context switch requires explicit confirmation",
-        )
-
-    try:
-        result = subprocess.run(
-            ["kubectl", "config", "use-context", context_name],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+    else:
         logger.error(
             "Kubectl context switch failed",
             extra={
                 "event": "contexts.switch.failed",
                 "context_name": context_name,
-                "error_type": type(exc).__name__,
+                "error_code": error.code,
             },
         )
-        return _build_public_context_error()
 
-    if result.returncode != 0:
-        logger.error(
-            "Kubectl returned non-zero exit code during context switch",
-            extra={
-                "event": "contexts.switch.failed",
-                "context_name": context_name,
-                "return_code": result.returncode,
-                "stderr_present": bool(result.stderr.strip()),
-                "stdout_present": bool(result.stdout.strip()),
-            },
-        )
-        return _build_public_context_error()
-
-    logger.info(
-        "Kubectl context switched",
-        extra={
-            "event": "contexts.switch.finished",
-            "context_name": context_name,
-        },
-    )
-    return None
+    return error

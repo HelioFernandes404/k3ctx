@@ -10,7 +10,13 @@ dependencies = [
     "pyyaml>=6.0",
     "python-dotenv>=1.0.0",
     "questionary>=2.0.0",
+    "starlette>=1.0.0",
+    "uvicorn>=0.42.0",
 ]
+
+[project.scripts]
+k3s-context-tunnel-manager = "src.interfaces.cli.app:main"
+k3s-context-tunnel-manager-http = "src.interfaces.http.app:main"
 
 [project.optional-dependencies]
 dev = [

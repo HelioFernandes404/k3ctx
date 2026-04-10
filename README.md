@@ -1,6 +1,6 @@
 # K3s Context Tunnel Manager
 
-Tool local do workspace `systemframe` para gerenciar túneis SSH e contextos kubeconfig para acesso a clusters K3s, em modo manual ou MCP.
+Tool local do workspace `systemframe` para gerenciar túneis SSH e contextos kubeconfig para acesso a clusters K3s, com CLI oficial, interface HTTP e interface MCP reaproveitando o mesmo dominio/aplicacao.
 
 ## Local certo
 
@@ -10,23 +10,55 @@ cd /home/helio/Obsidian/work/02-trabalho/systemframe/custom-tools/k3s-context-tu
 
 ## Modos de uso
 
-### Modo manual
+### CLI oficial
 
 Fluxo interativo para operador local:
 
 ```bash
+uv run k3s-context-tunnel-manager single
+uv run k3s-context-tunnel-manager multi
+uv run k3s-context-tunnel-manager status
+
 make help
 make run
 make multi-connect
-make k9s
 make status
 ```
 
-Requer TTY para `make run` e `make multi-connect`.
+`make run`, `make multi-connect` e `make status` sao atalhos para a CLI oficial. Requer TTY para os fluxos interativos.
+
+### HTTP
+
+Interface REST sobre os mesmos use cases:
+
+```bash
+uv run k3s-context-tunnel-manager-http --host 127.0.0.1 --port 8080
+make http
+```
+
+Endpoints expostos:
+
+- `GET /config`
+- `GET /clusters`
+- `GET /status`
+- `POST /connect`
+- `POST /contexts/current`
+- `POST /tunnels/{context}/kill`
+
+Exemplos:
+
+```bash
+curl http://127.0.0.1:8080/config
+curl http://127.0.0.1:8080/clusters
+curl http://127.0.0.1:8080/status
+curl -X POST http://127.0.0.1:8080/connect -H 'content-type: application/json' -d '{"context_name":"acme-prod"}'
+curl -X POST http://127.0.0.1:8080/contexts/current -H 'content-type: application/json' -d '{"context_name":"acme-prod","require_confirmation":false,"confirmed":true}'
+curl -X POST http://127.0.0.1:8080/tunnels/acme-prod/kill
+```
 
 ### Modo MCP
 
-Servidor FastMCP sobre o core em [`src/mcp_server.py`](/home/helio/Obsidian/work/02-trabalho/systemframe/custom-tools/k3s-context-tunnel-manager/src/mcp_server.py).
+Servidor FastMCP sobre a mesma base de casos de uso, exposto em [`src/mcp_server.py`](/home/helio/Obsidian/work/02-trabalho/systemframe/custom-tools/k3s-context-tunnel-manager/src/mcp_server.py).
 
 ```bash
 make mcp-stdio
@@ -57,6 +89,15 @@ Resources read-only:
 - `inventory://clusters`
 - `status://contexts`
 - `config://effective`
+
+## Contratos HTTP alinhados ao MCP
+
+- `GET /config` retorna o mesmo payload de `config://effective`
+- `GET /clusters` retorna o mesmo payload de `inventory://clusters`
+- `GET /status` retorna o mesmo payload de `status://contexts`
+- `POST /connect` retorna o mesmo payload estrutural de `connect_cluster`
+- `POST /contexts/current` retorna o mesmo payload estrutural de `set_current_context`
+- `POST /tunnels/{context}/kill` retorna o mesmo payload estrutural de `kill_tunnel`
 
 ## Config canônica
 
@@ -98,6 +139,7 @@ make run
 make multi-connect
 make k9s
 make status
+make http
 make tunnel-list
 make tunnel-kill CONTEXT=empresa-host
 make tunnel-kill-all

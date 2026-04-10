@@ -2,7 +2,41 @@
 
 from pathlib import Path
 
+from pytest_mock import MockerFixture
+
+from src.bootstrap import ServiceContainer
+from src.domain.models import ClusterTarget
 from src.services.inventory_service import list_cluster_targets
+
+
+def test_list_cluster_targets_delegates_to_application_use_case(
+    mocker: MockerFixture,
+    tmp_path: Path,
+) -> None:
+    target = ClusterTarget(
+        company="acme",
+        host_alias="prod",
+        group="k3s_cluster",
+        host_config={"ansible_host": "10.0.0.10"},
+    )
+    services = mocker.Mock(spec=ServiceContainer)
+    services.catalog = object()
+    build_services = mocker.patch(
+        "src.services.inventory_service.build_service_container",
+        return_value=services,
+    )
+    list_targets = mocker.patch(
+        "src.services.inventory_service.list_cluster_targets_use_case",
+        return_value=[target],
+    )
+
+    result = list_cluster_targets(tmp_path)
+
+    assert result == [target]
+    build_services.assert_called_once_with()
+    list_targets.assert_called_once_with(tmp_path, services.catalog)
+
+
 def test_list_cluster_targets_returns_structured_targets_with_group_vars(
     tmp_path: Path,
 ) -> None:

@@ -23,50 +23,14 @@ sys.path.insert(0, str(project_root))
 
 def test_full_workflow_mock() -> None:
     """
-    Smoke test: Manual single-cluster flow delegates to shared services.
+    Smoke test: legacy single-cluster entrypoint delegates to the official CLI.
     """
     import fetch_k3s_config
-    from src.models import ConnectResult, EffectiveConfig, NetworkRequirement
 
-    config = EffectiveConfig(
-        inventory_path=project_root,
-        ssh_config_path=str(project_root / "ssh_config"),
-        ssh_key_path=str(project_root / "id_ed25519"),
-        remote_k3s_config_path="/etc/rancher/k3s/k3s.yaml",
-        k3s_api_port=6443,
-        port_range_start=16443,
-        port_range_size=10000,
-    )
-    result = ConnectResult(
-        success=True,
-        context_name="testcompany-testhost",
-        local_port=16443,
-        internal_ip="10.0.0.100",
-        tunnel_pid=12345,
-        used_cache=False,
-        network_requirement=NetworkRequirement.none(),
-    )
-
-    with patch.object(fetch_k3s_config, "load_effective_config", return_value=config), \
-         patch.object(fetch_k3s_config, "setup_logging"), \
-         patch.object(fetch_k3s_config, "update_inventory_repo", return_value=(True, "updated")), \
-         patch.object(fetch_k3s_config, "select_company", return_value=("testcompany", {"all": {}})), \
-         patch.object(
-             fetch_k3s_config,
-             "select_host",
-             return_value=(
-                 "testhost",
-                 {
-                     "group": "k3s_cluster",
-                     "config": {"ansible_host": "8.8.8.8"},
-                     "group_vars": {},
-                 },
-             ),
-         ), \
-         patch.object(fetch_k3s_config, "connect_cluster", return_value=result) as connect_cluster:
+    with patch.object(fetch_k3s_config, "cli_main", return_value=0) as cli_main:
         assert fetch_k3s_config.main() == 0
 
-    connect_cluster.assert_called_once()
+    cli_main.assert_called_once_with(["single"])
 
 
 def test_vpn_warning_detection() -> None:
@@ -252,82 +216,13 @@ def test_multi_connect_uses_services_and_sets_first_successful_context(
     mocker: MockerFixture,
     tmp_path: Path,
 ) -> None:
+    del tmp_path
     import multi_connect
-    from src.models import (
-        ClusterTarget,
-        ConnectResult,
-        EffectiveConfig,
-        NetworkRequirement,
-    )
 
-    config = EffectiveConfig(
-        inventory_path=tmp_path,
-        ssh_config_path=str(tmp_path / "ssh_config"),
-        ssh_key_path=str(tmp_path / "id_ed25519"),
-        remote_k3s_config_path="/etc/rancher/k3s/k3s.yaml",
-        k3s_api_port=6443,
-        port_range_start=16443,
-        port_range_size=10000,
-    )
-    selected = [
-        ClusterTarget(
-            company="acme",
-            host_alias="prod",
-            group="k3s_cluster",
-            host_config={"ansible_host": "203.0.113.10"},
-            group_vars={},
-        ),
-        ClusterTarget(
-            company="beta",
-            host_alias="staging",
-            group="k3s_cluster",
-            host_config={"ansible_host": "203.0.113.11"},
-            group_vars={},
-        ),
-    ]
-    results = [
-        ConnectResult(
-            success=True,
-            context_name="acme-prod",
-            local_port=16443,
-            internal_ip="10.0.0.10",
-            tunnel_pid=1111,
-            used_cache=False,
-            network_requirement=NetworkRequirement.none(),
-        ),
-        ConnectResult(
-            success=True,
-            context_name="beta-staging",
-            local_port=16444,
-            internal_ip="10.0.0.11",
-            tunnel_pid=2222,
-            used_cache=True,
-            network_requirement=NetworkRequirement.none(),
-        ),
-    ]
-
-    mocker.patch("multi_connect.load_effective_config", return_value=config)
-    setup_logging = mocker.patch("multi_connect.setup_logging")
-    mocker.patch("multi_connect.list_cluster_targets", return_value=selected)
-    mocker.patch("multi_connect.select_clusters_interactive", return_value=selected)
-    mocker.patch("multi_connect.show_network_warnings", return_value=True)
-    connect_multiple = mocker.patch("multi_connect.connect_multiple", return_value=results)
-    set_current_context = mocker.patch("multi_connect.set_current_context", return_value=None)
+    cli_main = mocker.patch("multi_connect.cli_main", return_value=0)
 
     assert multi_connect.main() == 0
-
-    setup_logging.assert_called_once()
-    assert setup_logging.call_args.kwargs["structured"] is True
-    connect_multiple.assert_called_once_with(
-        targets=selected,
-        config=config,
-        allow_manual_network=True,
-    )
-    set_current_context.assert_called_once_with(
-        "acme-prod",
-        require_confirmation=False,
-        confirmed=True,
-    )
+    cli_main.assert_called_once_with(["multi"])
 
 
 def test_show_network_warnings_reports_vpn_and_sshuttle_for_dual_requirement(
@@ -345,9 +240,7 @@ def test_show_network_warnings_reports_vpn_and_sshuttle_for_dual_requirement(
         group_vars={"argocd_use_socks5_proxy": True},
     )
 
-    mocker.patch("multi_connect.require_interactive_terminal")
-    mock_confirm = mocker.patch("multi_connect.questionary.confirm")
-    mock_confirm.return_value.ask.return_value = True
+    mocker.patch("src.interfaces.cli.presenters.confirm_action", return_value=True)
 
     assert multi_connect.show_network_warnings([dual_target]) is True
 
@@ -418,6 +311,8 @@ def test_post_connection_output_uses_public_error_message_only(
 def test_makefile_exposes_mcp_targets() -> None:
     makefile = Path("Makefile").read_text()
 
+    assert "http:" in makefile
+    assert "k3s-context-tunnel-manager-http" in makefile
     assert "mcp-stdio:" in makefile
     assert "mcp-http:" in makefile
     assert "run_mcp_stdio.py" in makefile
@@ -428,6 +323,9 @@ def test_readme_documents_manual_and_mcp_modes() -> None:
     readme = Path("README.md").read_text()
 
     assert "make run" in readme
+    assert "make http" in readme
+    assert "GET /config" in readme
+    assert "POST /connect" in readme
     assert "make mcp-stdio" in readme
     assert "make mcp-http" in readme
     assert "connect_cluster" in readme

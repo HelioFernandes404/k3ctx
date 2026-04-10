@@ -5,11 +5,13 @@ from __future__ import annotations
 import asyncio
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 from pytest_mock import MockerFixture
 
-from src.models import ClusterTarget, ConnectResult, EffectiveConfig, NetworkRequirement
+from src.bootstrap import ServiceContainer
+from src.domain.models import ClusterTarget, ConnectResult, EffectiveConfig, NetworkRequirement
 from src.mcp_server import build_mcp_server, mcp
 
 
@@ -25,16 +27,45 @@ def build_config(tmp_path: Path) -> EffectiveConfig:
     )
 
 
+def build_services() -> ServiceContainer:
+    return cast(
+        ServiceContainer,
+        SimpleNamespace(
+            catalog=object(),
+            connector=object(),
+            switcher=object(),
+            status_reader=object(),
+            tunnel_manager=object(),
+        ),
+    )
+
+
+def get_tool_fn(server: Any, name: str) -> Any:
+    tool = asyncio.run(server.get_tool(name))
+    assert tool is not None
+    return tool.fn
+
+
+def get_resource_fn(server: Any, uri: str) -> Any:
+    resource = asyncio.run(server.get_resource(uri))
+    assert resource is not None
+    return resource.fn
+
+
 def test_build_mcp_server_registers_expected_tools_and_read_only_resources(
     mocker: MockerFixture,
     tmp_path: Path,
 ) -> None:
     mocker.patch(
-        "src.mcp_server.load_effective_config",
+        "src.interfaces.mcp.server.load_effective_config",
         return_value=build_config(tmp_path),
     )
-    mocker.patch("src.mcp_server.list_cluster_targets", return_value=[])
-    mocker.patch("src.mcp_server.list_context_status", return_value=[])
+    mocker.patch(
+        "src.interfaces.mcp.server.build_service_container",
+        return_value=build_services(),
+    )
+    mocker.patch("src.interfaces.mcp.server.list_cluster_targets", return_value=[])
+    mocker.patch("src.interfaces.mcp.server.list_context_status", return_value=[])
 
     server = build_mcp_server(project_dir=tmp_path)
 
@@ -69,32 +100,44 @@ def test_build_mcp_server_uses_public_project_name(
     tmp_path: Path,
 ) -> None:
     mocker.patch(
-        "src.mcp_server.load_effective_config",
+        "src.interfaces.mcp.server.load_effective_config",
         return_value=build_config(tmp_path),
     )
-    mocker.patch("src.mcp_server.list_cluster_targets", return_value=[])
-    mocker.patch("src.mcp_server.list_context_status", return_value=[])
+    mocker.patch(
+        "src.interfaces.mcp.server.build_service_container",
+        return_value=build_services(),
+    )
+    mocker.patch("src.interfaces.mcp.server.list_cluster_targets", return_value=[])
+    mocker.patch("src.interfaces.mcp.server.list_context_status", return_value=[])
 
     server = build_mcp_server(project_dir=tmp_path)
 
     assert getattr(server, "name", None) == "k3s-context-tunnel-manager"
 
 
-def test_connect_cluster_tool_delegates_to_core(
+def test_connect_cluster_tool_delegates_to_use_case(
     mocker: MockerFixture,
     tmp_path: Path,
 ) -> None:
     config = build_config(tmp_path)
+    services = build_services()
     target = ClusterTarget(
         company="acme",
         host_alias="prod",
         group="k3s_cluster",
         host_config={"ansible_host": "10.0.0.10"},
     )
-    mocker.patch("src.mcp_server.load_effective_config", return_value=config)
-    mocker.patch("src.mcp_server.list_cluster_targets", return_value=[target])
+    mocker.patch("src.interfaces.mcp.server.load_effective_config", return_value=config)
+    mocker.patch(
+        "src.interfaces.mcp.server.build_service_container",
+        return_value=services,
+    )
+    mocker.patch(
+        "src.interfaces.mcp.server.find_target_by_context_name",
+        return_value=target,
+    )
     connect_cluster_mock = mocker.patch(
-        "src.mcp_server.connect_cluster_service",
+        "src.interfaces.mcp.server.connect_cluster_use_case",
         return_value=ConnectResult(
             success=True,
             context_name="acme-prod",
@@ -107,12 +150,10 @@ def test_connect_cluster_tool_delegates_to_core(
     )
 
     server = build_mcp_server(project_dir=tmp_path)
+    connect_tool = get_tool_fn(server, "connect_cluster")
+    result = connect_tool(context_name="acme-prod")
 
-    result = asyncio.run(
-        server.call_tool("connect_cluster", {"context_name": "acme-prod"})
-    )
-
-    assert result.structured_content == {
+    assert result == {
         "success": True,
         "context_name": "acme-prod",
         "local_port": 16443,
@@ -129,6 +170,7 @@ def test_connect_cluster_tool_delegates_to_core(
     connect_cluster_mock.assert_called_once_with(
         target=target,
         config=config,
+        connector=services.connector,
         allow_manual_network=True,
     )
 
@@ -137,16 +179,20 @@ def test_connect_multiple_requires_explicit_contexts(
     mocker: MockerFixture,
     tmp_path: Path,
 ) -> None:
-    config = build_config(tmp_path)
-    mocker.patch("src.mcp_server.load_effective_config", return_value=config)
-    connect_multiple_mock = mocker.patch("src.mcp_server.connect_multiple_service")
+    mocker.patch(
+        "src.interfaces.mcp.server.load_effective_config",
+        return_value=build_config(tmp_path),
+    )
+    mocker.patch(
+        "src.interfaces.mcp.server.build_service_container",
+        return_value=build_services(),
+    )
+    connect_multiple_mock = mocker.patch("src.interfaces.mcp.server.connect_multiple_use_case")
 
     server = build_mcp_server(project_dir=tmp_path)
-
-    result_empty = asyncio.run(
-        server.call_tool("connect_multiple", {"context_names": []})
-    )
-    result_missing = asyncio.run(server.call_tool("connect_multiple"))
+    connect_multiple_tool = get_tool_fn(server, "connect_multiple")
+    result_empty = connect_multiple_tool(context_names=[])
+    result_missing = connect_multiple_tool()
 
     expected = {
         "success": False,
@@ -158,8 +204,8 @@ def test_connect_multiple_requires_explicit_contexts(
             "retryable": False,
         },
     }
-    assert result_empty.structured_content == expected
-    assert result_missing.structured_content == expected
+    assert result_empty == expected
+    assert result_missing == expected
     connect_multiple_mock.assert_not_called()
 
 
@@ -168,6 +214,7 @@ def test_connect_multiple_deduplicates_context_names_preserving_order(
     tmp_path: Path,
 ) -> None:
     config = build_config(tmp_path)
+    services = build_services()
     first = ClusterTarget(
         company="acme",
         host_alias="prod",
@@ -180,38 +227,46 @@ def test_connect_multiple_deduplicates_context_names_preserving_order(
         group="k3s_cluster",
         host_config={"ansible_host": "10.0.0.11"},
     )
-    mocker.patch("src.mcp_server.load_effective_config", return_value=config)
-    mocker.patch("src.mcp_server.list_cluster_targets", return_value=[first, second])
+    mocker.patch("src.interfaces.mcp.server.load_effective_config", return_value=config)
+    mocker.patch(
+        "src.interfaces.mcp.server.build_service_container",
+        return_value=services,
+    )
+    select_targets = mocker.patch(
+        "src.interfaces.mcp.server.select_targets_by_context_name",
+        return_value=([second, first], []),
+    )
     connect_multiple_mock = mocker.patch(
-        "src.mcp_server.connect_multiple_service",
+        "src.interfaces.mcp.server.connect_multiple_use_case",
         return_value=[],
     )
 
     server = build_mcp_server(project_dir=tmp_path)
-
-    result = asyncio.run(
-        server.call_tool(
-            "connect_multiple",
-            {
-                "context_names": [
-                    "beta-dev",
-                    "acme-prod",
-                    "beta-dev",
-                    "acme-prod",
-                ]
-            },
-        )
+    connect_multiple_tool = get_tool_fn(server, "connect_multiple")
+    result = connect_multiple_tool(
+        context_names=[
+            "beta-dev",
+            "acme-prod",
+            "beta-dev",
+            "acme-prod",
+        ],
     )
 
-    assert result.structured_content == {
+    assert result == {
         "success": True,
         "results": [],
         "missing_contexts": [],
         "error": None,
     }
+    select_targets.assert_called_once_with(
+        ["beta-dev", "acme-prod"],
+        config.inventory_path,
+        services.catalog,
+    )
     connect_multiple_mock.assert_called_once_with(
         targets=[second, first],
         config=config,
+        connector=services.connector,
         allow_manual_network=True,
     )
 
@@ -221,17 +276,23 @@ def test_connect_multiple_fails_when_all_context_names_are_invalid(
     tmp_path: Path,
 ) -> None:
     config = build_config(tmp_path)
-    mocker.patch("src.mcp_server.load_effective_config", return_value=config)
-    mocker.patch("src.mcp_server.list_cluster_targets", return_value=[])
-    connect_multiple_mock = mocker.patch("src.mcp_server.connect_multiple_service")
+    services = build_services()
+    mocker.patch("src.interfaces.mcp.server.load_effective_config", return_value=config)
+    mocker.patch(
+        "src.interfaces.mcp.server.build_service_container",
+        return_value=services,
+    )
+    mocker.patch(
+        "src.interfaces.mcp.server.select_targets_by_context_name",
+        return_value=([], ["nao-existe"]),
+    )
+    connect_multiple_mock = mocker.patch("src.interfaces.mcp.server.connect_multiple_use_case")
 
     server = build_mcp_server(project_dir=tmp_path)
+    connect_multiple_tool = get_tool_fn(server, "connect_multiple")
+    result = connect_multiple_tool(context_names=["nao-existe"])
 
-    result = asyncio.run(
-        server.call_tool("connect_multiple", {"context_names": ["nao-existe"]})
-    )
-
-    assert result.structured_content == {
+    assert result == {
         "success": False,
         "results": [],
         "missing_contexts": ["nao-existe"],
@@ -249,15 +310,19 @@ def test_kill_tunnel_returns_structured_error_on_failure(
     tmp_path: Path,
 ) -> None:
     mocker.patch(
-        "src.mcp_server.kill_tunnel_service",
+        "src.interfaces.mcp.server.build_service_container",
+        return_value=build_services(),
+    )
+    mocker.patch(
+        "src.interfaces.mcp.server.kill_tunnel_use_case",
         side_effect=RuntimeError("boom"),
     )
 
     server = build_mcp_server(project_dir=tmp_path)
+    kill_tunnel_tool = get_tool_fn(server, "kill_tunnel")
+    result = kill_tunnel_tool(context_name="acme-prod")
 
-    result = asyncio.run(server.call_tool("kill_tunnel", {"context_name": "acme-prod"}))
-
-    assert result.structured_content == {
+    assert result == {
         "success": False,
         "context_name": "acme-prod",
         "error": {
@@ -273,16 +338,19 @@ def test_config_resource_returns_json(
     tmp_path: Path,
 ) -> None:
     mocker.patch(
-        "src.mcp_server.load_effective_config",
+        "src.interfaces.mcp.server.load_effective_config",
         return_value=build_config(tmp_path),
     )
-    mocker.patch("src.mcp_server.list_cluster_targets", return_value=[])
-    mocker.patch("src.mcp_server.list_context_status", return_value=[])
+    mocker.patch(
+        "src.interfaces.mcp.server.build_service_container",
+        return_value=build_services(),
+    )
+    mocker.patch("src.interfaces.mcp.server.list_cluster_targets", return_value=[])
+    mocker.patch("src.interfaces.mcp.server.list_context_status", return_value=[])
 
     server = build_mcp_server(project_dir=tmp_path)
-
-    result = asyncio.run(server.read_resource("config://effective"))
-    payload = json.loads(result.contents[0].content)
+    config_resource = get_resource_fn(server, "config://effective")
+    payload = json.loads(config_resource())
 
     assert payload == {
         "inventory_path": str(tmp_path / "inventory"),

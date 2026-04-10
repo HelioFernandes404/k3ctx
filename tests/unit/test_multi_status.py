@@ -1,83 +1,139 @@
-"""Unit tests for legacy multi-status output."""
+"""Unit tests for legacy multi-status compatibility wrappers."""
+
+from __future__ import annotations
 
 from pathlib import Path
 
 from _pytest.capture import CaptureFixture
 from pytest_mock import MockerFixture
 
-from src.models import EffectiveConfig
 from src.multi_status import list_all_contexts, show_status
-from src.tunnel import get_unique_port
 
 
-def test_legacy_status_marks_corrupted_network_metadata_safely(
-    tmp_path: Path,
+def test_legacy_status_list_all_contexts_combines_status_and_network_validation(
     mocker: MockerFixture,
-    capsys: CaptureFixture[str],
-) -> None:
-    state_dir = tmp_path / "state"
-    state_dir.mkdir()
-    (state_dir / "acme-prod.network").write_text("network_type: [broken")
-
-    mocker.patch("src.multi_status.get_current_context", return_value=None)
-    mocker.patch("src.multi_status.is_tunnel_running", return_value=False)
-
-    contexts = list_all_contexts(state_dir)
-
-    assert contexts[0]["name"] == "acme-prod"
-    assert contexts[0]["network_validation"]["ok"] is False
-    assert "could not be read safely" in contexts[0]["network_validation"]["warning"]
-
-    show_status(state_dir)
-    output = capsys.readouterr().out
-
-    assert "acme-prod" in output
-    assert "network metadata unreadable" in output.lower()
-
-
-def test_legacy_status_uses_canonical_port_range(
     tmp_path: Path,
-    mocker: MockerFixture,
 ) -> None:
-    state_dir = tmp_path / "state"
-    state_dir.mkdir()
-    (state_dir / "acme-prod.pid").write_text("4242")
-
-    mocker.patch("src.multi_status.get_current_context", return_value=None)
-    mocker.patch("src.multi_status.is_tunnel_running", return_value=True)
-    mocker.patch("src.multi_status.get_tunnel_pid", return_value=4242)
-    mocker.patch("src.multi_status.get_network_metadata", return_value=None)
-    mocker.patch(
-        "src.multi_status.load_status_config",
-        return_value=EffectiveConfig(
-            inventory_path=tmp_path / "inventory",
-            ssh_config_path="~/.ssh/config",
-            ssh_key_path="~/.ssh/id_ed25519",
-            remote_k3s_config_path="/etc/rancher/k3s/k3s.yaml",
-            k3s_api_port=6443,
-            port_range_start=20000,
-            port_range_size=5000,
-        ),
+    list_status = mocker.patch(
+        "src.multi_status.list_context_status",
+        return_value=[
+            {
+                "name": "beta-dev",
+                "is_current": False,
+                "tunnel_running": False,
+                "tunnel_pid": 9999,
+                "local_port": 16444,
+                "network_metadata": None,
+            },
+            {
+                "name": "acme-prod",
+                "is_current": True,
+                "tunnel_running": True,
+                "tunnel_pid": 4242,
+                "local_port": 16443,
+                "network_metadata": {"network_type": "sshuttle"},
+            },
+        ],
+    )
+    validate_network = mocker.patch(
+        "src.multi_status.validate_context_network",
+        side_effect=[
+            {"context_name": "beta-dev", "ok": True},
+            {"context_name": "acme-prod", "ok": False, "warning": "requires sshuttle"},
+        ],
     )
 
-    contexts = list_all_contexts(state_dir)
+    contexts = list_all_contexts(tmp_path)
 
-    assert contexts[0]["local_port"] == get_unique_port("acme-prod", 20000, 5000)
+    assert contexts == [
+        {
+            "name": "acme-prod",
+            "is_current": True,
+            "tunnel_running": True,
+            "tunnel_pid": 4242,
+            "local_port": 16443,
+            "network_metadata": {"network_type": "sshuttle"},
+            "network_validation": {
+                "context_name": "acme-prod",
+                "ok": False,
+                "warning": "requires sshuttle",
+            },
+        },
+        {
+            "name": "beta-dev",
+            "is_current": False,
+            "tunnel_running": False,
+            "tunnel_pid": None,
+            "local_port": 16444,
+            "network_metadata": None,
+            "network_validation": {
+                "context_name": "beta-dev",
+                "ok": True,
+            },
+        },
+    ]
+    list_status.assert_called_once_with(tmp_path)
+    validate_network.assert_any_call("beta-dev", tmp_path)
+    validate_network.assert_any_call("acme-prod", tmp_path)
 
 
-def test_legacy_status_shows_operational_network_warnings_when_tunnel_down(
+def test_legacy_status_show_status_reuses_shared_cli_presenter(
+    mocker: MockerFixture,
     tmp_path: Path,
+) -> None:
+    mocker.patch(
+        "src.multi_status.list_all_contexts",
+        return_value=[
+            {
+                "name": "acme-prod",
+                "is_current": True,
+                "tunnel_running": True,
+                "tunnel_pid": 4242,
+                "local_port": 16443,
+                "network_metadata": {"network_type": "sshuttle"},
+                "network_validation": {
+                    "context_name": "acme-prod",
+                    "ok": False,
+                    "warning": "requires sshuttle",
+                },
+            }
+        ],
+    )
+    print_status = mocker.patch("src.multi_status.print_status")
+
+    show_status(tmp_path)
+
+    print_status.assert_called_once_with(
+        [
+            {
+                "name": "acme-prod",
+                "is_current": True,
+                "tunnel_running": True,
+                "tunnel_pid": 4242,
+                "local_port": 16443,
+                "network_metadata": {"network_type": "sshuttle"},
+            }
+        ],
+        {
+            "acme-prod": {
+                "context_name": "acme-prod",
+                "ok": False,
+                "warning": "requires sshuttle",
+            }
+        },
+    )
+
+
+def test_legacy_status_show_status_keeps_warning_output_contract(
     mocker: MockerFixture,
     capsys: CaptureFixture[str],
 ) -> None:
-    state_dir = tmp_path / "state"
-    state_dir.mkdir()
-
     mocker.patch(
         "src.multi_status.list_all_contexts",
         return_value=[
             {
                 "name": "acme-vpn",
+                "is_current": False,
                 "tunnel_running": False,
                 "tunnel_pid": None,
                 "local_port": 20101,
@@ -89,6 +145,7 @@ def test_legacy_status_shows_operational_network_warnings_when_tunnel_down(
             },
             {
                 "name": "acme-sshuttle",
+                "is_current": False,
                 "tunnel_running": False,
                 "tunnel_pid": None,
                 "local_port": 20102,
@@ -103,9 +160,8 @@ def test_legacy_status_shows_operational_network_warnings_when_tunnel_down(
             },
         ],
     )
-    mocker.patch("src.multi_status.get_current_context", return_value=None)
 
-    show_status(state_dir)
+    show_status()
     output = capsys.readouterr().out.lower()
 
     assert "acme-vpn" in output

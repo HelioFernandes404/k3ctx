@@ -114,3 +114,4 @@ tmp/
 .directory
 Thumbs.db
 ansible/
+.worktrees/
