@@ -18,7 +18,7 @@ GREEN := \033[0;32m
 YELLOW := \033[1;33m
 NC := \033[0m # No Color
 
-.PHONY: help init sync run multi-connect k9s status tunnel-list tunnel-kill tunnel-kill-all clean logs config test http mcp-stdio mcp-http
+.PHONY: help init sync run k9s status tunnel-list tunnel-kill tunnel-kill-all clean logs config test http mcp-stdio mcp-http
 
 ## help: Show this help message
 help:
@@ -29,7 +29,6 @@ help:
 	@echo "Main commands:"
 	@echo "  $(YELLOW)make init$(NC)          - Initialize project (first time setup)"
 	@echo "  $(YELLOW)make run$(NC)           - Discover and connect to a cluster"
-	@echo "  $(YELLOW)make multi-connect$(NC) - Start legacy multi-cluster flow"
 	@echo "  $(YELLOW)make http$(NC)          - Start REST HTTP interface"
 	@echo "  $(YELLOW)make mcp-stdio$(NC)     - Start MCP server over stdio"
 	@echo "  $(YELLOW)make mcp-http$(NC)      - Start MCP server over HTTP"
@@ -55,11 +54,6 @@ sync:
 run:
 	@echo "$(GREEN)Starting Context Tunnel Manager...$(NC)"
 	@$(CLI_COMMAND) connect
-
-## multi-connect: Connect to multiple clusters simultaneously (legacy flow)
-multi-connect:
-	@echo "$(YELLOW)Starting legacy multi-cluster flow...$(NC)"
-	@$(CLI_COMMAND) multi
 
 ## k9s: Start k9s with tunnel verification
 k9s:

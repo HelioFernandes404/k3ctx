@@ -140,7 +140,6 @@ def test_connect_command_resolves_before_connecting(
     mocker.patch("src.interfaces.cli.app.load_host_records", return_value=list(resolution.matches))
     mocker.patch("src.interfaces.cli.app.resolve_host", return_value=resolution)
     mocker.patch("src.interfaces.cli.app.find_target_by_context_name", return_value=target)
-    mocker.patch("src.interfaces.cli.app.show_manual_network_warnings", return_value=True)
     connect_cluster = mocker.patch(
         "src.interfaces.cli.app.connect_cluster",
         return_value=build_success_result(),
@@ -152,12 +151,11 @@ def test_connect_command_resolves_before_connecting(
     connect_cluster.assert_called_once()
 
 
-def test_connect_command_rejects_empty_non_interactive_invocation(
+def test_connect_command_rejects_empty_invocation(
     mocker: MockerFixture,
     capsys: CaptureFixture[str],
 ) -> None:
     mocker.patch("src.interfaces.cli.app.setup_logging")
-    mocker.patch("src.interfaces.cli.app._has_tty", return_value=False)
 
     exit_code = main(["connect"])
 
@@ -165,7 +163,7 @@ def test_connect_command_rejects_empty_non_interactive_invocation(
     assert "at least one identifier" in capsys.readouterr().err
 
 
-def test_connect_json_disables_manual_network_prompts(
+def test_connect_command_disables_manual_network_flow(
     mocker: MockerFixture,
     tmp_path: Path,
 ) -> None:
@@ -195,17 +193,14 @@ def test_connect_json_disables_manual_network_prompts(
     mocker.patch("src.interfaces.cli.app.load_host_records", return_value=list(resolution.matches))
     mocker.patch("src.interfaces.cli.app.resolve_host", return_value=resolution)
     mocker.patch("src.interfaces.cli.app.find_target_by_context_name", return_value=target)
-    mocker.patch("src.interfaces.cli.app._has_tty", return_value=False)
-    prompt_warning = mocker.patch("src.interfaces.cli.app.show_manual_network_warnings")
     connect_cluster = mocker.patch(
         "src.interfaces.cli.app.connect_cluster",
         return_value=build_success_result(),
     )
 
-    exit_code = main(["connect", "--json", "acme", "prod"])
+    exit_code = main(["connect", "acme", "prod"])
 
     assert exit_code == 0
-    prompt_warning.assert_not_called()
     connect_cluster.assert_called_once_with(
         target=target,
         config=config,
@@ -250,25 +245,25 @@ def test_connect_command_returns_ambiguous_exit_code_without_prompt(
     print_failure.assert_called_once()
 
 
-def test_single_command_keeps_guided_flow_compatibility(
+def test_single_command_returns_non_interactive_error(
     mocker: MockerFixture,
-    tmp_path: Path,
+    capsys: CaptureFixture[str],
 ) -> None:
-    config = build_config(tmp_path)
-    target = build_target()
-    mocker.patch("src.interfaces.cli.app.load_effective_config", return_value=config)
     mocker.patch("src.interfaces.cli.app.setup_logging")
-    mocker.patch("src.interfaces.cli.app.refresh_inventory_if_possible")
-    mocker.patch("src.interfaces.cli.app.list_cluster_targets", return_value=[target])
-    mocker.patch("src.interfaces.cli.app.select_company", return_value="acme")
-    mocker.patch("src.interfaces.cli.app.select_single_target", return_value=target)
-    mocker.patch("src.interfaces.cli.app.show_manual_network_warnings", return_value=True)
-    connect_cluster = mocker.patch(
-        "src.interfaces.cli.app.connect_cluster",
-        return_value=build_success_result(),
-    )
 
     exit_code = main(["single"])
 
-    assert exit_code == 0
-    connect_cluster.assert_called_once()
+    assert exit_code == 4
+    assert "has been removed" in capsys.readouterr().err
+
+
+def test_multi_command_returns_non_interactive_error(
+    mocker: MockerFixture,
+    capsys: CaptureFixture[str],
+) -> None:
+    mocker.patch("src.interfaces.cli.app.setup_logging")
+
+    exit_code = main(["multi"])
+
+    assert exit_code == 4
+    assert "has been removed" in capsys.readouterr().err

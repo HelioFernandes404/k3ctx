@@ -25,7 +25,7 @@
 # DEPENDENCIES:
 #   - kubectl: For reading kubeconfig current context
 #   - lens-desktop: Lens Desktop application
-#   - ssh: For tunneling (created by fetch_k3s_config.py)
+#   - ssh: For tunneling (created by context-tunnel-manager connect)
 
 set -euo pipefail
 
@@ -75,7 +75,7 @@ function ensure_tunnel() {
 
     if [[ -z "$context" ]]; then
         echo -e "${RED}✗ No current kubernetes context set${NC}"
-        echo "Run: source venv/bin/activate && python3 fetch_k3s_config.py"
+        echo "Run: uv run context-tunnel-manager connect <identifier>"
         exit 1
     fi
 
@@ -85,8 +85,8 @@ function ensure_tunnel() {
         echo -e "${GREEN}✓ Tunnel already running${NC} (PID: $pid)"
     else
         echo -e "${YELLOW}⚠ Tunnel not running for context '$context'${NC}"
-        echo "Please run: source venv/bin/activate && python3 fetch_k3s_config.py"
-        echo "Or create tunnel manually (check the output from fetch script)"
+        echo "Please run: uv run context-tunnel-manager connect <identifier>"
+        echo "Or create the tunnel manually from the CLI output"
         exit 1
     fi
 }

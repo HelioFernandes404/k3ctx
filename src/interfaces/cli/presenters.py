@@ -7,9 +7,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from src.domain.discovery import ClientPage, HostPage, HostResolutionResult
-from src.domain.models import ClusterTarget, ConnectResult
-from src.domain.network import detect_network_requirement
-from src.interfaces.cli.prompts import confirm_action, format_multi_target_label
+from src.domain.models import ConnectResult
 from src.tunnel import build_sshuttle_command
 
 SECTION_SEPARATOR = "=" * 60
@@ -23,40 +21,6 @@ def _print_section(title: str) -> None:
     print(f"\n{SECTION_SEPARATOR}")
     print(title)
     print(SECTION_SEPARATOR)
-
-
-def _confirm_action_or_none(prompt: str, *, default: bool) -> bool | None:
-    try:
-        return confirm_action(prompt, default=default)
-    except KeyboardInterrupt:
-        return None
-
-
-def show_manual_network_warnings(target: ClusterTarget) -> bool:
-    network_type, network_range, needs_vpn = detect_network_requirement(
-        target.host_config,
-        target.group_vars,
-        target.group,
-    )
-
-    if needs_vpn:
-        print("\n⚠️  WARNING: This host requires VPN (argocd_use_socks5_proxy=true)")
-        print("   Make sure your VPN is connected before proceeding.")
-        confirmed = _confirm_action_or_none("Continue?", default=False)
-        if not confirmed:
-            return False
-
-    if network_type == "sshuttle":
-        print(f"\n🔒 NETWORK REQUIREMENT: This host is on private network {network_range}")
-        print("   You need to run sshuttle to access this network.")
-        print("\n   Example command:")
-        print(f"   {build_sshuttle_command(network_type, network_range)}")
-        print("\n   Make sure sshuttle is running before proceeding.")
-        confirmed = _confirm_action_or_none("Continue?", default=False)
-        if not confirmed:
-            return False
-
-    return True
 
 
 def print_single_success(result: ConnectResult) -> None:
@@ -88,63 +52,6 @@ def print_single_failure(result: ConnectResult) -> None:
         print("Failed to connect.", file=sys.stderr)
         return
     print(f"Failed to connect: {result.error.message}")
-
-
-def show_network_warnings(selected_targets: Sequence[ClusterTarget]) -> bool:
-    direct: list[ClusterTarget] = []
-    vpn_required: list[ClusterTarget] = []
-    sshuttle_required: list[tuple[ClusterTarget, str | None]] = []
-
-    for target in selected_targets:
-        network_type, network_range, needs_vpn = detect_network_requirement(
-            target.host_config,
-            target.group_vars,
-            target.group,
-        )
-        has_manual_requirement = False
-        if needs_vpn:
-            vpn_required.append(target)
-            has_manual_requirement = True
-        if network_type == "sshuttle":
-            sshuttle_required.append((target, network_range))
-            has_manual_requirement = True
-        if not has_manual_requirement:
-            direct.append(target)
-
-    _print_section("Selected clusters:")
-
-    if direct:
-        print("\n✓ Direct access (no special setup):")
-        for target in direct:
-            print(f"  • {target.company}: {target.host_alias}")
-
-    if sshuttle_required:
-        print("\n⚠ Requires sshuttle:")
-        for target, network_range in sshuttle_required:
-            print(f"  • {target.company}: {target.host_alias} → {network_range}")
-
-    if vpn_required:
-        print("\n⚠ Requires VPN:")
-        for target in vpn_required:
-            print(f"  • {target.company}: {target.host_alias}")
-
-    if sshuttle_required or vpn_required:
-        _print_section("Network setup commands:")
-        commands = {
-            build_sshuttle_command("sshuttle", network_range)
-            for _, network_range in sshuttle_required
-        }
-        for command in sorted(cmd for cmd in commands if cmd):
-            print(f"\n🔒 {command}")
-        if vpn_required:
-            print("\n🔐 Ensure VPN connection is active before proceeding")
-
-    print(f"\n{SECTION_SEPARATOR}")
-    confirmed = _confirm_action_or_none(
-        "Continue with multi-cluster connection?",
-        default=True,
-    )
-    return bool(confirmed)
 
 
 def _network_note(result: ConnectResult) -> str:
@@ -298,8 +205,7 @@ def print_status(
 ) -> None:
     if not items:
         print(f"{YELLOW}No connected clusters found.{NC}")
-        print("\nRun: make run         # Connect single cluster")
-        print("     make multi-connect  # Connect multiple clusters")
+        print("\nRun: make run  # Connect a cluster")
         return
 
     print(f"{GREEN}Connected clusters:{NC}")
@@ -354,13 +260,10 @@ __all__ = [
     "print_client_page",
     "print_host_page",
     "print_host_resolution_failure",
-    "format_multi_target_label",
     "print_multi_summary",
     "print_multi_usage",
     "print_network_reminders",
     "print_single_failure",
     "print_single_success",
     "print_status",
-    "show_manual_network_warnings",
-    "show_network_warnings",
 ]

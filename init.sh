@@ -4,17 +4,17 @@
 #
 # DESCRIPTION:
 #   Sets up Python project using uv for dependency management.
-#   Optionally runs the main fetch_k3s_config.py script immediately after setup.
+#   Optionally runs the main CLI immediately after setup.
 #
 # USAGE:
-#   ./init.sh               # Setup with uv and run fetch script
-#   uv run python fetch_k3s_config.py  # Manual approach
+#   ./init.sh                               # Setup with uv and run connect
+#   uv run context-tunnel-manager connect   # Manual approach
 #
 # FEATURES:
 #   - Uses uv for fast, modern Python dependency management
 #   - Syncs all dependencies from pyproject.toml
 #   - Creates isolated virtual environment automatically
-#   - Runs fetch_k3s_config.py to fetch first kubeconfig
+#   - Runs the main CLI connect command
 #
 # ENVIRONMENT:
 #   PROJECT_DIR: Detected automatically as script directory
@@ -30,9 +30,7 @@
 set -e  # Exit immediately on any error
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PYTHON_SCRIPT="$PROJECT_DIR/fetch_k3s_config.py"
-
-echo "=== K3s Config Fetcher Setup ==="
+echo "=== K3s Context Tunnel Manager Setup ==="
 echo "Project directory: $PROJECT_DIR"
 
 # Check if uv is installed
@@ -72,8 +70,8 @@ fi
 # Only run the script if SKIP_FETCH is not set
 if [ -z "${SKIP_FETCH:-}" ]; then
     echo ""
-    echo "Running fetch_k3s_config.py..."
-    uv run python "$PYTHON_SCRIPT"
+    echo "Running context-tunnel-manager connect..."
+    uv run context-tunnel-manager connect
 fi
 
 echo ""
@@ -83,8 +81,7 @@ echo "Next steps:"
 echo "  1. Add inventory files to inventory/ directory"
 echo "  2. Edit your config: $CONFIG_DIR/config.yaml"
 echo "  3. Connect single cluster: make run"
-echo "  4. Connect multiple clusters: make multi-connect"
-echo "  5. Launch k9s: make k9s"
+echo "  4. Launch k9s: make k9s"
 echo ""
 echo "To view status: make status"
 echo "To view logs: make logs (or: tail -f $LOG_DIR/k9s-config.log)"

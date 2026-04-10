@@ -22,7 +22,6 @@ uv run context-tunnel-manager status
 
 make help
 make run
-make multi-connect
 make status
 ```
 
@@ -31,17 +30,26 @@ Exemplos de refinamento:
 ```bash
 uv run context-tunnel-manager hosts acme --host api --limit 10
 uv run context-tunnel-manager connect --ip 10.0.0.10
+uv run context-tunnel-manager connect --context acme-prod
 uv run context-tunnel-manager connect --id sf-1042 --json
+uv run context-tunnel-manager status --json
 ```
 
-Aliases legados ainda disponiveis temporariamente:
+Alias adicional:
 
 ```bash
-uv run context-tunnel-manager single
-uv run context-tunnel-manager multi
+uv run k3s-context-tunnel-manager connect acme prod
 ```
 
-`make run` agora chama `connect`. `make multi-connect` continua disponivel como fluxo legado. Comandos com `--json` funcionam bem sem TTY.
+Regras de uso:
+
+- `clients` mostra apenas clientes e contagem de hosts.
+- `hosts <client>` exige escopo de cliente e evita listagem global.
+- `connect` aceita 1 a 3 identificadores e conecta apenas quando a resolucao for unica.
+- `connect` sem identificadores falha com erro deterministico; nao existe prompt interativo.
+- `--json` funciona bem sem TTY e retorna saida estruturada.
+
+`make run` agora chama `connect`. Os atalhos antigos baseados em prompt foram removidos.
 
 ### HTTP
 
@@ -136,7 +144,7 @@ port_range_size: 10000
 - `connect_cluster` e `connect_multiple` abrem tunel SSH, leem inventario e alteram `~/.kube/config`.
 - `set_current_context` troca o contexto atual do `kubectl`; em MCP use confirmacao explicita.
 - `kill_tunnel` encerra apenas um tunel por contexto; `tunnel-kill-all` continua manual-only.
-- Se o cluster exigir VPN ou `sshuttle`, o modo MCP retorna erro estruturado/remediacao em vez de prompt interativo.
+- Se o cluster exigir VPN ou `sshuttle`, CLI/HTTP/MCP retornam erro estruturado/remediacao sem prompt interativo.
 - Nao versione `config.yaml`, kubeconfigs gerados, chaves SSH ou estado local.
 
 ## Como funciona no `systemframe`
@@ -152,7 +160,6 @@ port_range_size: 10000
 make init
 make sync
 make run
-make multi-connect
 make k9s
 make status
 make http
@@ -169,5 +176,5 @@ make test
 ```bash
 uv run python -m pytest tests/unit -q
 uv run python -m pytest tests/smoke -q
-uv run mypy src tests
+uv run python -m mypy src tests
 ```

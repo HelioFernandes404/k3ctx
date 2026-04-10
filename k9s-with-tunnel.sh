@@ -25,7 +25,7 @@
 # DEPENDENCIES:
 #   - kubectl: For reading kubeconfig current context
 #   - k9s: For interactive Kubernetes dashboard
-#   - ssh: For tunneling (created by fetch_k3s_config.py)
+#   - ssh: For tunneling (created by context-tunnel-manager connect)
 
 set -euo pipefail
 
@@ -71,7 +71,7 @@ function get_tunnel_pid() {
 function check_network_requirements() {
     # Check if context has network requirements (VPN/sshuttle)
     # Args: $1 = context name
-    # Returns: 0 if validation passes or user confirms, 1 if user cancels
+    # Returns: 0 after printing any detected requirements
     local context="$1"
     local network_file="$TUNNEL_STATE_DIR/${context}.network"
 
@@ -86,12 +86,9 @@ function check_network_requirements() {
     local sshuttle_cmd=$(grep '^sshuttle_command:' "$network_file" 2>/dev/null | sed 's/^sshuttle_command: //' | tr -d '"')
     local needs_vpn=$(grep '^needs_vpn:' "$network_file" 2>/dev/null | awk '{print $2}')
 
-    local has_warning=false
-
     # Check VPN requirement
     if [[ "$needs_vpn" == "true" ]]; then
         echo -e "${YELLOW}⚠ WARNING: This context requires VPN connection${NC}"
-        has_warning=true
     fi
 
     # Check sshuttle requirement
@@ -102,16 +99,6 @@ function check_network_requirements() {
             if [[ -n "$sshuttle_cmd" ]]; then
                 echo -e "${YELLOW}   Run: $sshuttle_cmd${NC}"
             fi
-            has_warning=true
-        fi
-    fi
-
-    if [[ "$has_warning" == "true" ]]; then
-        echo ""
-        read -p "Continue anyway? (y/n) " -n 1 -r
-        echo ""
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            return 1
         fi
     fi
 
@@ -125,8 +112,7 @@ function ensure_tunnel() {
 
     if [[ -z "$context" ]]; then
         echo -e "${RED}✗ No current kubernetes context set${NC}"
-        echo "Run: make run         # Connect single cluster"
-        echo "     make multi-connect  # Connect multiple clusters"
+        echo "Run: make run  # Connect a cluster with explicit identifiers"
         exit 1
     fi
 
@@ -136,8 +122,8 @@ function ensure_tunnel() {
         echo -e "${GREEN}✓ Tunnel already running${NC} (PID: $pid)"
     else
         echo -e "${YELLOW}⚠ Tunnel not running for context '$context'${NC}"
-        echo "Please run: make run  # or make multi-connect"
-        echo "Or create tunnel manually (check the output from fetch script)"
+        echo "Please run: make run"
+        echo "Or create the tunnel manually from the CLI output"
         exit 1
     fi
 

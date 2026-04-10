@@ -12,7 +12,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from src.application.use_cases.connect import connect_cluster, connect_multiple
-from src.application.use_cases.contexts import set_current_context
 from src.application.use_cases.discovery import (
     list_client_summaries,
     load_host_records,
@@ -21,7 +20,6 @@ from src.application.use_cases.discovery import (
 )
 from src.application.use_cases.inventory import (
     find_target_by_context_name,
-    list_cluster_targets,
     refresh_inventory_if_possible,
 )
 from src.application.use_cases.status import list_context_status, validate_context_network
@@ -33,21 +31,9 @@ from src.interfaces.cli.presenters import (
     print_client_page,
     print_host_page,
     print_host_resolution_failure,
-    print_multi_summary,
-    print_multi_usage,
-    print_network_reminders,
     print_single_failure,
     print_single_success,
     print_status,
-    show_manual_network_warnings,
-    show_network_warnings,
-)
-from src.interfaces.cli.prompts import (
-    NonInteractiveTerminalError,
-    confirm_action,
-    select_company,
-    select_multiple_targets,
-    select_single_target,
 )
 from src.interfaces.serialization import (
     client_page_payload,
@@ -78,12 +64,6 @@ def _load_runtime() -> tuple[EffectiveConfig, ServiceContainer]:
     return config, services
 
 
-def _has_tty() -> bool:
-    stdin_isatty = getattr(sys.stdin, "isatty", lambda: False)()
-    stdout_isatty = getattr(sys.stdout, "isatty", lambda: False)()
-    return bool(stdin_isatty and stdout_isatty)
-
-
 def _refresh_inventory(
     config: EffectiveConfig,
     services: ServiceContainer,
@@ -108,103 +88,13 @@ def _print_json(payload: object) -> None:
     print(json.dumps(to_jsonable(payload), sort_keys=True))
 
 
-def _confirm_action_or_none(prompt: str, *, default: bool) -> bool | None:
-    try:
-        return confirm_action(prompt, default=default)
-    except KeyboardInterrupt:
-        return None
-
-
-def _guided_connect() -> int:
-    config, services = _load_runtime()
-    _refresh_inventory(config, services)
-    targets = list_cluster_targets(config.inventory_path, services.catalog)
-    if not targets:
-        print(f"No inventories found in {config.inventory_path}.", file=sys.stderr)
-        return 1
-
-    companies = sorted({target.company for target in targets})
-    while True:
-        company = select_company(companies)
-        if company is None:
-            print("Cancelled.")
-            return 0
-
-        company_targets = [target for target in targets if target.company == company]
-        target = select_single_target(company, company_targets)
-        if target is None:
-            continue
-        if not show_manual_network_warnings(target):
-            continue
-
-        result = connect_cluster(
-            target=target,
-            config=config,
-            connector=services.connector,
-            allow_manual_network=True,
-        )
-        if result.success:
-            print_single_success(result)
-            return 0
-
-        print_single_failure(result)
-        retry = _confirm_action_or_none("Try another host?", default=True)
-        if retry:
-            continue
-        if retry is None:
-            return 0
-        return 1
-
-
-def run_multi() -> int:
-    config, services = _load_runtime()
-    _refresh_inventory(config, services)
-    print("Loading available clusters...")
-    targets = list_cluster_targets(config.inventory_path, services.catalog)
-    if not targets:
-        print("No clusters found in inventory.", file=sys.stderr)
-        return 1
-
-    print(f"Found {len(targets)} clusters in inventory")
-    selected = select_multiple_targets(targets)
-    if not selected:
-        print("\nNo clusters selected. Cancelled.")
-        return 0
-
-    if not show_network_warnings(selected):
-        print("Cancelled.")
-        return 0
-
-    print("\n============================================================")
-    print("Connecting to clusters...")
-    print("============================================================")
-    results = connect_multiple(
-        targets=selected,
-        config=config,
-        connector=services.connector,
-        allow_manual_network=True,
+def _print_removed_command_error(command: str) -> int:
+    print(
+        f"Error: `{command}` has been removed. "
+        f"Use `{_cli_name()} connect <identifier>` with explicit arguments.",
+        file=sys.stderr,
     )
-    successful = print_multi_summary(results)
-    if not successful:
-        print("\nNo clusters connected successfully.")
-        return 1
-
-    first_context = successful[0].context_name
-    print(f"\nSetting active context to: {first_context}")
-    context_error = set_current_context(
-        first_context,
-        switcher=services.switcher,
-        require_confirmation=False,
-        confirmed=True,
-    )
-    if context_error is None:
-        print(f"✓ Active context: {first_context}")
-    else:
-        print("⚠️  Failed to set active context (you can set it manually)")
-
-    print_network_reminders(successful)
-    print_multi_usage()
-    return 0
+    return 4
 
 
 def _build_connect_query(
@@ -296,13 +186,11 @@ def run_connect(args: argparse.Namespace) -> int:
     if not args.identifiers and not any(
         [args.client, args.host, args.systemframe_id, args.addr_ip, args.context_name]
     ):
-        if not _has_tty():
-            print(
-                "Error: connect requires at least one identifier in non-interactive mode.",
-                file=sys.stderr,
-            )
-            return 4
-        return _guided_connect()
+        print(
+            "Error: connect requires at least one identifier.",
+            file=sys.stderr,
+        )
+        return 4
 
     config, services = _load_runtime()
     _refresh_inventory(config, services, quiet=args.json)
@@ -339,15 +227,11 @@ def run_connect(args: argparse.Namespace) -> int:
         print("Resolved context disappeared from inventory.", file=sys.stderr)
         return 1
 
-    allow_manual_network = _has_tty() and not args.json
-    if allow_manual_network and not show_manual_network_warnings(target):
-        return 1
-
     result = connect_cluster(
         target=target,
         config=config,
         connector=services.connector,
-        allow_manual_network=allow_manual_network,
+        allow_manual_network=False,
     )
     if args.json:
         _print_json(result.to_public_dict())
@@ -442,14 +326,11 @@ def main(argv: list[str] | None = None) -> int:
         if command == "hosts":
             return run_hosts(args)
         if command == "single":
-            return _guided_connect()
+            return _print_removed_command_error("single")
         if command == "multi":
-            return run_multi()
+            return _print_removed_command_error("multi")
         if command == "status":
             return run_status(args)
-    except NonInteractiveTerminalError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 1
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 4

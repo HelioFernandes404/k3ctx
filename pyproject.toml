@@ -9,7 +9,6 @@ dependencies = [
     "paramiko>=3.0.0",
     "pyyaml>=6.0",
     "python-dotenv>=1.0.0",
-    "questionary>=2.0.0",
     "starlette>=1.0.0",
     "uvicorn>=0.42.0",
 ]
