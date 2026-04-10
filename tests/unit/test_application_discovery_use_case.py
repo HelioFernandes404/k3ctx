@@ -7,6 +7,7 @@ from pathlib import Path
 from src.application.use_cases.discovery import (
     list_client_summaries,
     load_host_records,
+    resolve_host,
     search_hosts,
 )
 from src.domain.discovery import ClientSummary, HostQuery, HostRecord
@@ -174,3 +175,74 @@ def test_search_hosts_supports_id_ip_and_free_text_filters(
 
     assert [item.context_name for item in page.items] == ["acme-api-prod"]
     assert page.page.total == 1
+
+
+def test_resolve_host_returns_unique_context_for_single_match(
+    tmp_path: Path,
+) -> None:
+    catalog = StubCatalog(
+        [
+            build_target(company="acme", host_alias="api-prod", systemframe_id="sf-1042"),
+            build_target(company="acme", host_alias="db-prod", systemframe_id="sf-2001"),
+        ]
+    )
+
+    result = resolve_host(
+        tmp_path,
+        catalog,
+        query=HostQuery(client="acme", host_name="api"),
+    )
+
+    assert result.status == "unique"
+    assert result.context_name == "acme-api-prod"
+    assert [item.context_name for item in result.matches] == ["acme-api-prod"]
+
+
+def test_resolve_host_returns_ambiguous_preview_with_hint(
+    tmp_path: Path,
+) -> None:
+    catalog = StubCatalog(
+        [
+            build_target(company="acme", host_alias="api-01", systemframe_id="sf-1"),
+            build_target(company="acme", host_alias="api-02", systemframe_id="sf-2"),
+            build_target(company="acme", host_alias="api-03", systemframe_id="sf-3"),
+        ]
+    )
+
+    result = resolve_host(
+        tmp_path,
+        catalog,
+        query=HostQuery(client="acme", host_name="api"),
+        limit=2,
+    )
+
+    assert result.status == "ambiguous"
+    assert result.context_name is None
+    assert [item.context_name for item in result.matches] == [
+        "acme-api-01",
+        "acme-api-02",
+    ]
+    assert result.page.total == 3
+    assert result.hint == "Multiple hosts matched. Refine with --ip, --id, or a more specific host name."
+
+
+def test_resolve_host_returns_no_match_when_filters_do_not_overlap(
+    tmp_path: Path,
+) -> None:
+    catalog = StubCatalog(
+        [
+            build_target(company="acme", host_alias="api-prod", addr_ip="10.0.0.10"),
+            build_target(company="acme", host_alias="db-prod", addr_ip="10.0.0.20"),
+        ]
+    )
+
+    result = resolve_host(
+        tmp_path,
+        catalog,
+        query=HostQuery(client="acme", host_name="api", addr_ip="10.0.0.20"),
+    )
+
+    assert result.status == "no_match"
+    assert result.context_name is None
+    assert result.matches == ()
+    assert result.hint == "No hosts matched the provided identifiers."
