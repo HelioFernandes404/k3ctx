@@ -206,7 +206,7 @@ def test_makefile_exposes_mcp_targets() -> None:
     assert "k3s-context-tunnel-manager-http" in makefile
     assert "mcp-stdio:" in makefile
     assert "mcp-http:" in makefile
-    assert "run_mcp_stdio.py" in makefile
+    assert "k3s-context-tunnel-manager-mcp-stdio" in makefile
     assert "src/mcp_server.py" in makefile or "src.mcp_server" in makefile
 
 
@@ -214,10 +214,14 @@ def test_readme_documents_manual_and_mcp_modes() -> None:
     readme = Path("README.md").read_text()
 
     assert "make run" in readme
+    assert "context-tunnel-manager init" in readme
+    assert "context-tunnel-manager k9s" in readme
+    assert "context-tunnel-manager tunnel-list" in readme
     assert "make http" in readme
     assert "GET /config" in readme
     assert "POST /connect" in readme
     assert "make mcp-stdio" in readme
+    assert "k3s-context-tunnel-manager-mcp-stdio" in readme
     assert "make mcp-http" in readme
     assert "connect_cluster" in readme
     assert "inventory://clusters" in readme

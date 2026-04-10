@@ -4,7 +4,6 @@
 # Configuration
 PROJECT_DIR := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 CLI_COMMAND := uv run context-tunnel-manager
-TUNNEL_SCRIPT := $(PROJECT_DIR)/k9s-with-tunnel.sh
 CONFIG_DIR := $(HOME)/.k9s-config
 LOG_DIR := $(HOME)/.local/state/k9s
 MCP_HTTP_HOST ?= 127.0.0.1
@@ -43,7 +42,8 @@ help:
 ## init: Initialize project (first time setup)
 init:
 	@echo "$(GREEN)Initializing K9s Multi-Context Manager...$(NC)"
-	@bash $(PROJECT_DIR)/init.sh
+	@uv sync
+	@$(CLI_COMMAND) init
 
 ## sync: Sync dependencies with uv
 sync:
@@ -58,7 +58,7 @@ run:
 ## k9s: Start k9s with tunnel verification
 k9s:
 	@echo "$(GREEN)Starting k9s...$(NC)"
-	@bash $(TUNNEL_SCRIPT)
+	@$(CLI_COMMAND) k9s
 
 ## status: Show status of all connected clusters
 status:
@@ -66,7 +66,7 @@ status:
 
 ## tunnel-list: List all active SSH tunnels
 tunnel-list:
-	@bash $(TUNNEL_SCRIPT) list
+	@$(CLI_COMMAND) tunnel-list
 
 ## tunnel-kill: Kill tunnel for specific context (usage: make tunnel-kill CONTEXT=name)
 tunnel-kill:
@@ -75,11 +75,11 @@ ifndef CONTEXT
 	@echo "Usage: make tunnel-kill CONTEXT=your-context-name"
 	@exit 1
 endif
-	@bash $(TUNNEL_SCRIPT) kill $(CONTEXT)
+	@$(CLI_COMMAND) tunnel-kill $(CONTEXT)
 
 ## tunnel-kill-all: Kill all SSH tunnels
 tunnel-kill-all:
-	@bash $(TUNNEL_SCRIPT) kill-all
+	@$(CLI_COMMAND) tunnel-kill-all
 
 ## clean: Remove generated kubeconfig files
 clean:
@@ -113,7 +113,7 @@ http:
 
 ## mcp-stdio: Start the MCP server over stdio
 mcp-stdio:
-	@uv run python run_mcp_stdio.py
+	@uv run k3s-context-tunnel-manager-mcp-stdio
 
 ## mcp-http: Start the MCP server over HTTP
 mcp-http:

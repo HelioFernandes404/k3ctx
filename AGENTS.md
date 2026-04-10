@@ -6,7 +6,7 @@ This project is a local K3s context tunnel manager for the `systemframe` workspa
 
 ## Project Structure & Module Organization
 
-The codebase is organized in layers. Core domain models and pure policies live in `src/domain/`. Application orchestration lives in `src/application/use_cases/`. Infrastructure adapters live in `src/infrastructure/adapters/` and handle inventory access, connection, context switching, tunnel management, and status reads. User-facing entrypoints live in `src/interfaces/cli/`, `src/interfaces/http/`, and `src/interfaces/mcp/`, with compatibility wrappers such as [`src/mcp_server.py`](/home/helio/Obsidian/work/02-trabalho/systemframe/custom-tools/k3s-context-tunnel-manager/src/mcp_server.py) preserved at the repository root. Shell helpers such as `k9s-with-tunnel.sh` remain for local workflows. Tests stay split between `tests/unit/` and `tests/smoke/`. Local defaults live in `config.yaml`. Generated kubeconfig cache files are stored under `~/.cache/k9s-config/<context>.yml`.
+The codebase is organized in layers. Core domain models and pure policies live in `src/domain/`. Application orchestration lives in `src/application/use_cases/`. Infrastructure adapters live in `src/infrastructure/adapters/` and handle inventory access, connection, context switching, tunnel management, and status reads. User-facing entrypoints live in `src/interfaces/cli/`, `src/interfaces/http/`, and `src/interfaces/mcp/`, with compatibility wrappers such as [`src/mcp_server.py`](/home/helio/Obsidian/work/02-trabalho/systemframe/custom-tools/k3s-context-tunnel-manager/src/mcp_server.py) preserved at the repository root. Repository-root helper scripts have been removed in favor of official entrypoints under `src`. Tests stay split between `tests/unit/` and `tests/smoke/`. Local defaults live in `config.yaml`. Generated kubeconfig cache files are stored under `~/.cache/k9s-config/<context>.yml`.
 
 ## Stack
 
@@ -25,10 +25,16 @@ The main stack is Python 3, `uv`, `paramiko`, `PyYAML`, and Bash.
 - `make mcp-stdio`: start the MCP server over stdio.
 - `make mcp-http`: start the MCP server over HTTP on `127.0.0.1:8000` by default.
 - `make test`: run the full test suite with verbose output.
+- `uv run context-tunnel-manager init`: prepare local config and log directories.
 - `uv run context-tunnel-manager clients`: list clients with host counts.
 - `uv run context-tunnel-manager hosts <client>`: list or search hosts inside one client.
 - `uv run context-tunnel-manager connect [identifiers...]`: resolve identifiers and connect if unique.
+- `uv run context-tunnel-manager k9s`: validate current tunnel and launch `k9s`.
+- `uv run context-tunnel-manager tunnel-list`: list active SSH tunnels.
+- `uv run context-tunnel-manager tunnel-kill <context>`: stop one managed tunnel.
+- `uv run context-tunnel-manager tunnel-kill-all`: stop all managed tunnels.
 - `uv run context-tunnel-manager status`: show active contexts and tunnels.
+- `uv run k3s-context-tunnel-manager-mcp-stdio`: start the MCP server over stdio.
 - `uv run python -m pytest tests/unit -q`: fast unit test pass.
 - `uv run python -m pytest tests/smoke -q`: smoke validation for user-facing entrypoints and docs.
 - `uv run python -m mypy src tests`: run static type checks.

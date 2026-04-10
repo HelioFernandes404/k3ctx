@@ -267,3 +267,75 @@ def test_multi_command_returns_non_interactive_error(
 
     assert exit_code == 4
     assert "has been removed" in capsys.readouterr().err
+
+
+def test_init_command_dispatches_to_official_cli_workflow(
+    mocker: MockerFixture,
+) -> None:
+    mocker.patch("src.interfaces.cli.app.setup_logging")
+    run_init = mocker.patch("src.interfaces.cli.app.run_init", return_value=0, create=True)
+
+    exit_code = main(["init"])
+
+    assert exit_code == 0
+    run_init.assert_called_once()
+
+
+def test_k9s_command_dispatches_to_official_cli_workflow(
+    mocker: MockerFixture,
+) -> None:
+    mocker.patch("src.interfaces.cli.app.setup_logging")
+    run_k9s = mocker.patch("src.interfaces.cli.app.run_k9s", return_value=0, create=True)
+
+    exit_code = main(["k9s"])
+
+    assert exit_code == 0
+    run_k9s.assert_called_once()
+
+
+def test_tunnel_list_command_dispatches_to_official_cli_workflow(
+    mocker: MockerFixture,
+) -> None:
+    mocker.patch("src.interfaces.cli.app.setup_logging")
+    run_tunnel_list = mocker.patch(
+        "src.interfaces.cli.app.run_tunnel_list",
+        return_value=0,
+        create=True,
+    )
+
+    exit_code = main(["tunnel-list"])
+
+    assert exit_code == 0
+    run_tunnel_list.assert_called_once()
+
+
+def test_tunnel_kill_command_dispatches_to_official_cli_workflow(
+    mocker: MockerFixture,
+) -> None:
+    mocker.patch("src.interfaces.cli.app.setup_logging")
+    run_tunnel_kill = mocker.patch(
+        "src.interfaces.cli.app.run_tunnel_kill",
+        return_value=0,
+        create=True,
+    )
+
+    exit_code = main(["tunnel-kill", "acme-prod"])
+
+    assert exit_code == 0
+    run_tunnel_kill.assert_called_once()
+
+
+def test_tunnel_kill_all_command_dispatches_to_official_cli_workflow(
+    mocker: MockerFixture,
+) -> None:
+    mocker.patch("src.interfaces.cli.app.setup_logging")
+    run_tunnel_kill_all = mocker.patch(
+        "src.interfaces.cli.app.run_tunnel_kill_all",
+        return_value=0,
+        create=True,
+    )
+
+    exit_code = main(["tunnel-kill-all"])
+
+    assert exit_code == 0
+    run_tunnel_kill_all.assert_called_once()

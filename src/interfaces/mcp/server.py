@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -199,8 +200,14 @@ def build_mcp_server(
 mcp = build_mcp_server()
 
 
-if __name__ == "__main__":
+def main_stdio() -> None:
+    os.environ.setdefault("FASTMCP_LOG_ENABLED", "false")
+    os.environ.setdefault("FASTMCP_SHOW_SERVER_BANNER", "false")
     mcp.run(show_banner=False)
 
 
-__all__ = ["build_mcp_server", "mcp"]
+if __name__ == "__main__":
+    main_stdio()
+
+
+__all__ = ["build_mcp_server", "main_stdio", "mcp"]

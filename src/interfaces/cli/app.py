@@ -6,6 +6,8 @@ import argparse
 import json
 import os
 import re
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -23,6 +25,7 @@ from src.application.use_cases.inventory import (
     refresh_inventory_if_possible,
 )
 from src.application.use_cases.status import list_context_status, validate_context_network
+from src.application.use_cases.tunnels import kill_tunnel as kill_tunnel_use_case
 from src.bootstrap import ServiceContainer, build_service_container
 from src.config import load_effective_config
 from src.domain.discovery import HostQuery, HostRecord
@@ -42,6 +45,7 @@ from src.interfaces.serialization import (
     to_jsonable,
 )
 from src.logging_config import setup_logging
+from src.status_runtime import get_current_context, get_tunnel_pid
 
 PROJECT_DIR = Path(__file__).resolve().parents[3]
 _IP_PATTERN = re.compile(r"^\d{1,3}(?:\.\d{1,3}){3}$")
@@ -95,6 +99,25 @@ def _print_removed_command_error(command: str) -> int:
         file=sys.stderr,
     )
     return 4
+
+
+def _default_config_dir() -> Path:
+    override = os.getenv("K9S_CONFIG_DIR")
+    return Path(override).expanduser() if override else Path.home() / ".k9s-config"
+
+
+def _default_log_dir() -> Path:
+    override = os.getenv("K9S_LOG_DIR")
+    return Path(override).expanduser() if override else Path.home() / ".local" / "state" / "k9s"
+
+
+def _copy_default_config(project_dir: Path, config_dir: Path) -> bool:
+    example = project_dir / ".k9s-config-example" / "config.yaml"
+    destination = config_dir / "config.yaml"
+    if destination.exists() or not example.exists():
+        return False
+    shutil.copy2(example, destination)
+    return True
 
 
 def _build_connect_query(
@@ -261,9 +284,103 @@ def run_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_init(args: argparse.Namespace) -> int:
+    del args
+    config_dir = _default_config_dir()
+    log_dir = _default_log_dir()
+
+    config_dir.mkdir(parents=True, exist_ok=True)
+    copied_default = _copy_default_config(PROJECT_DIR, config_dir)
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"Config directory: {config_dir}")
+    if copied_default:
+        print(f"Created default config: {config_dir / 'config.yaml'}")
+    else:
+        print(f"Config file ready: {config_dir / 'config.yaml'}")
+    print(f"Log directory: {log_dir}")
+    print(f"Next: {_cli_name()} connect <identifier>")
+    return 0
+
+
+def run_k9s(args: argparse.Namespace) -> int:
+    del args
+    _, services = _load_runtime()
+    current_context = get_current_context()
+    if not current_context:
+        print("No current kubernetes context set.", file=sys.stderr)
+        print(f"Run: {_cli_name()} connect <identifier>", file=sys.stderr)
+        return 1
+
+    tunnel_pid = get_tunnel_pid(current_context)
+    if tunnel_pid is None:
+        print(f"Tunnel not running for context '{current_context}'.", file=sys.stderr)
+        print(f"Run: {_cli_name()} connect --context {current_context}", file=sys.stderr)
+        return 1
+
+    validation = validate_context_network(current_context, services.status_reader)
+    if not bool(validation.get("ok", True)):
+        warning = validation.get("warning")
+        if warning:
+            print(f"Warning: {warning}")
+        network_metadata = validation.get("network_metadata")
+        if isinstance(network_metadata, dict):
+            sshuttle_command = network_metadata.get("sshuttle_command")
+            if isinstance(sshuttle_command, str) and sshuttle_command:
+                print(f"Run: {sshuttle_command}")
+
+    try:
+        result = subprocess.run(["k9s", "-l", "debug"], check=False)
+    except FileNotFoundError:
+        print("k9s executable not found in PATH.", file=sys.stderr)
+        return 1
+    return int(result.returncode)
+
+
+def run_tunnel_list(args: argparse.Namespace) -> int:
+    del args
+    _, services = _load_runtime()
+    items = list_context_status(services.status_reader)
+    running = [item for item in items if bool(item.get("tunnel_running"))]
+
+    print("Active SSH tunnels:")
+    if not running:
+        print("  (none)")
+        return 0
+
+    for item in running:
+        print(f"  ✓ {item['name']} (PID: {item.get('tunnel_pid')})")
+    return 0
+
+
+def run_tunnel_kill(args: argparse.Namespace) -> int:
+    _, services = _load_runtime()
+    kill_tunnel_use_case(args.context_name, services.tunnel_manager)
+    print(f"Killed tunnel for {args.context_name}")
+    return 0
+
+
+def run_tunnel_kill_all(args: argparse.Namespace) -> int:
+    del args
+    _, services = _load_runtime()
+    items = list_context_status(services.status_reader)
+    running_contexts = [str(item["name"]) for item in items if bool(item.get("tunnel_running"))]
+
+    if not running_contexts:
+        print("(none to kill)")
+        return 0
+
+    for context_name in running_contexts:
+        kill_tunnel_use_case(context_name, services.tunnel_manager)
+        print(f"Killed tunnel for {context_name}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog=_cli_name())
     subparsers = parser.add_subparsers(dest="command")
+
+    subparsers.add_parser("init", help="Prepare local config and log directories")
 
     clients_parser = subparsers.add_parser("clients", help="List clients with host counts")
     clients_parser.add_argument("query", nargs="?")
@@ -290,8 +407,15 @@ def build_parser() -> argparse.ArgumentParser:
     connect_parser.add_argument("--context", dest="context_name")
     connect_parser.add_argument("--json", action="store_true")
 
+    subparsers.add_parser("k9s", help="Launch k9s after tunnel validation")
+
     status_parser = subparsers.add_parser("status", help="Show active contexts and tunnels")
     status_parser.add_argument("--json", action="store_true")
+
+    subparsers.add_parser("tunnel-list", help="List active SSH tunnels")
+    tunnel_kill_parser = subparsers.add_parser("tunnel-kill", help="Kill one tunnel by context")
+    tunnel_kill_parser.add_argument("context_name")
+    subparsers.add_parser("tunnel-kill-all", help="Kill all managed tunnels")
 
     subparsers.add_parser("single", help=argparse.SUPPRESS)
     subparsers.add_parser("multi", help=argparse.SUPPRESS)
@@ -325,12 +449,22 @@ def main(argv: list[str] | None = None) -> int:
             return run_clients(args)
         if command == "hosts":
             return run_hosts(args)
+        if command == "init":
+            return run_init(args)
+        if command == "k9s":
+            return run_k9s(args)
         if command == "single":
             return _print_removed_command_error("single")
         if command == "multi":
             return _print_removed_command_error("multi")
         if command == "status":
             return run_status(args)
+        if command == "tunnel-list":
+            return run_tunnel_list(args)
+        if command == "tunnel-kill":
+            return run_tunnel_kill(args)
+        if command == "tunnel-kill-all":
+            return run_tunnel_kill_all(args)
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 4

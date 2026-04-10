@@ -15,9 +15,12 @@ cd /home/helio/Obsidian/work/02-trabalho/systemframe/custom-tools/k3s-context-tu
 Fluxo principal para descoberta e conexao:
 
 ```bash
+uv run context-tunnel-manager init
 uv run context-tunnel-manager clients
 uv run context-tunnel-manager hosts acme
 uv run context-tunnel-manager connect acme prod
+uv run context-tunnel-manager k9s
+uv run context-tunnel-manager tunnel-list
 uv run context-tunnel-manager status
 
 make help
@@ -32,6 +35,8 @@ uv run context-tunnel-manager hosts acme --host api --limit 10
 uv run context-tunnel-manager connect --ip 10.0.0.10
 uv run context-tunnel-manager connect --context acme-prod
 uv run context-tunnel-manager connect --id sf-1042 --json
+uv run context-tunnel-manager tunnel-kill acme-prod
+uv run context-tunnel-manager tunnel-kill-all
 uv run context-tunnel-manager status --json
 ```
 
@@ -85,6 +90,7 @@ curl -X POST http://127.0.0.1:8080/tunnels/acme-prod/kill
 Servidor FastMCP sobre a mesma base de casos de uso, exposto em [`src/mcp_server.py`](/home/helio/Obsidian/work/02-trabalho/systemframe/custom-tools/k3s-context-tunnel-manager/src/mcp_server.py).
 
 ```bash
+uv run k3s-context-tunnel-manager-mcp-stdio
 make mcp-stdio
 make mcp-http
 ```
@@ -146,6 +152,7 @@ port_range_size: 10000
 - `kill_tunnel` encerra apenas um tunel por contexto; `tunnel-kill-all` continua manual-only.
 - Se o cluster exigir VPN ou `sshuttle`, CLI/HTTP/MCP retornam erro estruturado/remediacao sem prompt interativo.
 - Nao versione `config.yaml`, kubeconfigs gerados, chaves SSH ou estado local.
+- Scripts legados fora de `src` foram removidos; use apenas `context-tunnel-manager ...`, `k3s-context-tunnel-manager-http`, e `k3s-context-tunnel-manager-mcp-stdio`.
 
 ## Como funciona no `systemframe`
 
