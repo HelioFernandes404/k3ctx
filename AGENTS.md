@@ -1,5 +1,19 @@
 # Repository Guidelines
 
+## LLM Startup Instructions
+
+At the start of each session:
+
+- Read this file before proposing commands, edits, or architecture changes.
+- Treat `src/interfaces/cli/app.py`, `src/interfaces/http/`, and `src/interfaces/mcp/` as the official entrypoints.
+- Do not reintroduce repository-root helper scripts or interactive prompt flows.
+- Prefer the discovery-first CLI flow: `init`, `clients`, `hosts`, `connect`, `status`, `k9s`.
+- Assume local YAML data belongs under `~/.local/share/k3s-context-tunnel-manager/yaml/`, not in the repository root.
+- Keep the default CLI non-interactive and automation-safe; preserve clean `--json` stdout contracts.
+- Refresh inventory only when explicitly requested via `--refresh-inventory` or `K9S_REFRESH_INVENTORY=1`.
+- Before changing behavior, read the affected module and its current tests in `tests/unit/` and `tests/smoke/`.
+- When validating a real cluster flow, verify the tunnel, current context, and a real `kubectl` call instead of trusting setup messages alone.
+
 ## Project Overview
 
 This project is a local K3s context tunnel manager for the `systemframe` workspace. It fetches kubeconfig files over SSH, opens local tunnels to K3s API servers, merges contexts into `~/.kube/config`, and supports local workflows with `kubectl`, `k9s`, and related tools.
