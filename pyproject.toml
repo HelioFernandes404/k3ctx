@@ -14,6 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
+k3ctx = "src.interfaces.cli.app:main"
 context-tunnel-manager = "src.interfaces.cli.app:main"
 k3s-context-tunnel-manager = "src.interfaces.cli.app:main"
 k3s-context-tunnel-manager-mcp-stdio = "src.interfaces.mcp.server:main_stdio"

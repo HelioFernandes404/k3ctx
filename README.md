@@ -15,13 +15,13 @@ cd /home/helio/Obsidian/work/02-trabalho/systemframe/custom-tools/k3s-context-tu
 Fluxo principal para descoberta e conexao:
 
 ```bash
-uv run context-tunnel-manager init
-uv run context-tunnel-manager clients
-uv run context-tunnel-manager hosts acme
-uv run context-tunnel-manager connect acme prod
-uv run context-tunnel-manager k9s
-uv run context-tunnel-manager tunnel-list
-uv run context-tunnel-manager status
+uv run k3ctx init
+uv run k3ctx clients
+uv run k3ctx hosts acme
+uv run k3ctx connect acme prod
+uv run k3ctx k9s
+uv run k3ctx tunnel-list
+uv run k3ctx status
 
 make help
 make run
@@ -31,18 +31,19 @@ make status
 Exemplos de refinamento:
 
 ```bash
-uv run context-tunnel-manager hosts acme --host api --limit 10
-uv run context-tunnel-manager connect --ip 10.0.0.10
-uv run context-tunnel-manager connect --context acme-prod
-uv run context-tunnel-manager connect --id sf-1042 --json
-uv run context-tunnel-manager tunnel-kill acme-prod
-uv run context-tunnel-manager tunnel-kill-all
-uv run context-tunnel-manager status --json
+uv run k3ctx hosts acme --host api --limit 10
+uv run k3ctx connect --ip 10.0.0.10
+uv run k3ctx connect --context acme-prod
+uv run k3ctx connect --id sf-1042 --json
+uv run k3ctx tunnel-kill acme-prod
+uv run k3ctx tunnel-kill-all
+uv run k3ctx status --json
 ```
 
-Alias adicional:
+Aliases compativeis:
 
 ```bash
+uv run context-tunnel-manager connect acme prod
 uv run k3s-context-tunnel-manager connect acme prod
 ```
 
@@ -135,7 +136,7 @@ Resources read-only:
 
 ## Config canônica
 
-`uv run context-tunnel-manager init` prepara o caminho oficial de YAML em:
+`uv run k3ctx init` prepara o caminho oficial de YAML em:
 
 ```bash
 ~/.local/share/k3s-context-tunnel-manager/yaml/
@@ -185,7 +186,7 @@ port_range_size: 10000
 - `kill_tunnel` encerra apenas um tunel por contexto; `tunnel-kill-all` continua manual-only.
 - Se o cluster exigir VPN ou `sshuttle`, CLI/HTTP/MCP retornam erro estruturado/remediacao sem prompt interativo.
 - Nao versione `~/.local/share/k3s-context-tunnel-manager/yaml/config/config.yaml`, kubeconfigs gerados, chaves SSH ou estado local.
-- Scripts legados fora de `src` foram removidos; use apenas `context-tunnel-manager ...`, `k3s-context-tunnel-manager-http`, e `k3s-context-tunnel-manager-mcp-stdio`.
+- Scripts legados fora de `src` foram removidos; use `k3ctx ...` como alias curto ou `context-tunnel-manager ...`, alem de `k3s-context-tunnel-manager-http` e `k3s-context-tunnel-manager-mcp-stdio`.
 
 ## Como funciona no `systemframe`
 

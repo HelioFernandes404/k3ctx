@@ -214,9 +214,10 @@ def test_readme_documents_manual_and_mcp_modes() -> None:
     readme = Path("README.md").read_text()
 
     assert "make run" in readme
-    assert "context-tunnel-manager init" in readme
-    assert "context-tunnel-manager k9s" in readme
-    assert "context-tunnel-manager tunnel-list" in readme
+    assert "k3ctx init" in readme
+    assert "k3ctx k9s" in readme
+    assert "k3ctx tunnel-list" in readme
+    assert "context-tunnel-manager connect" in readme
     assert "make http" in readme
     assert "GET /config" in readme
     assert "POST /connect" in readme
@@ -227,6 +228,13 @@ def test_readme_documents_manual_and_mcp_modes() -> None:
     assert "inventory://clusters" in readme
     assert "config.yaml" in readme
     assert "~/.local/share/k3s-context-tunnel-manager/yaml/" in readme
+
+
+def test_pyproject_exposes_short_cli_alias() -> None:
+    pyproject = Path("pyproject.toml").read_text()
+
+    assert 'k3ctx = "src.interfaces.cli.app:main"' in pyproject
+    assert 'context-tunnel-manager = "src.interfaces.cli.app:main"' in pyproject
 
 
 def test_agents_mentions_layered_architecture_and_mcp_server() -> None:
