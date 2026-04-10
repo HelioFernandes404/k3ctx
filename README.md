@@ -12,12 +12,13 @@ cd /home/helio/Obsidian/work/02-trabalho/systemframe/custom-tools/k3s-context-tu
 
 ### CLI oficial
 
-Fluxo interativo para operador local:
+Fluxo principal para descoberta e conexao:
 
 ```bash
-uv run k3s-context-tunnel-manager single
-uv run k3s-context-tunnel-manager multi
-uv run k3s-context-tunnel-manager status
+uv run context-tunnel-manager clients
+uv run context-tunnel-manager hosts acme
+uv run context-tunnel-manager connect acme prod
+uv run context-tunnel-manager status
 
 make help
 make run
@@ -25,7 +26,22 @@ make multi-connect
 make status
 ```
 
-`make run`, `make multi-connect` e `make status` sao atalhos para a CLI oficial. Requer TTY para os fluxos interativos.
+Exemplos de refinamento:
+
+```bash
+uv run context-tunnel-manager hosts acme --host api --limit 10
+uv run context-tunnel-manager connect --ip 10.0.0.10
+uv run context-tunnel-manager connect --id sf-1042 --json
+```
+
+Aliases legados ainda disponiveis temporariamente:
+
+```bash
+uv run context-tunnel-manager single
+uv run context-tunnel-manager multi
+```
+
+`make run` agora chama `connect`. `make multi-connect` continua disponivel como fluxo legado. Comandos com `--json` funcionam bem sem TTY.
 
 ### HTTP
 

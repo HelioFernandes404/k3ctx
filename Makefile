@@ -3,7 +3,7 @@
 
 # Configuration
 PROJECT_DIR := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
-CLI_COMMAND := uv run k3s-context-tunnel-manager
+CLI_COMMAND := uv run context-tunnel-manager
 TUNNEL_SCRIPT := $(PROJECT_DIR)/k9s-with-tunnel.sh
 CONFIG_DIR := $(HOME)/.k9s-config
 LOG_DIR := $(HOME)/.local/state/k9s
@@ -28,8 +28,8 @@ help:
 	@echo ""
 	@echo "Main commands:"
 	@echo "  $(YELLOW)make init$(NC)          - Initialize project (first time setup)"
-	@echo "  $(YELLOW)make run$(NC)           - Connect to single cluster"
-	@echo "  $(YELLOW)make multi-connect$(NC) - Connect to multiple clusters"
+	@echo "  $(YELLOW)make run$(NC)           - Discover and connect to a cluster"
+	@echo "  $(YELLOW)make multi-connect$(NC) - Start legacy multi-cluster flow"
 	@echo "  $(YELLOW)make http$(NC)          - Start REST HTTP interface"
 	@echo "  $(YELLOW)make mcp-stdio$(NC)     - Start MCP server over stdio"
 	@echo "  $(YELLOW)make mcp-http$(NC)      - Start MCP server over HTTP"
@@ -51,14 +51,14 @@ sync:
 	@echo "$(GREEN)Syncing dependencies...$(NC)"
 	@uv sync
 
-## run: Connect to a single cluster
+## run: Discover and connect to a cluster
 run:
-	@echo "$(GREEN)Starting K9s Multi-Context Manager...$(NC)"
-	@$(CLI_COMMAND) single
+	@echo "$(GREEN)Starting Context Tunnel Manager...$(NC)"
+	@$(CLI_COMMAND) connect
 
-## multi-connect: Connect to multiple clusters simultaneously
+## multi-connect: Connect to multiple clusters simultaneously (legacy flow)
 multi-connect:
-	@echo "$(GREEN)Starting multi-cluster connection...$(NC)"
+	@echo "$(YELLOW)Starting legacy multi-cluster flow...$(NC)"
 	@$(CLI_COMMAND) multi
 
 ## k9s: Start k9s with tunnel verification

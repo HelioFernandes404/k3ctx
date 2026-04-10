@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from pytest import CaptureFixture
 from pytest_mock import MockerFixture
 
 from src.domain.discovery import (
@@ -56,7 +57,7 @@ def build_success_result(context_name: str = "acme-prod") -> ConnectResult:
 def test_clients_command_returns_json_payload(
     mocker: MockerFixture,
     tmp_path: Path,
-    capsys: object,
+    capsys: CaptureFixture[str],
 ) -> None:
     config = build_config(tmp_path)
     mocker.patch("src.interfaces.cli.app.load_effective_config", return_value=config)
@@ -153,7 +154,7 @@ def test_connect_command_resolves_before_connecting(
 
 def test_connect_command_rejects_empty_non_interactive_invocation(
     mocker: MockerFixture,
-    capsys: object,
+    capsys: CaptureFixture[str],
 ) -> None:
     mocker.patch("src.interfaces.cli.app.setup_logging")
     mocker.patch("src.interfaces.cli.app._has_tty", return_value=False)
