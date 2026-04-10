@@ -7,6 +7,15 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from src.domain.discovery import (
+    ClientPage,
+    ClientSummary,
+    HostPage,
+    HostQuery,
+    HostRecord,
+    HostResolutionResult,
+    PageInfo,
+)
 from src.domain.models import ClusterTarget, EffectiveConfig, OperationError
 
 
@@ -54,6 +63,103 @@ def cluster_target_payload(target: ClusterTarget) -> dict[str, Any]:
 
 def cluster_targets_payload(targets: Sequence[ClusterTarget]) -> list[dict[str, Any]]:
     return [cluster_target_payload(target) for target in targets]
+
+
+def page_info_payload(page: PageInfo) -> dict[str, Any]:
+    return {
+        "limit": page.limit,
+        "returned": page.returned,
+        "total": page.total,
+        "has_more": page.has_more,
+        "next_cursor": page.next_cursor,
+    }
+
+
+def client_summary_payload(summary: ClientSummary) -> dict[str, Any]:
+    return {
+        "client": summary.client,
+        "host_count": summary.host_count,
+    }
+
+
+def client_page_payload(page: ClientPage) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "items": [client_summary_payload(item) for item in page.items],
+        "pagination": page_info_payload(page.page),
+    }
+
+
+def host_query_payload(query: HostQuery) -> dict[str, Any]:
+    return {
+        "client": query.client,
+        "host_name": query.host_name,
+        "systemframe_id": query.systemframe_id,
+        "addr_ip": query.addr_ip,
+        "context_name": query.context_name,
+        "query": query.query,
+        "exact": query.exact,
+    }
+
+
+def host_record_payload(record: HostRecord) -> dict[str, Any]:
+    return {
+        "client": record.client,
+        "host_name": record.host_name,
+        "systemframe_id": record.systemframe_id,
+        "addr_ip": record.addr_ip,
+        "context_name": record.context_name,
+        "group": record.group,
+    }
+
+
+def host_page_payload(page: HostPage) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "query": host_query_payload(page.query),
+        "items": [host_record_payload(item) for item in page.items],
+        "pagination": page_info_payload(page.page),
+    }
+
+
+def _resolution_error_code(status: str) -> str:
+    return "ambiguous_target" if status == "ambiguous" else "no_match"
+
+
+def _suggested_commands(
+    result: HostResolutionResult,
+    *,
+    cli_name: str,
+) -> list[str]:
+    if result.status != "ambiguous" or not result.matches:
+        return []
+
+    first = result.matches[0]
+    commands = [f"{cli_name} hosts {first.client} --host {first.host_name}"]
+    if first.addr_ip is not None:
+        commands.append(f"{cli_name} connect --ip {first.addr_ip}")
+    if first.systemframe_id is not None:
+        commands.append(f"{cli_name} connect --id {first.systemframe_id}")
+    return commands
+
+
+def host_resolution_payload(
+    result: HostResolutionResult,
+    *,
+    cli_name: str,
+) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "error": {
+            "code": _resolution_error_code(result.status),
+            "message": result.hint or "Host resolution failed",
+        },
+        "query": host_query_payload(result.query),
+        "matches": [host_record_payload(item) for item in result.matches],
+        "pagination": page_info_payload(result.page),
+        "hint": result.hint,
+        "suggested_commands": _suggested_commands(result, cli_name=cli_name),
+    }
 
 
 def context_not_found_payload(context_name: str) -> dict[str, Any]:
