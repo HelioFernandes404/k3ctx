@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import re
 import shutil
@@ -13,15 +14,22 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from src.app_paths import (
+    get_config_dir,
+    get_config_file_path,
+    get_kubeconfig_cache_dir,
+    get_legacy_home_config_file_path,
+    get_legacy_project_root_yaml_files,
+)
 from src.application.use_cases.connect import connect_cluster, connect_multiple
 from src.application.use_cases.discovery import (
+    build_host_records,
     list_client_summaries,
-    load_host_records,
-    resolve_host,
+    resolve_host_records,
     search_hosts,
 )
 from src.application.use_cases.inventory import (
-    find_target_by_context_name,
+    list_cluster_targets,
     refresh_inventory_if_possible,
 )
 from src.application.use_cases.status import list_context_status, validate_context_network
@@ -55,11 +63,33 @@ def _cli_name() -> str:
     return Path(sys.argv[0]).name or "context-tunnel-manager"
 
 
-def _configure_logging() -> None:
+def _env_truthy(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _resolve_log_level() -> int:
+    value = os.getenv("K9S_LOG_LEVEL", "").strip().lower()
+    levels = {
+        "debug": logging.DEBUG,
+        "info": logging.INFO,
+        "warning": logging.WARNING,
+        "error": logging.ERROR,
+    }
+    return levels.get(value, logging.INFO)
+
+
+def _configure_logging(args: argparse.Namespace) -> None:
     log_file_path = os.path.expanduser(
         os.getenv("K9S_LOG_FILE", "~/.local/state/k9s/k9s-config.log")
     )
-    setup_logging(log_file=log_file_path, structured=True)
+    structured = bool(getattr(args, "json", False)) or (
+        os.getenv("K9S_LOG_FORMAT", "").strip().lower() == "json"
+    )
+    setup_logging(
+        level=_resolve_log_level(),
+        log_file=log_file_path,
+        structured=structured,
+    )
 
 
 def _load_runtime() -> tuple[EffectiveConfig, ServiceContainer]:
@@ -72,8 +102,12 @@ def _refresh_inventory(
     config: EffectiveConfig,
     services: ServiceContainer,
     *,
+    enabled: bool = False,
     quiet: bool = False,
 ) -> None:
+    if not enabled:
+        return
+
     refresh_result = refresh_inventory_if_possible(config.inventory_path, services.refresher)
     if refresh_result is None or not isinstance(refresh_result, tuple) or len(refresh_result) != 2:
         return
@@ -102,8 +136,7 @@ def _print_removed_command_error(command: str) -> int:
 
 
 def _default_config_dir() -> Path:
-    override = os.getenv("K9S_CONFIG_DIR")
-    return Path(override).expanduser() if override else Path.home() / ".k9s-config"
+    return get_config_dir()
 
 
 def _default_log_dir() -> Path:
@@ -111,13 +144,74 @@ def _default_log_dir() -> Path:
     return Path(override).expanduser() if override else Path.home() / ".local" / "state" / "k9s"
 
 
-def _copy_default_config(project_dir: Path, config_dir: Path) -> bool:
-    example = project_dir / ".k9s-config-example" / "config.yaml"
-    destination = config_dir / "config.yaml"
+def _copy_default_config(project_dir: Path, destination: Path) -> bool:
+    example = project_dir / "examples" / "config" / "config.yaml"
     if destination.exists() or not example.exists():
         return False
+    destination.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(example, destination)
     return True
+
+
+def _migrate_file(
+    source: Path,
+    destination: Path,
+    *,
+    conflict_label: str | None = None,
+) -> str | None:
+    if not source.exists() or source == destination:
+        return None
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists():
+        if source.read_bytes() == destination.read_bytes():
+            source.unlink()
+            return f"Removed duplicate legacy file: {source}"
+        label = conflict_label or "legacy-conflict"
+        conflict_destination = destination.parent / (
+            f"{destination.stem}.{label}{destination.suffix}"
+        )
+        if conflict_destination.exists():
+            if source.read_bytes() == conflict_destination.read_bytes():
+                source.unlink()
+                return f"Removed duplicate legacy file: {source}"
+            return f"Skipped legacy file because archive already exists: {source}"
+
+        shutil.move(str(source), str(conflict_destination))
+        return f"Migrated conflicting legacy file: {source} -> {conflict_destination}"
+
+    shutil.move(str(source), str(destination))
+    return f"Migrated {source} -> {destination}"
+
+
+def _migrate_legacy_yaml_storage(project_dir: Path) -> list[str]:
+    messages: list[str] = []
+    config_file = get_config_file_path()
+    kubeconfig_dir = get_kubeconfig_cache_dir()
+
+    config_sources = (
+        (project_dir / "config.yaml", "legacy-project-root"),
+        (get_legacy_home_config_file_path(), "legacy-home"),
+    )
+    for source, conflict_label in config_sources:
+        message = _migrate_file(
+            source,
+            config_file,
+            conflict_label=conflict_label,
+        )
+        if message is not None:
+            messages.append(message)
+
+    for source in get_legacy_project_root_yaml_files(project_dir):
+        message = _migrate_file(
+            source,
+            kubeconfig_dir / source.name,
+            conflict_label="legacy-project-root",
+        )
+        if message is not None:
+            messages.append(message)
+
+    return messages
 
 
 def _build_connect_query(
@@ -167,7 +261,12 @@ def _build_connect_query(
 
 def run_clients(args: argparse.Namespace) -> int:
     config, services = _load_runtime()
-    _refresh_inventory(config, services, quiet=args.json)
+    _refresh_inventory(
+        config,
+        services,
+        enabled=bool(getattr(args, "refresh_inventory", False) or _env_truthy("K9S_REFRESH_INVENTORY")),
+        quiet=args.json,
+    )
     page = list_client_summaries(
         config.inventory_path,
         services.catalog,
@@ -184,7 +283,12 @@ def run_clients(args: argparse.Namespace) -> int:
 
 def run_hosts(args: argparse.Namespace) -> int:
     config, services = _load_runtime()
-    _refresh_inventory(config, services, quiet=args.json)
+    _refresh_inventory(
+        config,
+        services,
+        enabled=bool(getattr(args, "refresh_inventory", False) or _env_truthy("K9S_REFRESH_INVENTORY")),
+        quiet=args.json,
+    )
     page = search_hosts(
         config.inventory_path,
         services.catalog,
@@ -216,8 +320,14 @@ def run_connect(args: argparse.Namespace) -> int:
         return 4
 
     config, services = _load_runtime()
-    _refresh_inventory(config, services, quiet=args.json)
-    records = load_host_records(config.inventory_path, services.catalog)
+    _refresh_inventory(
+        config,
+        services,
+        enabled=bool(getattr(args, "refresh_inventory", False) or _env_truthy("K9S_REFRESH_INVENTORY")),
+        quiet=args.json,
+    )
+    targets = list_cluster_targets(config.inventory_path, services.catalog)
+    records = build_host_records(targets)
     query = _build_connect_query(
         identifiers=args.identifiers,
         client=args.client,
@@ -227,9 +337,8 @@ def run_connect(args: argparse.Namespace) -> int:
         context_name=args.context_name,
         known_records=records,
     )
-    resolution = resolve_host(
-        config.inventory_path,
-        services.catalog,
+    resolution = resolve_host_records(
+        records=records,
         query=query,
         limit=10,
     )
@@ -241,10 +350,9 @@ def run_connect(args: argparse.Namespace) -> int:
             print_host_resolution_failure(resolution, cli_name=_cli_name())
         return 3 if resolution.status == "ambiguous" else 2
 
-    target = find_target_by_context_name(
-        resolution.context_name,
-        config.inventory_path,
-        services.catalog,
+    target = next(
+        (candidate for candidate in targets if candidate.context_name == resolution.context_name),
+        None,
     )
     if target is None:
         print("Resolved context disappeared from inventory.", file=sys.stderr)
@@ -287,17 +395,24 @@ def run_status(args: argparse.Namespace) -> int:
 def run_init(args: argparse.Namespace) -> int:
     del args
     config_dir = _default_config_dir()
+    config_file = get_config_file_path()
+    kubeconfig_dir = get_kubeconfig_cache_dir()
     log_dir = _default_log_dir()
 
     config_dir.mkdir(parents=True, exist_ok=True)
-    copied_default = _copy_default_config(PROJECT_DIR, config_dir)
+    kubeconfig_dir.mkdir(parents=True, exist_ok=True)
+    migrated = _migrate_legacy_yaml_storage(PROJECT_DIR)
+    copied_default = _copy_default_config(PROJECT_DIR, config_file)
     log_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Config directory: {config_dir}")
+    print(f"YAML storage: {kubeconfig_dir}")
+    for message in migrated:
+        print(message)
     if copied_default:
-        print(f"Created default config: {config_dir / 'config.yaml'}")
+        print(f"Created default config: {config_file}")
     else:
-        print(f"Config file ready: {config_dir / 'config.yaml'}")
+        print(f"Config file ready: {config_file}")
     print(f"Log directory: {log_dir}")
     print(f"Next: {_cli_name()} connect <identifier>")
     return 0
@@ -380,12 +495,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog=_cli_name())
     subparsers = parser.add_subparsers(dest="command")
 
-    subparsers.add_parser("init", help="Prepare local config and log directories")
+    subparsers.add_parser("init", help="Prepare local config, YAML storage, and log directories")
 
     clients_parser = subparsers.add_parser("clients", help="List clients with host counts")
     clients_parser.add_argument("query", nargs="?")
     clients_parser.add_argument("--limit", type=int, default=20)
     clients_parser.add_argument("--cursor")
+    clients_parser.add_argument("--refresh-inventory", action="store_true")
     clients_parser.add_argument("--json", action="store_true")
 
     hosts_parser = subparsers.add_parser("hosts", help="List or search hosts in one client")
@@ -396,6 +512,7 @@ def build_parser() -> argparse.ArgumentParser:
     hosts_parser.add_argument("--ip", dest="addr_ip")
     hosts_parser.add_argument("--limit", type=int, default=20)
     hosts_parser.add_argument("--cursor")
+    hosts_parser.add_argument("--refresh-inventory", action="store_true")
     hosts_parser.add_argument("--json", action="store_true")
 
     connect_parser = subparsers.add_parser("connect", help="Resolve identifiers and connect if unique")
@@ -405,6 +522,7 @@ def build_parser() -> argparse.ArgumentParser:
     connect_parser.add_argument("--id", dest="systemframe_id")
     connect_parser.add_argument("--ip", dest="addr_ip")
     connect_parser.add_argument("--context", dest="context_name")
+    connect_parser.add_argument("--refresh-inventory", action="store_true")
     connect_parser.add_argument("--json", action="store_true")
 
     subparsers.add_parser("k9s", help="Launch k9s after tunnel validation")
@@ -428,7 +546,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     command = args.command
 
-    _configure_logging()
+    _configure_logging(args)
 
     try:
         if command in (None, "connect"):
@@ -442,6 +560,7 @@ def main(argv: list[str] | None = None) -> int:
                     systemframe_id=None,
                     addr_ip=None,
                     context_name=None,
+                    refresh_inventory=False,
                     json=False,
                 )
             )

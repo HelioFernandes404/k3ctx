@@ -5,8 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.application.use_cases.discovery import (
+    build_host_records,
     list_client_summaries,
     load_host_records,
+    resolve_host_records,
     resolve_host,
     search_hosts,
 )
@@ -69,6 +71,21 @@ def test_load_host_records_projects_public_fields_from_cluster_targets(
         )
     ]
     assert catalog.calls == [tmp_path]
+
+
+def test_build_host_records_projects_public_fields_from_targets() -> None:
+    records = build_host_records([build_target(systemframe_id="sf-1042")])
+
+    assert records == [
+        HostRecord(
+            client="acme",
+            host_name="prod",
+            systemframe_id="sf-1042",
+            addr_ip="10.0.0.10",
+            context_name="acme-prod",
+            group="k3s_cluster",
+        )
+    ]
 
 
 def test_load_host_records_falls_back_to_group_vars_for_systemframe_id(
@@ -246,3 +263,20 @@ def test_resolve_host_returns_no_match_when_filters_do_not_overlap(
     assert result.context_name is None
     assert result.matches == ()
     assert result.hint == "No hosts matched the provided identifiers."
+
+
+def test_resolve_host_records_returns_unique_context_without_catalog_roundtrip() -> None:
+    records = build_host_records(
+        [
+            build_target(company="acme", host_alias="api-prod", systemframe_id="sf-1042"),
+            build_target(company="acme", host_alias="db-prod", systemframe_id="sf-2001"),
+        ]
+    )
+
+    result = resolve_host_records(
+        records=records,
+        query=HostQuery(client="acme", host_name="api"),
+    )
+
+    assert result.status == "unique"
+    assert result.context_name == "acme-api-prod"

@@ -4,7 +4,12 @@
 # Configuration
 PROJECT_DIR := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 CLI_COMMAND := uv run context-tunnel-manager
-CONFIG_DIR := $(HOME)/.k9s-config
+DATA_HOME ?= $(if $(XDG_DATA_HOME),$(XDG_DATA_HOME),$(HOME)/.local/share)
+APP_DATA_DIR := $(DATA_HOME)/k3s-context-tunnel-manager
+YAML_DIR := $(APP_DATA_DIR)/yaml
+CONFIG_DIR := $(YAML_DIR)/config
+KUBECONFIG_CACHE_DIR := $(YAML_DIR)/kubeconfigs
+LEGACY_KUBECONFIG_CACHE_DIR := $(HOME)/.cache/k9s-config
 LOG_DIR := $(HOME)/.local/state/k9s
 MCP_HTTP_HOST ?= 127.0.0.1
 MCP_HTTP_PORT ?= 8000
@@ -84,7 +89,8 @@ tunnel-kill-all:
 ## clean: Remove generated kubeconfig files
 clean:
 	@echo "$(YELLOW)Removing generated kubeconfig files...$(NC)"
-	@rm -f $(PROJECT_DIR)/*.yml
+	@rm -f $(KUBECONFIG_CACHE_DIR)/*.yml $(KUBECONFIG_CACHE_DIR)/*.yaml
+	@rm -f $(LEGACY_KUBECONFIG_CACHE_DIR)/*.yml $(LEGACY_KUBECONFIG_CACHE_DIR)/*.yaml
 	@echo "$(GREEN)✓ Cleaned generated files$(NC)"
 
 ## logs: Show k9s logs (tail -f)
@@ -97,7 +103,7 @@ logs:
 ## config: Open config file in default editor
 config:
 	@if [ ! -f "$(CONFIG_DIR)/config.yaml" ]; then \
-		echo "$(RED)Config file not found. Run 'make run' first.$(NC)"; \
+		echo "$(RED)Config file not found. Run 'make init' first.$(NC)"; \
 		exit 1; \
 	fi
 	@$${EDITOR:-nano} $(CONFIG_DIR)/config.yaml

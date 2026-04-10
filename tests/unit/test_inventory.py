@@ -1,5 +1,6 @@
 """Unit tests for inventory module."""
 
+from types import SimpleNamespace
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -7,7 +8,7 @@ from typing import Any
 import pytest
 import yaml
 from _pytest.capture import CaptureFixture
-from src.inventory import load_inventories, extract_hosts_from_inventory
+from src.inventory import extract_hosts_from_inventory, load_inventories, update_inventory_repo
 
 
 class TestLoadInventories:
@@ -235,3 +236,36 @@ class TestExtractHostsFromInventory:
         hosts = extract_hosts_from_inventory(inv_data)
 
         assert hosts == {}
+
+
+class TestUpdateInventoryRepo:
+    """Tests for git-backed inventory refresh behavior."""
+
+    def test_skips_refresh_when_git_repository_is_dirty(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        calls: list[list[str]] = []
+
+        def fake_run(
+            cmd: list[str],
+            cwd: Path,
+            capture_output: bool,
+            text: bool,
+            timeout: int,
+        ) -> SimpleNamespace:
+            calls.append(cmd)
+            if cmd[:3] == ["git", "rev-parse", "--show-toplevel"]:
+                return SimpleNamespace(returncode=0, stdout=str(tmp_path), stderr="")
+            if cmd[:3] == ["git", "status", "--porcelain"]:
+                return SimpleNamespace(returncode=0, stdout=" M inventory/acme_hosts.yml\n", stderr="")
+            raise AssertionError(f"Unexpected command: {cmd}")
+
+        monkeypatch.setattr("src.inventory.subprocess.run", fake_run)
+
+        success, message = update_inventory_repo(tmp_path / "inventory")
+
+        assert success is False
+        assert "local changes" in message
+        assert ["git", "pull", "--ff-only"] not in calls

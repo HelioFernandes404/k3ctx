@@ -226,6 +226,7 @@ def test_readme_documents_manual_and_mcp_modes() -> None:
     assert "connect_cluster" in readme
     assert "inventory://clusters" in readme
     assert "config.yaml" in readme
+    assert "~/.local/share/k3s-context-tunnel-manager/yaml/" in readme
 
 
 def test_agents_mentions_layered_architecture_and_mcp_server() -> None:
@@ -233,3 +234,9 @@ def test_agents_mentions_layered_architecture_and_mcp_server() -> None:
 
     assert "camadas" in agents.lower() or "layers" in agents.lower()
     assert "src/mcp_server.py" in agents
+    assert "~/.local/share/k3s-context-tunnel-manager/yaml/" in agents
+
+
+def test_example_config_uses_neutral_examples_path() -> None:
+    assert Path("examples/config/config.yaml").exists()
+    assert not Path(".k9s-config-example").exists()

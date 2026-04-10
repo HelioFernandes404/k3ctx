@@ -14,6 +14,32 @@ from src.domain.models import (
 )
 
 
+class ClusterConnectionError(RuntimeError):
+    """Connector failure with a public-safe error contract."""
+
+    def __init__(
+        self,
+        *,
+        code: str,
+        message: str,
+        detail: str | None = None,
+        retryable: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.detail = detail
+        self.retryable = retryable
+
+    def to_operation_error(self) -> OperationError:
+        return OperationError(
+            code=self.code,
+            message=self.message,
+            detail=self.detail,
+            retryable=self.retryable,
+        )
+
+
 @dataclass(frozen=True)
 class ConnectionArtifacts:
     local_port: int

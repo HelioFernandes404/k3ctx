@@ -1,5 +1,6 @@
-# Example local configuration for k9s_setup.
-# Copy to ./config.yaml or ~/.k9s-config/config.yaml and adjust for your environment.
+# Example local configuration for k3s-context-tunnel-manager.
+# The official default path is ~/.local/share/k3s-context-tunnel-manager/yaml/config/config.yaml
+# or $XDG_DATA_HOME/k3s-context-tunnel-manager/yaml/config/config.yaml.
 
 remote_k3s_config_path: /etc/rancher/k3s/k3s.yaml
 ssh_key_path: ~/.ssh/id_ed25519

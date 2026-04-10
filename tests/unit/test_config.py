@@ -14,6 +14,7 @@ from src.config import (
     load_effective_config,
     resolve_inventory_path,
 )
+from src.app_paths import get_config_file_path
 
 
 class TestLoadConfig:
@@ -220,6 +221,78 @@ class TestLoadEffectiveConfig:
         assert config.k3s_api_port == 6443
         assert config.port_range_start == 16443
         assert config.port_range_size == 5000
+
+    def test_load_effective_config_uses_user_data_config_by_default(
+        self,
+        tmp_path: Path,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
+        inventory_dir = tmp_path / "inventory"
+        inventory_dir.mkdir()
+        config_file = get_config_file_path()
+        config_file.parent.mkdir(parents=True, exist_ok=True)
+        config_file.write_text(
+            yaml.dump(
+                {
+                    "inventory_path": str(inventory_dir),
+                    "k3s_api_port": 7443,
+                }
+            )
+        )
+
+        config = load_effective_config(tmp_path)
+
+        assert config.inventory_path == inventory_dir
+        assert config.k3s_api_port == 7443
+
+    def test_load_effective_config_falls_back_to_legacy_project_root_config(
+        self,
+        tmp_path: Path,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
+        inventory_dir = tmp_path / "inventory"
+        inventory_dir.mkdir()
+        legacy_config = tmp_path / "config.yaml"
+        legacy_config.write_text(
+            yaml.dump(
+                {
+                    "inventory_path": str(inventory_dir),
+                    "k3s_api_port": 7555,
+                }
+            )
+        )
+
+        config = load_effective_config(tmp_path)
+
+        assert config.inventory_path == inventory_dir
+        assert config.k3s_api_port == 7555
+
+    def test_load_effective_config_falls_back_to_legacy_home_config_dir(
+        self,
+        tmp_path: Path,
+        monkeypatch: MonkeyPatch,
+    ) -> None:
+        monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
+        monkeypatch.setenv("HOME", str(tmp_path / "home"))
+        inventory_dir = tmp_path / "inventory"
+        inventory_dir.mkdir()
+        legacy_config = tmp_path / "home" / ".k9s-config" / "config.yaml"
+        legacy_config.parent.mkdir(parents=True, exist_ok=True)
+        legacy_config.write_text(
+            yaml.dump(
+                {
+                    "inventory_path": str(inventory_dir),
+                    "k3s_api_port": 7666,
+                }
+            )
+        )
+
+        config = load_effective_config(tmp_path)
+
+        assert config.inventory_path == inventory_dir
+        assert config.k3s_api_port == 7666
 
 
 class TestConfigEdgeCases:

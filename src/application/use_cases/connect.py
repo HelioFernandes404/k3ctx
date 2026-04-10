@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.application.ports import ClusterConnector
+from src.application.ports import ClusterConnectionError, ClusterConnector
 from src.domain.models import (
     ClusterTarget,
     ConnectResult,
@@ -81,6 +81,26 @@ def connect_cluster(
 
     try:
         artifacts = connector.connect(target, config, requirement)
+    except ClusterConnectionError as exc:
+        logger.error(
+            "Cluster connection use case failed",
+            extra={
+                "event": "application.connect.failed",
+                "context_name": target.context_name,
+                "error_type": type(exc).__name__,
+                "error_code": exc.code,
+            },
+        )
+        return ConnectResult(
+            success=False,
+            context_name=target.context_name,
+            local_port=None,
+            internal_ip=None,
+            tunnel_pid=None,
+            used_cache=False,
+            network_requirement=requirement,
+            error=exc.to_operation_error(),
+        )
     except Exception as exc:
         logger.error(
             "Cluster connection use case failed",

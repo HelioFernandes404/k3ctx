@@ -3,6 +3,7 @@
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from pytest import MonkeyPatch
 from pytest_mock import MockerFixture
 
 from src.models import ClusterTarget, EffectiveConfig
@@ -91,6 +92,46 @@ def test_prepare_local_kubeconfig_returns_internal_ip_port_and_cache_usage(
     assert used_cache is True
     fetch_remote_file_cached.assert_called_once()
     merge_kubeconfig.assert_called_once_with("apiVersion: v1\n", "acme-prod")
+
+
+def test_prepare_local_kubeconfig_uses_user_data_kubeconfig_cache_path(
+    mocker: MockerFixture,
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg"))
+    config = build_config(tmp_path)
+    target = ClusterTarget(
+        company="acme",
+        host_alias="prod",
+        group="k3s_cluster",
+        host_config={"ansible_host": "10.0.0.10"},
+    )
+    ssh_client = MagicMock()
+
+    mocker.patch("src.services.connect.get_internal_ip", return_value="10.0.0.10")
+    fetch_remote_file_cached = mocker.patch(
+        "src.services.connect.fetch_remote_file_cached",
+        return_value=("apiVersion: v1\nclusters: []\n", True),
+    )
+    mocker.patch(
+        "src.services.connect.update_kubeconfig_server",
+        return_value="apiVersion: v1\n",
+    )
+    mocker.patch("src.services.connect.merge_kubeconfig")
+    mocker.patch("src.services.connect.get_unique_port", return_value=20001)
+
+    _prepare_local_kubeconfig(target, config, ssh_client)
+
+    cache_path = fetch_remote_file_cached.call_args.args[2]
+    assert cache_path == (
+        tmp_path
+        / "xdg"
+        / "k3s-context-tunnel-manager"
+        / "yaml"
+        / "kubeconfigs"
+        / "acme-prod.yml"
+    )
 
 
 def test_ensure_tunnel_reuses_existing_pid_without_creating_new_tunnel(

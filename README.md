@@ -51,8 +51,12 @@ Regras de uso:
 - `clients` mostra apenas clientes e contagem de hosts.
 - `hosts <client>` exige escopo de cliente e evita listagem global.
 - `connect` aceita 1 a 3 identificadores e conecta apenas quando a resolucao for unica.
+- `connect` valida a API Kubernetes forwarded em `https://127.0.0.1:<port>` antes de reportar sucesso.
 - `connect` sem identificadores falha com erro deterministico; nao existe prompt interativo.
+- refresh do inventory nao roda automaticamente; use `--refresh-inventory` ou `K9S_REFRESH_INVENTORY=1` quando quiser atualizar explicitamente.
 - `--json` funciona bem sem TTY e retorna saida estruturada.
+- logs da CLI sao legiveis em nivel INFO por padrao; use `K9S_LOG_LEVEL=DEBUG` para debug e `K9S_LOG_FORMAT=json` para logs estruturados no stderr.
+- o readiness check da API pode ser ajustado com `K9S_API_READY_TIMEOUT_SECONDS` ou desabilitado com `K9S_VERIFY_API_READY=0`.
 
 `make run` agora chama `connect`. Os atalhos antigos baseados em prompt foram removidos.
 
@@ -131,7 +135,31 @@ Resources read-only:
 
 ## Config canônica
 
-Copie `.k9s-config-example/config.yaml` para `config.yaml` e ajuste:
+`uv run context-tunnel-manager init` prepara o caminho oficial de YAML em:
+
+```bash
+~/.local/share/k3s-context-tunnel-manager/yaml/
+```
+
+Estrutura:
+
+```text
+~/.local/share/k3s-context-tunnel-manager/yaml/
+├── config/config.yaml
+└── kubeconfigs/<context>.yml
+```
+
+`XDG_DATA_HOME` altera a base automaticamente. `init` tambem migra:
+
+- `config.yaml` no root do projeto
+- `~/.k9s-config/config.yaml`
+- kubeconfigs `.yml` ou `.yaml` deixados no root do projeto
+
+Template versionado:
+
+- `examples/config/config.yaml`
+
+Exemplo de `config.yaml`:
 
 ```yaml
 inventory_path: /caminho/para/inventory
@@ -145,19 +173,25 @@ port_range_size: 10000
 
 `config://effective` expõe a configuracao efetiva carregada em runtime.
 
+## Troubleshooting rapido
+
+- Se `connect` falhar com `Kubernetes API did not become ready on https://127.0.0.1:<port>/version`, teste primeiro com `K9S_API_READY_TIMEOUT_SECONDS=10`.
+- Se o tunel estiver funcional mas o readiness check ainda falhar no seu ambiente, use `K9S_VERIFY_API_READY=0` temporariamente e valide com `kubectl --request-timeout=10s get --raw=/version`.
+
 ## Limites e acoes sensiveis
 
 - `connect_cluster` e `connect_multiple` abrem tunel SSH, leem inventario e alteram `~/.kube/config`.
 - `set_current_context` troca o contexto atual do `kubectl`; em MCP use confirmacao explicita.
 - `kill_tunnel` encerra apenas um tunel por contexto; `tunnel-kill-all` continua manual-only.
 - Se o cluster exigir VPN ou `sshuttle`, CLI/HTTP/MCP retornam erro estruturado/remediacao sem prompt interativo.
-- Nao versione `config.yaml`, kubeconfigs gerados, chaves SSH ou estado local.
+- Nao versione `~/.local/share/k3s-context-tunnel-manager/yaml/config/config.yaml`, kubeconfigs gerados, chaves SSH ou estado local.
 - Scripts legados fora de `src` foram removidos; use apenas `context-tunnel-manager ...`, `k3s-context-tunnel-manager-http`, e `k3s-context-tunnel-manager-mcp-stdio`.
 
 ## Como funciona no `systemframe`
 
 - O inventario vem de `/home/helio/Work/systemframe/ansible/inventory`
 - O contexto final e mesclado em `~/.kube/config`
+- Os YAMLs locais ficam em `~/.local/share/k3s-context-tunnel-manager/yaml/`
 - Os PIDs dos tuneis ficam em `~/.local/state/k9s-tunnels`
 - Logs locais ficam em `~/.local/state/k9s/`
 

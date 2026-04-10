@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
+from src.app_paths import get_kubeconfig_cache_path
 from src.kubeconfig import merge_kubeconfig, update_kubeconfig_server
 from src.logging_config import get_logger
 from src.models import (
@@ -92,7 +91,7 @@ def _prepare_local_kubeconfig(
     ssh_client: object,
 ) -> tuple[str, int, bool]:
     internal_ip = get_internal_ip(ssh_client)
-    cache_path = Path.home() / ".cache" / "k9s-config" / f"{target.context_name}.yml"
+    cache_path = get_kubeconfig_cache_path(target.context_name)
     content, used_cache = fetch_remote_file_cached(
         ssh_client,
         config.remote_k3s_config_path,

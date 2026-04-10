@@ -48,6 +48,22 @@ def update_inventory_repo(inventory_path: Path) -> Tuple[bool, str]:
     except FileNotFoundError:
         return False, "git command not found"
 
+    try:
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=no"],
+            cwd=git_root,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if status_result.returncode == 0 and status_result.stdout.strip():
+            logger.info(f"Skipping inventory refresh for dirty repository: {git_root}")
+            return False, "Skipped inventory refresh: repository has local changes"
+    except subprocess.TimeoutExpired:
+        return False, "Timeout checking repository status"
+    except FileNotFoundError:
+        return False, "git command not found"
+
     # Run git pull
     try:
         logger.info(f"Updating inventory repository: {git_root}")

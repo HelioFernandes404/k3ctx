@@ -11,6 +11,7 @@ from typing import Any, Dict, Optional
 
 import yaml
 
+from .app_paths import get_config_file_path, get_default_config_candidates
 from .logging_config import get_logger
 from .models import EffectiveConfig
 
@@ -156,16 +157,21 @@ def load_effective_config(
 
     Args:
         project_dir: Directory of the current tool/script
-        config_path: Optional config file path. Defaults to project_dir/config.yaml
+        config_path: Optional config file path. Defaults to the canonical user-data
+            config path with legacy fallback.
 
     Returns:
         EffectiveConfig with env-over-file precedence preserved via load_config().
     """
-    resolved_config_path = (
-        Path(config_path)
-        if config_path is not None
-        else project_dir / "config.yaml"
-    )
+    if config_path is not None:
+        resolved_config_path = Path(config_path)
+    else:
+        resolved_config_path = get_config_file_path()
+        for candidate in get_default_config_candidates(project_dir):
+            if candidate.exists():
+                resolved_config_path = candidate
+                break
+
     config = load_config(os.path.expanduser(str(resolved_config_path)))
 
     return EffectiveConfig(

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.application.ports import ConnectionArtifacts
+from src.application.ports import ClusterConnectionError, ConnectionArtifacts
 from src.application.use_cases.connect import connect_cluster, connect_multiple
 from src.domain.models import ClusterTarget, EffectiveConfig
 
@@ -129,3 +129,23 @@ def test_connect_multiple_preserves_target_order(
 
     assert [result.context_name for result in results] == ["acme-prod", "beta-staging"]
     assert connector.calls == [(first, config), (second, config)]
+
+
+def test_connect_cluster_returns_specific_public_error_for_api_readiness_failure(
+    tmp_path: Path,
+) -> None:
+    config = build_config(tmp_path)
+    target = build_target()
+    connector = StubConnector(
+        ClusterConnectionError(
+            code="kubernetes_api_unreachable",
+            message="Kubernetes API did not become ready on https://127.0.0.1:16443",
+        )
+    )
+
+    result = connect_cluster(target=target, config=config, connector=connector)
+
+    assert result.success is False
+    assert result.error is not None
+    assert result.error.code == "kubernetes_api_unreachable"
+    assert "did not become ready" in result.error.message

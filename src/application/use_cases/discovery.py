@@ -47,14 +47,15 @@ def project_target_to_host_record(target: ClusterTarget) -> HostRecord:
     )
 
 
+def build_host_records(targets: Sequence[ClusterTarget]) -> list[HostRecord]:
+    return [project_target_to_host_record(target) for target in targets]
+
+
 def load_host_records(
     inventory_path: Path,
     catalog: InventoryCatalog,
 ) -> list[HostRecord]:
-    return [
-        project_target_to_host_record(target)
-        for target in list_cluster_targets(inventory_path, catalog)
-    ]
+    return build_host_records(list_cluster_targets(inventory_path, catalog))
 
 
 def _paginate(
@@ -158,9 +159,24 @@ def search_hosts(
     limit: int = 20,
     cursor: str | None = None,
 ) -> HostPage:
+    return search_host_records(
+        records=load_host_records(inventory_path, catalog),
+        query=query,
+        limit=limit,
+        cursor=cursor,
+    )
+
+
+def search_host_records(
+    *,
+    records: Sequence[HostRecord],
+    query: HostQuery,
+    limit: int = 20,
+    cursor: str | None = None,
+) -> HostPage:
     matches = [
         record
-        for record in load_host_records(inventory_path, catalog)
+        for record in records
         if _matches_query(record, query)
     ]
     page_items, page = _paginate(
@@ -179,9 +195,21 @@ def resolve_host(
     query: HostQuery,
     limit: int = 10,
 ) -> HostResolutionResult:
-    page = search_hosts(
-        inventory_path,
-        catalog,
+    return resolve_host_records(
+        records=load_host_records(inventory_path, catalog),
+        query=query,
+        limit=limit,
+    )
+
+
+def resolve_host_records(
+    *,
+    records: Sequence[HostRecord],
+    query: HostQuery,
+    limit: int = 10,
+) -> HostResolutionResult:
+    page = search_host_records(
+        records=records,
         query=query,
         limit=limit,
         cursor=None,
