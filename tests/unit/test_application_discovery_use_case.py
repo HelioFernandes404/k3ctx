@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.application.use_cases.discovery import load_host_records
-from src.domain.discovery import HostRecord
+from src.application.use_cases.discovery import (
+    list_client_summaries,
+    load_host_records,
+    search_hosts,
+)
+from src.domain.discovery import ClientSummary, HostQuery, HostRecord
 from src.domain.models import ClusterTarget
 
 
@@ -76,3 +80,97 @@ def test_load_host_records_falls_back_to_group_vars_for_systemframe_id(
     records = load_host_records(tmp_path, catalog)
 
     assert records[0].systemframe_id == "sf-group-7"
+
+
+def test_list_client_summaries_returns_sorted_counts_and_cursor(
+    tmp_path: Path,
+) -> None:
+    catalog = StubCatalog(
+        [
+            build_target(company="beta", host_alias="api-01"),
+            build_target(company="acme", host_alias="api-01"),
+            build_target(company="acme", host_alias="api-02"),
+        ]
+    )
+
+    page = list_client_summaries(tmp_path, catalog, limit=1)
+
+    assert page.items == (
+        ClientSummary(client="acme", host_count=2),
+    )
+    assert page.page.limit == 1
+    assert page.page.returned == 1
+    assert page.page.total == 2
+    assert page.page.has_more is True
+    assert page.page.next_cursor == "acme"
+
+
+def test_search_hosts_filters_inside_one_client_and_uses_context_cursor(
+    tmp_path: Path,
+) -> None:
+    catalog = StubCatalog(
+        [
+            build_target(company="acme", host_alias="api-01", systemframe_id="sf-1"),
+            build_target(company="acme", host_alias="api-02", systemframe_id="sf-2"),
+            build_target(company="acme", host_alias="db-01", systemframe_id="sf-3"),
+            build_target(company="beta", host_alias="api-01", systemframe_id="sf-9"),
+        ]
+    )
+
+    first_page = search_hosts(
+        tmp_path,
+        catalog,
+        query=HostQuery(client="acme", host_name="api"),
+        limit=1,
+    )
+
+    assert [item.context_name for item in first_page.items] == ["acme-api-01"]
+    assert first_page.page.total == 2
+    assert first_page.page.has_more is True
+    assert first_page.page.next_cursor == "acme-api-01"
+
+    second_page = search_hosts(
+        tmp_path,
+        catalog,
+        query=HostQuery(client="acme", host_name="api"),
+        limit=1,
+        cursor=first_page.page.next_cursor,
+    )
+
+    assert [item.context_name for item in second_page.items] == ["acme-api-02"]
+    assert second_page.page.has_more is False
+
+
+def test_search_hosts_supports_id_ip_and_free_text_filters(
+    tmp_path: Path,
+) -> None:
+    catalog = StubCatalog(
+        [
+            build_target(
+                company="acme",
+                host_alias="api-prod",
+                addr_ip="10.0.0.10",
+                systemframe_id="sf-1042",
+            ),
+            build_target(
+                company="acme",
+                host_alias="api-dev",
+                addr_ip="10.0.0.11",
+                systemframe_id="sf-2001",
+            ),
+        ]
+    )
+
+    page = search_hosts(
+        tmp_path,
+        catalog,
+        query=HostQuery(
+            client="acme",
+            query="1042",
+            addr_ip="10.0.0.10",
+        ),
+        limit=20,
+    )
+
+    assert [item.context_name for item in page.items] == ["acme-api-prod"]
+    assert page.page.total == 1
