@@ -139,10 +139,11 @@ def _wait_for_kubernetes_api(
             ssl_context = ssl.create_default_context(
                 cadata=base64.b64decode(ca_data).decode("utf-8")
             )
+            ssl_context.check_hostname = False
         else:
             ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
             ssl_context.verify_mode = ssl.CERT_NONE
-        ssl_context.check_hostname = False
 
         if (
             isinstance(client_cert_data, str)
@@ -166,7 +167,7 @@ def _wait_for_kubernetes_api(
 
         while time.monotonic() < deadline:
             remaining = max(0.1, deadline - time.monotonic())
-            request_timeout = min(poll_interval_seconds, remaining)
+            request_timeout = min(max(poll_interval_seconds, 2.0), remaining)
             try:
                 with urllib.request.urlopen(
                     request,
@@ -263,7 +264,7 @@ class LocalClusterConnector:
             )
         if api_ready_timeout_seconds is None:
             api_ready_timeout_seconds = float(
-                os.getenv("K9S_API_READY_TIMEOUT_SECONDS", "3.0")
+                os.getenv("K9S_API_READY_TIMEOUT_SECONDS", "15.0")
             )
 
         self.verify_api_readiness = verify_api_readiness

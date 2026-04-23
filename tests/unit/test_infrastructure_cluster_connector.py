@@ -10,7 +10,10 @@ from pytest_mock import MockerFixture
 
 from src.application.ports import ClusterConnectionError
 from src.domain.models import ClusterTarget, EffectiveConfig, NetworkRequirement
-from src.infrastructure.adapters.cluster_connector import LocalClusterConnector
+from src.infrastructure.adapters.cluster_connector import (
+    LocalClusterConnector,
+    _wait_for_kubernetes_api,
+)
 
 
 def build_config(tmp_path: Path) -> EffectiveConfig:
@@ -82,7 +85,7 @@ def test_connector_aborts_before_merge_when_api_readiness_check_fails(
     wait_for_api.assert_called_once_with(
         16443,
         kubeconfig_text="apiVersion: v1\n",
-        timeout_seconds=3.0,
+        timeout_seconds=15.0,
         poll_interval_seconds=0.25,
     )
     kill_tunnel.assert_called_once_with("acme-prod")
@@ -143,3 +146,44 @@ def test_connector_recreates_stale_reused_tunnel_after_readiness_failure(
     kill_tunnel.assert_called_once_with("acme-prod")
     merge_kubeconfig.assert_called_once_with("apiVersion: v1\n", "acme-prod")
     ssh_client.close.assert_called_once()
+
+
+def test_wait_for_kubernetes_api_allows_slow_tls_handshake_within_budget(
+    mocker: MockerFixture,
+) -> None:
+    """Per-request timeout must not be clamped to the small poll interval.
+
+    Regression: with poll_interval_seconds=0.25, each urlopen used to inherit
+    the same 0.25 s timeout, so a handshake taking ~0.4 s always timed out and
+    the whole deadline elapsed without a single successful call. The fix
+    raises the per-request floor to 2.0 s while keeping the 0.25 s poll
+    cadence.
+    """
+
+    response = MagicMock()
+    response.status = 200
+    response.__enter__ = lambda self: self
+    response.__exit__ = lambda self, exc_type, exc, tb: None
+
+    observed_timeouts: list[float] = []
+
+    def fake_urlopen(request: object, *, timeout: float, context: object) -> object:
+        observed_timeouts.append(timeout)
+        return response
+
+    mocker.patch(
+        "src.infrastructure.adapters.cluster_connector.urllib.request.urlopen",
+        side_effect=fake_urlopen,
+    )
+
+    _wait_for_kubernetes_api(
+        16443,
+        kubeconfig_text="apiVersion: v1\n",
+        timeout_seconds=5.0,
+        poll_interval_seconds=0.25,
+    )
+
+    assert observed_timeouts, "urlopen must be called at least once"
+    assert observed_timeouts[0] >= 2.0, (
+        f"per-request timeout too tight: {observed_timeouts[0]}"
+    )
