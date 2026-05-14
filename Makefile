@@ -11,10 +11,6 @@ CONFIG_DIR := $(YAML_DIR)/config
 KUBECONFIG_CACHE_DIR := $(YAML_DIR)/kubeconfigs
 LEGACY_KUBECONFIG_CACHE_DIR := $(HOME)/.cache/k9s-config
 LOG_DIR := $(HOME)/.local/state/k9s
-MCP_HTTP_HOST ?= 127.0.0.1
-MCP_HTTP_PORT ?= 8000
-HTTP_HOST ?= 127.0.0.1
-HTTP_PORT ?= 8080
 
 # Colors for output
 RED := \033[0;31m
@@ -22,7 +18,7 @@ GREEN := \033[0;32m
 YELLOW := \033[1;33m
 NC := \033[0m # No Color
 
-.PHONY: help init sync run k9s status tunnel-list tunnel-kill tunnel-kill-all clean logs config test http mcp-stdio mcp-http
+.PHONY: help init sync run k9s status tunnel-list tunnel-kill tunnel-kill-all clean logs config test
 
 ## help: Show this help message
 help:
@@ -33,9 +29,6 @@ help:
 	@echo "Main commands:"
 	@echo "  $(YELLOW)make init$(NC)          - Initialize project (first time setup)"
 	@echo "  $(YELLOW)make run$(NC)           - Discover and connect to a cluster"
-	@echo "  $(YELLOW)make http$(NC)          - Start REST HTTP interface"
-	@echo "  $(YELLOW)make mcp-stdio$(NC)     - Start MCP server over stdio"
-	@echo "  $(YELLOW)make mcp-http$(NC)      - Start MCP server over HTTP"
 	@echo ""
 	@echo "All targets:"
 	@awk '/^##/ { \
@@ -112,18 +105,6 @@ config:
 test:
 	@echo "$(GREEN)Running tests...$(NC)"
 	@uv run python -m pytest tests/ -v
-
-## http: Start the REST HTTP server
-http:
-	@uv run k3s-context-tunnel-manager-http --host $(HTTP_HOST) --port $(HTTP_PORT)
-
-## mcp-stdio: Start the MCP server over stdio
-mcp-stdio:
-	@uv run k3s-context-tunnel-manager-mcp-stdio
-
-## mcp-http: Start the MCP server over HTTP
-mcp-http:
-	@uv run python -c "from src.mcp_server import build_mcp_server; build_mcp_server().run(transport='http', host='$(MCP_HTTP_HOST)', port=$(MCP_HTTP_PORT), show_banner=False)"
 
 # Default target
 .DEFAULT_GOAL := run

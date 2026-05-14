@@ -199,18 +199,7 @@ def test_post_connection_output_uses_public_error_message_only(
     assert "token=secret" not in output
 
 
-def test_makefile_exposes_mcp_targets() -> None:
-    makefile = Path("Makefile").read_text()
-
-    assert "http:" in makefile
-    assert "k3s-context-tunnel-manager-http" in makefile
-    assert "mcp-stdio:" in makefile
-    assert "mcp-http:" in makefile
-    assert "k3s-context-tunnel-manager-mcp-stdio" in makefile
-    assert "src/mcp_server.py" in makefile or "src.mcp_server" in makefile
-
-
-def test_readme_documents_manual_and_mcp_modes() -> None:
+def test_readme_documents_cli_usage() -> None:
     readme = Path("README.md").read_text()
 
     assert "make run" in readme
@@ -218,14 +207,6 @@ def test_readme_documents_manual_and_mcp_modes() -> None:
     assert "k3ctx k9s" in readme
     assert "k3ctx tunnel-list" in readme
     assert "context-tunnel-manager connect" in readme
-    assert "make http" in readme
-    assert "GET /config" in readme
-    assert "POST /connect" in readme
-    assert "make mcp-stdio" in readme
-    assert "k3s-context-tunnel-manager-mcp-stdio" in readme
-    assert "make mcp-http" in readme
-    assert "connect_cluster" in readme
-    assert "inventory://clusters" in readme
     assert "config.yaml" in readme
     assert "~/.local/share/k3s-context-tunnel-manager/yaml/" in readme
 
@@ -237,11 +218,10 @@ def test_pyproject_exposes_short_cli_alias() -> None:
     assert 'context-tunnel-manager = "src.interfaces.cli.app:main"' in pyproject
 
 
-def test_agents_mentions_layered_architecture_and_mcp_server() -> None:
+def test_agents_mentions_layered_architecture() -> None:
     agents = Path("AGENTS.md").read_text()
 
     assert "camadas" in agents.lower() or "layers" in agents.lower()
-    assert "src/mcp_server.py" in agents
     assert "~/.local/share/k3s-context-tunnel-manager/yaml/" in agents
 
 

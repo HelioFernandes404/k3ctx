@@ -5,20 +5,15 @@ description = "Gerencia túneis SSH e contextos kubeconfig para acesso a cluster
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-    "fastmcp>=3.0.0",
     "paramiko>=3.0.0",
     "pyyaml>=6.0",
     "python-dotenv>=1.0.0",
-    "starlette>=1.0.0",
-    "uvicorn>=0.42.0",
 ]
 
 [project.scripts]
 k3ctx = "src.interfaces.cli.app:main"
 context-tunnel-manager = "src.interfaces.cli.app:main"
 k3s-context-tunnel-manager = "src.interfaces.cli.app:main"
-k3s-context-tunnel-manager-mcp-stdio = "src.interfaces.mcp.server:main_stdio"
-k3s-context-tunnel-manager-http = "src.interfaces.http.app:main"
 
 [project.optional-dependencies]
 dev = [
