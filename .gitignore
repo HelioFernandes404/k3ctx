@@ -13,8 +13,8 @@
 # ==============================================================================
 # Kubeconfig & Kubernetes (sensitive data)
 # ==============================================================================
-kubeconfig
-kubeconfig.*
+/kubeconfig
+/kubeconfig.*
 cogcs.yml
 cogcs.yml.bak
 *.yml
