@@ -66,3 +66,38 @@ def test_switch_context_returns_none_on_success(
         text=True,
         timeout=10,
     )
+
+
+def test_switch_context_returns_safe_public_error_on_timeout(
+    mocker: MockerFixture,
+) -> None:
+    mocker.patch(
+        "src.infrastructure.adapters.context_switcher.subprocess.run",
+        side_effect=subprocess.TimeoutExpired(["kubectl"], 10),
+    )
+
+    error = KubectlContextSwitcher().switch_context("acme-prod")
+
+    assert error is not None
+    assert error.code == "kubectl_context_failed"
+    assert error.detail is None
+
+
+def test_switch_context_does_not_expose_sensitive_data_in_error(
+    mocker: MockerFixture,
+) -> None:
+    mocker.patch(
+        "src.infrastructure.adapters.context_switcher.subprocess.run",
+        return_value=subprocess.CompletedProcess(
+            args=["kubectl"],
+            returncode=1,
+            stdout="",
+            stderr="error: certificate /tmp/secret.key is invalid",
+        ),
+    )
+
+    error = KubectlContextSwitcher().switch_context("acme-prod")
+
+    assert error is not None
+    assert "/tmp/secret.key" not in (error.detail or "")
+    assert "/tmp/secret.key" not in error.message

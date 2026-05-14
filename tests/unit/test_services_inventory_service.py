@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import pytest
 from pytest_mock import MockerFixture
 
 from src.bootstrap import ServiceContainer
@@ -68,3 +69,33 @@ def test_list_cluster_targets_returns_structured_targets_with_group_vars(
     assert targets[0].group_vars["base_domain"] == "corp.example"
     assert targets[0].group_vars["gateway"] == "bastion.example"
     assert targets[0].host_config["ansible_host"] == "10.0.0.11"
+
+
+def test_list_cluster_targets_returns_empty_list_for_empty_inventory(
+    tmp_path: Path,
+) -> None:
+    inventory_dir = tmp_path / "inventory"
+    inventory_dir.mkdir()
+
+    targets = list_cluster_targets(inventory_dir)
+
+    assert targets == []
+
+
+def test_list_cluster_targets_propagates_exception_from_use_case(
+    mocker: MockerFixture,
+    tmp_path: Path,
+) -> None:
+    services = mocker.Mock(spec=ServiceContainer)
+    services.catalog = object()
+    mocker.patch(
+        "src.services.inventory_service.build_service_container",
+        return_value=services,
+    )
+    mocker.patch(
+        "src.services.inventory_service.list_cluster_targets_use_case",
+        side_effect=FileNotFoundError("inventory not found"),
+    )
+
+    with pytest.raises(FileNotFoundError, match="inventory not found"):
+        list_cluster_targets(tmp_path)

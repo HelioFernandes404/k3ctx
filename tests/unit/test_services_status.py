@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+import pytest
 from pytest_mock import MockerFixture
 
 from src.bootstrap import ServiceContainer
@@ -50,3 +51,52 @@ def test_validate_context_network_delegates_to_application_use_case(
     assert result == {"context_name": "acme-prod", "ok": True}
     build_services.assert_called_once_with(tmp_path)
     validate_network.assert_called_once_with("acme-prod", services.status_reader)
+
+
+def test_list_context_status_propagates_exception_from_use_case(
+    mocker: MockerFixture,
+    tmp_path: Path,
+) -> None:
+    services = mocker.Mock(spec=ServiceContainer)
+    services.status_reader = object()
+    mocker.patch("src.services.status.build_service_container", return_value=services)
+    mocker.patch(
+        "src.services.status.list_context_status_use_case",
+        side_effect=RuntimeError("reader failed"),
+    )
+
+    with pytest.raises(RuntimeError, match="reader failed"):
+        list_context_status(tmp_path)
+
+
+def test_validate_context_network_propagates_exception_from_use_case(
+    mocker: MockerFixture,
+    tmp_path: Path,
+) -> None:
+    services = mocker.Mock(spec=ServiceContainer)
+    services.status_reader = object()
+    mocker.patch("src.services.status.build_service_container", return_value=services)
+    mocker.patch(
+        "src.services.status.validate_context_network_use_case",
+        side_effect=RuntimeError("network read failed"),
+    )
+
+    with pytest.raises(RuntimeError, match="network read failed"):
+        validate_context_network("acme-prod", tmp_path)
+
+
+def test_list_context_status_returns_empty_list_when_no_contexts(
+    mocker: MockerFixture,
+    tmp_path: Path,
+) -> None:
+    services = mocker.Mock(spec=ServiceContainer)
+    services.status_reader = object()
+    mocker.patch("src.services.status.build_service_container", return_value=services)
+    mocker.patch(
+        "src.services.status.list_context_status_use_case",
+        return_value=[],
+    )
+
+    result = list_context_status(tmp_path)
+
+    assert result == []

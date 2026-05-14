@@ -56,9 +56,13 @@ The main stack is Python 3, `uv`, `paramiko`, `PyYAML`, and Bash.
 
 Use Python 3.10+ compatible code and 4-space indentation. Keep transport concerns thin in `src/interfaces/cli/`; reusable behavior belongs in `src/application/use_cases/`, with side-effecting implementations in `src/infrastructure/adapters/`. Do not move SSH, tunnel, or kubeconfig business rules into CLI handlers. Follow existing naming patterns: `snake_case` for files, functions, variables, and test modules like `test_tunnel.py`. Keep shell scripts focused on orchestration. `mypy.ini` enables strict checks, so add or update type hints when changing behavior.
 
+**TDD**: Write the failing test first, then implement the minimum code to make it pass, then refactor. No production code without a corresponding test.
+
 ## Testing Guidelines
 
 Use `pytest`. Place unit tests under `tests/unit/` and smoke coverage under `tests/smoke/`. Name files `test_*.py` and test functions `test_*`. Update tests together with behavior changes, especially around discovery queries, connect resolution, config parsing, SSH validation, tunnel cleanup, and kubeconfig generation. Interactive CLI flows require a real TTY and should fail with a clear error when run non-interactively, while `--json` flows must remain non-interactive-safe.
+
+When writing or reviewing tests, use the `/pytest-quality` skill. It provides isolation patterns per layer, stub/mock conventions, naming rules, and a quality checklist.
 
 ## Commit & Pull Request Guidelines
 
