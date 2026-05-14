@@ -22,8 +22,8 @@ cogcs.yml.bak
 *.yml.bak
 *.yaml.bak
 .kube/
-inventory/
-!inventory/.gitkeep
+/inventory/
+!/inventory/.gitkeep
 !src/kubeconfig.py
 !examples/config/config.yaml
 
