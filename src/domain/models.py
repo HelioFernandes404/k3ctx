@@ -90,6 +90,7 @@ class ConnectResult:
     used_cache: bool
     network_requirement: NetworkRequirement
     error: Optional[OperationError] = None
+    argocd_local_port: Optional[int] = None
 
     def __post_init__(self) -> None:
         if self.success and self.error is not None:
@@ -111,4 +112,5 @@ class ConnectResult:
                 "needs_vpn": self.network_requirement.needs_vpn,
             },
             "error": None if self.error is None else self.error.to_public_dict(),
+            "argocd_local_port": self.argocd_local_port,
         }

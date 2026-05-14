@@ -41,13 +41,13 @@ class TestCheckVpnRequirement:
     """Tests for check_vpn_requirement function."""
 
     def test_detects_vpn_requirement_when_flag_true(self) -> None:
-        """Returns True when argocd_use_socks5_proxy is true."""
+        """Returns True when k3s_use_socks5_proxy is true."""
         inv_data: dict[str, Any] = {
             "all": {
                 "children": {
                     "k3s_cluster": {
                         "vars": {
-                            "argocd_use_socks5_proxy": True
+                            "k3s_use_socks5_proxy": True
                         }
                     }
                 }
@@ -57,7 +57,7 @@ class TestCheckVpnRequirement:
         assert result is True
 
     def test_returns_false_when_flag_missing(self) -> None:
-        """Returns False when argocd_use_socks5_proxy not set."""
+        """Returns False when k3s_use_socks5_proxy not set."""
         inv_data: dict[str, Any] = {
             "all": {
                 "children": {
@@ -71,13 +71,13 @@ class TestCheckVpnRequirement:
         assert result is False
 
     def test_returns_false_when_flag_false(self) -> None:
-        """Returns False when argocd_use_socks5_proxy is false."""
+        """Returns False when k3s_use_socks5_proxy is false."""
         inv_data: dict[str, Any] = {
             "all": {
                 "children": {
                     "k3s_cluster": {
                         "vars": {
-                            "argocd_use_socks5_proxy": False
+                            "k3s_use_socks5_proxy": False
                         }
                     }
                 }
@@ -85,6 +85,22 @@ class TestCheckVpnRequirement:
         }
         result = check_vpn_requirement(inv_data, "k3s_cluster", "testhost")
         assert result is False
+
+    def test_backward_compat_legacy_argocd_flag(self) -> None:
+        """Still returns True for the legacy argocd_use_socks5_proxy key."""
+        inv_data: dict[str, Any] = {
+            "all": {
+                "children": {
+                    "k3s_cluster": {
+                        "vars": {
+                            "argocd_use_socks5_proxy": True
+                        }
+                    }
+                }
+            }
+        }
+        result = check_vpn_requirement(inv_data, "k3s_cluster", "testhost")
+        assert result is True
 
     def test_returns_false_for_invalid_inventory(self) -> None:
         """Returns False for malformed inventory data."""

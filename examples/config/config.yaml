@@ -10,3 +10,12 @@ port_range_size: 10000
 
 # Update this path to your inventory checkout.
 inventory_path: /path/to/ansible/inventory
+
+# Optional: per-host ArgoCD integration (set in Ansible inventory host_config or group_vars)
+# argocd_enabled: true          # enable ArgoCD tunnel + argocd login after connect
+# argocd_namespace: argocd      # namespace where argocd-server runs (default: argocd)
+# argocd_node_port: 30080       # NodePort of argocd-server service (required when enabled)
+
+# Optional: VPN/sshuttle requirement flag (use in Ansible inventory group_vars)
+# k3s_use_socks5_proxy: true    # signal that sshuttle is needed to reach this cluster
+#                               # (legacy: argocd_use_socks5_proxy still accepted)

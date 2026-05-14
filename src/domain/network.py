@@ -6,7 +6,8 @@ import ipaddress
 from typing import Any, Dict, Mapping, Optional, Tuple
 
 
-_VPN_FLAG = "argocd_use_socks5_proxy"
+_VPN_FLAG = "k3s_use_socks5_proxy"
+_VPN_FLAG_LEGACY = "argocd_use_socks5_proxy"
 _ANSIBLE_HOST = "ansible_host"
 
 
@@ -55,7 +56,8 @@ def is_private_network(ip_or_hostname: str) -> bool:
 
 def check_vpn_requirement(inv_data: Any, group_name: str, host_name: str) -> bool:
     del host_name
-    return bool(_extract_group_vars(inv_data, group_name).get(_VPN_FLAG, False))
+    vars_dict = _extract_group_vars(inv_data, group_name)
+    return bool(vars_dict.get(_VPN_FLAG, False)) or bool(vars_dict.get(_VPN_FLAG_LEGACY, False))
 
 
 def check_network_requirement(hostname: str, host_info: Dict[str, Any]) -> Tuple[Optional[str], Optional[str]]:
@@ -77,11 +79,11 @@ def detect_network_requirement(
     host_info = {"config": dict(host_config)}
     network_type, network_range = check_network_requirement(group_name or "", host_info)
 
-    needs_vpn = bool(host_config.get(_VPN_FLAG, False))
+    needs_vpn = bool(host_config.get(_VPN_FLAG, False)) or bool(host_config.get(_VPN_FLAG_LEGACY, False))
     vars_dict = host_config.get("vars")
     if isinstance(vars_dict, Mapping):
-        needs_vpn = needs_vpn or bool(vars_dict.get(_VPN_FLAG, False))
+        needs_vpn = needs_vpn or bool(vars_dict.get(_VPN_FLAG, False)) or bool(vars_dict.get(_VPN_FLAG_LEGACY, False))
     if isinstance(group_vars, Mapping):
-        needs_vpn = needs_vpn or bool(group_vars.get(_VPN_FLAG, False))
+        needs_vpn = needs_vpn or bool(group_vars.get(_VPN_FLAG, False)) or bool(group_vars.get(_VPN_FLAG_LEGACY, False))
 
     return network_type, network_range, needs_vpn

@@ -13,6 +13,7 @@ from src.application.ports import (
     StatusReader,
     TunnelManager,
 )
+from src.infrastructure.adapters.argocd_connector import LocalArgocdConnector
 from src.infrastructure.adapters.cluster_connector import LocalClusterConnector
 from src.infrastructure.adapters.context_switcher import KubectlContextSwitcher
 from src.infrastructure.adapters.inventory_catalog import (
@@ -37,7 +38,7 @@ def build_service_container(state_dir: Path | None = None) -> ServiceContainer:
     return ServiceContainer(
         catalog=YamlInventoryCatalog(),
         refresher=GitInventoryRefresher(),
-        connector=LocalClusterConnector(),
+        connector=LocalClusterConnector(argocd_connector=LocalArgocdConnector()),
         switcher=KubectlContextSwitcher(),
         status_reader=LocalStatusReader() if state_dir is None else LocalStatusReader(state_dir),
         tunnel_manager=LocalTunnelManager(),

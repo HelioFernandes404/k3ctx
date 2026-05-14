@@ -524,7 +524,7 @@ def test_connect_cluster_detects_vpn_requirement_from_group_vars(
         host_alias="vpn",
         group="k3s_cluster",
         host_config={"ansible_host": "8.8.8.8"},
-        group_vars={"argocd_use_socks5_proxy": True},
+        group_vars={"k3s_use_socks5_proxy": True},
     )
 
     load_ssh_config_mock = mocker.patch("src.services.connect.load_ssh_config")

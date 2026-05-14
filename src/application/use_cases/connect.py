@@ -137,6 +137,7 @@ def connect_cluster(
         tunnel_pid=artifacts.tunnel_pid,
         used_cache=artifacts.used_cache,
         network_requirement=requirement,
+        argocd_local_port=artifacts.argocd_local_port,
     )
 
 

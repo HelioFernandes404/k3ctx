@@ -32,6 +32,8 @@ def print_single_success(result: ConnectResult) -> None:
         print("✓ Fetched kubeconfig from remote")
     if result.tunnel_pid is not None:
         print(f"✓ Tunnel ready (PID: {result.tunnel_pid})")
+    if result.argocd_local_port is not None:
+        print(f"✓ ArgoCD available at localhost:{result.argocd_local_port}")
 
     requirement = result.network_requirement
     if requirement.needs_vpn:

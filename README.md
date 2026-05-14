@@ -54,8 +54,9 @@ Regras de uso:
 - `connect` aceita 1 a 3 identificadores e conecta apenas quando a resolucao for unica.
 - `connect` valida a API Kubernetes forwarded em `https://127.0.0.1:<port>` antes de reportar sucesso.
 - `connect` sem identificadores falha com erro deterministico; nao existe prompt interativo.
+- se o host tiver `argocd_enabled: true` no inventario, `connect` abre um tunel SSH para o NodePort do ArgoCD e executa `argocd login` automaticamente.
 - refresh do inventory nao roda automaticamente; use `--refresh-inventory` ou `K9S_REFRESH_INVENTORY=1` quando quiser atualizar explicitamente.
-- `--json` funciona bem sem TTY e retorna saida estruturada.
+- `--json` funciona bem sem TTY e retorna saida estruturada (inclui `argocd_local_port` quando disponivel).
 - logs da CLI sao legiveis em nivel INFO por padrao; use `K9S_LOG_LEVEL=DEBUG` para debug e `K9S_LOG_FORMAT=json` para logs estruturados no stderr.
 - o readiness check da API pode ser ajustado com `K9S_API_READY_TIMEOUT_SECONDS` ou desabilitado com `K9S_VERIFY_API_READY=0`.
 
@@ -99,10 +100,42 @@ port_range_start: 16443
 port_range_size: 10000
 ```
 
+## Integracao ArgoCD
+
+Adicione ao host no inventario Ansible para ativar login automatico no `connect`:
+
+```yaml
+MY-HOST:
+  ansible_host: 1.2.3.4
+  argocd_enabled: true
+  argocd_namespace: argocd      # default "argocd"
+  argocd_node_port: 30080       # NodePort do argocd-server (obrigatorio)
+  argocd_plaintext: true        # usar --plaintext em vez de --insecure
+```
+
+O que acontece no `connect` quando `argocd_enabled: true`:
+
+1. Tunel SSH para K3s API abre em `localhost:<porta-k3s>`
+2. Kubeconfig mesclado em `~/.kube/config`
+3. Tunel SSH para ArgoCD NodePort abre em `localhost:<porta-argocd>`
+4. Senha lida do secret `argocd-initial-admin-secret` via kubectl
+5. `argocd login` executado automaticamente
+6. Saida mostra `✓ ArgoCD available at localhost:<porta>`
+
+Para matar o tunel ArgoCD separadamente:
+
+```bash
+uv run k3ctx tunnel-kill <context>-argocd
+```
+
+Se o `argocd` CLI nao estiver instalado ou o secret nao existir, o `connect` ainda completa com sucesso — apenas o login e ignorado e a porta do tunel e reportada para login manual.
+
 ## Troubleshooting rapido
 
 - Se `connect` falhar com `Kubernetes API did not become ready on https://127.0.0.1:<port>/version`, teste primeiro com `K9S_API_READY_TIMEOUT_SECONDS=10`.
 - Se o tunel estiver funcional mas o readiness check ainda falhar no seu ambiente, use `K9S_VERIFY_API_READY=0` temporariamente e valide com `kubectl --request-timeout=10s get --raw=/version`.
+- Se o `argocd login` falhar, o tunel ainda fica aberto. Verifique: `argocd` CLI instalado? Secret `argocd-initial-admin-secret` existe no namespace? `argocd_plaintext` correto para o cluster?
+- Para relogar no ArgoCD sem reconectar o cluster: `uv run k3ctx tunnel-kill <context>-argocd` e depois `uv run k3ctx connect <identifier>`.
 
 ## Limites e acoes sensiveis
 

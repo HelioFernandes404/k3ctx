@@ -18,9 +18,18 @@ At the start of each session:
 
 This project is a local K3s context tunnel manager for the `systemframe` workspace. It fetches kubeconfig files over SSH, opens local tunnels to K3s API servers, merges contexts into `~/.kube/config`, and supports local workflows with `kubectl`, `k9s`, and related tools.
 
+When a cluster has ArgoCD configured in its inventory (`argocd_enabled: true`), `connect` also opens a parallel SSH tunnel to the ArgoCD NodePort and runs `argocd login` automatically. This removes the need to manually choose between CLI vs port-forward on every session.
+
 ## Project Structure & Module Organization
 
 The codebase is organized in layers. Core domain models and pure policies live in `src/domain/`. Application orchestration lives in `src/application/use_cases/`. Infrastructure adapters live in `src/infrastructure/adapters/` and handle inventory access, connection, context switching, tunnel management, and status reads. The user-facing entrypoint is `src/interfaces/cli/`. Repository-root helper scripts have been removed in favor of the CLI entrypoint under `src`. Tests stay split between `tests/unit/` and `tests/smoke/`. Local YAML data now lives under `~/.local/share/k3s-context-tunnel-manager/yaml/`, with config in `config/config.yaml` and generated kubeconfig cache files in `kubeconfigs/<context>.yml`. `XDG_DATA_HOME` overrides the base location.
+
+Key domain files:
+- `src/domain/models.py` — `ClusterTarget`, `ConnectResult` (includes `argocd_local_port`), `EffectiveConfig`, `NetworkRequirement`
+- `src/domain/argocd.py` — `ArgocdConfig`: reads `argocd_enabled`, `argocd_namespace`, `argocd_node_port`, `argocd_plaintext` from inventory
+- `src/domain/network.py` — VPN/sshuttle detection; primary flag is `k3s_use_socks5_proxy` (legacy `argocd_use_socks5_proxy` still accepted)
+- `src/infrastructure/adapters/argocd_connector.py` — `LocalArgocdConnector`: opens ArgoCD SSH tunnel, fetches admin password from k8s secret, runs `argocd login`
+- `src/infrastructure/adapters/cluster_connector.py` — `LocalClusterConnector`: accepts optional `argocd_connector`; calls it after `merge_kubeconfig` when `argocd_enabled`
 
 ## Stack
 
@@ -67,6 +76,24 @@ When writing or reviewing tests, use the `/pytest-quality` skill. It provides is
 ## Commit & Pull Request Guidelines
 
 Local Git history is not available in this directory, so no verified project-specific commit pattern could be derived from `git log`. Use short imperative commit messages, preferably Conventional Commit style, for example `feat: add tunnel-kill-all command`. PRs should include: purpose, behavior impact, test evidence (`uv run python -m pytest tests/unit -q`, `uv run python -m pytest tests/smoke -q`, `uv run mypy src tests`), and terminal excerpts when changing interactive flows.
+
+## ArgoCD Inventory Keys
+
+Add these to a host entry or group_vars to enable the ArgoCD integration:
+
+```yaml
+argocd_enabled: true          # required — activates tunnel + argocd login
+argocd_namespace: argocd      # optional, default "argocd"
+argocd_node_port: 30080       # required — NodePort of argocd-server
+argocd_plaintext: true        # optional, default false — use --plaintext instead of --insecure
+```
+
+ArgoCD tunnel state is saved under `~/.local/state/k9s-tunnels/<context>-argocd.pid`. Kill it with:
+```bash
+uv run context-tunnel-manager tunnel-kill <context>-argocd
+```
+
+`argocd login` uses the `argocd-initial-admin-secret` Kubernetes secret in the configured namespace. If the secret is absent or `argocd` CLI is not in PATH, the K3s connection still succeeds; only the login step is skipped with a message.
 
 ## Security & Configuration Tips
 

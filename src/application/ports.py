@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from src.domain.models import (
     ClusterTarget,
@@ -12,6 +12,9 @@ from src.domain.models import (
     NetworkRequirement,
     OperationError,
 )
+
+if TYPE_CHECKING:
+    from src.domain.argocd import ArgocdConfig
 
 
 class ClusterConnectionError(RuntimeError):
@@ -46,6 +49,15 @@ class ConnectionArtifacts:
     internal_ip: str
     tunnel_pid: int | None
     used_cache: bool
+    argocd_local_port: int | None = None
+
+
+@dataclass(frozen=True)
+class ArgocdLoginResult:
+    success: bool
+    local_port: int | None
+    skipped: bool = False
+    message: str = ""
 
 
 class InventoryCatalog(Protocol):
@@ -77,3 +89,18 @@ class StatusReader(Protocol):
 
 class TunnelManager(Protocol):
     def kill_tunnel(self, context_name: str) -> None: ...
+
+
+class ArgocdConnector(Protocol):
+    def setup(
+        self,
+        context_name: str,
+        argocd_config: "ArgocdConfig",
+        *,
+        hostname: str,
+        username: str,
+        keyfile: str | None,
+        port: int,
+        proxycmd: str | None,
+        internal_ip: str,
+    ) -> ArgocdLoginResult: ...

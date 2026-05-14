@@ -10,11 +10,13 @@ import time
 import urllib.error
 import urllib.request
 from contextlib import ExitStack
+from typing import Optional
 
 import yaml
 
-from src.application.ports import ClusterConnectionError, ConnectionArtifacts
+from src.application.ports import ArgocdConnector, ClusterConnectionError, ConnectionArtifacts
 from src.app_paths import get_kubeconfig_cache_path
+from src.domain.argocd import ArgocdConfig
 from src.domain.models import ClusterTarget, EffectiveConfig, NetworkRequirement
 from src.kubeconfig import merge_kubeconfig, update_kubeconfig_server
 from src.logging_config import get_logger
@@ -256,6 +258,7 @@ class LocalClusterConnector:
         verify_api_readiness: bool | None = None,
         api_ready_timeout_seconds: float | None = None,
         api_ready_interval_seconds: float = 0.25,
+        argocd_connector: Optional[ArgocdConnector] = None,
     ) -> None:
         if verify_api_readiness is None:
             verify_api_readiness = (
@@ -270,6 +273,7 @@ class LocalClusterConnector:
         self.verify_api_readiness = verify_api_readiness
         self.api_ready_timeout_seconds = api_ready_timeout_seconds
         self.api_ready_interval_seconds = api_ready_interval_seconds
+        self.argocd_connector: Optional[ArgocdConnector] = argocd_connector
 
     def connect(
         self,
@@ -341,6 +345,25 @@ class LocalClusterConnector:
                 needs_vpn=requirement.needs_vpn,
                 internal_ip=internal_ip,
             )
+
+            argocd_local_port: Optional[int] = None
+            if self.argocd_connector is not None:
+                argocd_config = ArgocdConfig.from_host_config(
+                    target.host_config, target.group_vars
+                )
+                if argocd_config.enabled:
+                    argocd_result = self.argocd_connector.setup(
+                        target.context_name,
+                        argocd_config,
+                        hostname=hostname,
+                        username=username,
+                        keyfile=keyfile,
+                        port=port,
+                        proxycmd=proxycmd,
+                        internal_ip=internal_ip,
+                    )
+                    argocd_local_port = argocd_result.local_port
+
             logger.info(
                 "Completed local cluster connection adapter",
                 extra={
@@ -348,6 +371,7 @@ class LocalClusterConnector:
                     "context_name": target.context_name,
                     "used_cache": used_cache,
                     "tunnel_reused": tunnel_reused,
+                    "argocd_local_port": argocd_local_port,
                 },
             )
             return ConnectionArtifacts(
@@ -355,6 +379,7 @@ class LocalClusterConnector:
                 internal_ip=internal_ip,
                 tunnel_pid=tunnel_pid,
                 used_cache=used_cache,
+                argocd_local_port=argocd_local_port,
             )
         except Exception:
             logger.error(

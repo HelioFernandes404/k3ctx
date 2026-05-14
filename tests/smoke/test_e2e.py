@@ -15,7 +15,7 @@ def test_vpn_warning_detection() -> None:
             "children": {
                 "k3s_cluster": {
                     "vars": {
-                        "argocd_use_socks5_proxy": True
+                        "k3s_use_socks5_proxy": True
                     },
                     "hosts": {
                         "vpnhost": {
