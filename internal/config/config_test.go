@@ -117,7 +117,7 @@ func TestResolveInventoryPath_UsesExistingConfiguredPath(t *testing.T) {
 
 func TestResolveInventoryPath_FallsBackToAncestorAnsibleInventory(t *testing.T) {
 	root := t.TempDir()
-	projectDir := filepath.Join(root, ".custom-tools", "k3s-context-tunnel-manager")
+	projectDir := filepath.Join(root, ".custom-tools", "k3ctx")
 	require.NoError(t, os.MkdirAll(projectDir, 0o755))
 	ancestorInv := filepath.Join(root, "ansible", "inventory")
 	require.NoError(t, os.MkdirAll(ancestorInv, 0o755))

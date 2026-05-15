@@ -7,7 +7,7 @@ At the start of each session:
 - Read this file before proposing commands, edits, or architecture changes.
 - Treat `cmd/k3ctx/main.go` as the binary entrypoint and `cli/` as the cobra command layer.
 - Prefer the discovery-first CLI flow: `init`, `clients`, `hosts`, `connect`, `status`, `k9s`.
-- Assume local YAML data belongs under `~/.local/share/k3s-context-tunnel-manager/yaml/`, not in the repository root.
+- Assume local YAML data belongs under `~/.local/share/k3ctx/yaml/`, not in the repository root.
 - Keep the default CLI non-interactive and automation-safe; preserve clean `--json` stdout contracts.
 - Refresh inventory only when explicitly requested via `--refresh-inventory`.
 - Before changing behavior, read the affected Go module and its `_test.go` file in the same package.
@@ -138,4 +138,4 @@ ArgoCD tunnel state is saved under `~/.local/state/k9s-tunnels/<context>-argocd.
 
 ## Security & Configuration Tips
 
-Do not commit generated kubeconfigs, SSH keys, or local state files. Treat `~/.local/share/k3s-context-tunnel-manager/yaml/config/config.yaml` as machine-specific; verify `inventory_path`, `ssh_key_path`, and port range settings before testing against real clusters. The tracked config template lives in `examples/config/config.yaml`. Do not assume a local `./inventory`; this workspace commonly points `inventory_path` to an external Ansible inventory via `config.yaml` or `INVENTORY_PATH`. Contexts are merged into `~/.kube/config`, generated kubeconfig cache files live in `~/.local/share/k3s-context-tunnel-manager/yaml/kubeconfigs/`, and tunnel PID files live in `~/.local/state/k9s-tunnels`.
+Do not commit generated kubeconfigs, SSH keys, or local state files. Treat `~/.local/share/k3ctx/yaml/config/config.yaml` as machine-specific; verify `inventory_path`, `ssh_key_path`, and port range settings before testing against real clusters. The tracked config template lives in `examples/config/config.yaml`. Do not assume a local `./inventory`; this workspace commonly points `inventory_path` to an external Ansible inventory via `config.yaml` or `INVENTORY_PATH`. Contexts are merged into `~/.kube/config`, generated kubeconfig cache files live in `~/.local/share/k3ctx/yaml/kubeconfigs/`, and tunnel PID files live in `~/.local/state/k9s-tunnels`.
