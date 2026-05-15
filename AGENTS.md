@@ -1,141 +1,42 @@
-# Repository Guidelines
+# Repository Instructions
 
-## LLM Startup Instructions
+## Source Of Truth
+- This is a Go CLI repo; prefer `go.mod`, `Makefile`, and Go source over stale README Python/uv commands.
+- Module: `github.com/systemframe/k3ctx`; CLI entrypoint: `cmd/k3ctx/main.go`.
 
-At the start of each session:
+## Commands
+- Test all packages: `make test` or `go test ./...`.
+- Focused test: `go test ./internal/<package> -run TestName`.
+- Build: `make build` writes `bin/k3ctx`.
+- Install: `make install` installs to `$(HOME)/.local/bin` unless `PREFIX` is set.
+- Format Go edits: `gofmt -w <files>`.
 
-- Read this file before proposing commands, edits, or architecture changes.
-- Treat `cmd/k3ctx/main.go` as the binary entrypoint and `cli/` as the cobra command layer.
-- Prefer the discovery-first CLI flow: `init`, `clients`, `hosts`, `connect`, `status`, `k9s`.
-- Assume local YAML data belongs under `~/.local/share/k3ctx/yaml/`, not in the repository root.
-- Keep the default CLI non-interactive and automation-safe; preserve clean `--json` stdout contracts.
-- Refresh inventory only when explicitly requested via `--refresh-inventory`.
-- Before changing behavior, read the affected Go module and its `_test.go` file in the same package.
-- When validating a real cluster flow, verify the tunnel, current context, and a real `kubectl` call instead of trusting setup messages alone.
+## TDD Workflow
+- For any implementation, write or update the focused test first and run it to see it fail.
+- Make the smallest code change that passes the focused test.
+- Run the focused test again, then broaden to `go test ./...` when the change touches shared behavior.
+- Do not skip tests for behavior changes unless the user explicitly asks; explain any untested gap.
 
-## Project Overview
+## Architecture
+- `cli/` contains Cobra commands.
+- `internal/domain` contains core models and decisions.
+- `internal/application/usecases` orchestrates behavior behind ports.
+- `internal/infrastructure` contains local adapters for SSH, kubectl, kubeconfig, ArgoCD, inventory refresh, and tunnel state.
+- Runtime wiring is in `internal/bootstrap/bootstrap.go`.
 
-This project is a local K3s context tunnel manager for the `systemframe` workspace. It fetches kubeconfig files over SSH, opens local tunnels to K3s API servers, merges contexts into `~/.kube/config`, and supports local workflows with `kubectl`, `k9s`, and related tools.
+## Runtime Config And State
+- `CONFIG_FILE` overrides config path.
+- Default config path: `~/.local/share/k3ctx/yaml/config/config.yaml`.
+- `K9S_CONFIG_DIR` overrides the config directory.
+- Kubeconfig cache: `~/.local/share/k3ctx/yaml/kubeconfigs/`.
+- Tunnel PID files: `~/.local/state/k9s-tunnels/`.
 
-When a cluster has ArgoCD configured in its inventory (`argocd_enabled: true`), `connect` also opens a parallel SSH tunnel to the ArgoCD NodePort and runs `argocd login` automatically.
+## Gotchas
+- `connect` opens SSH tunnels and merges kubeconfig into the user kubeconfig.
+- API readiness is enabled by default; disable with `K9S_VERIFY_API_READY=0` or tune with `K9S_API_READY_TIMEOUT_SECONDS`.
+- Inventory refresh is explicit via `--refresh-inventory`; it runs `git pull --ff-only` only when the inventory repo is clean.
+- Inventory files are Ansible YAML matching `*_hosts.yml`; unknown YAML tags like `!vault` are ignored.
 
-## Project Structure
-
-```
-cmd/k3ctx/main.go         ← binary entrypoint; only calls cli.Execute()
-cli/                      ← cobra commands (root, clients, hosts, connect, status, k9s, tunnel)
-internal/
-  domain/                 ← ClusterTarget, ConnectResult, EffectiveConfig, NetworkRequirement,
-  │                          OperationError, ArgocdConfig, network policies, discovery models
-  config/                 ← LoadConfig, LoadEffectiveConfig (YAML + env override)
-  paths/                  ← XDG-compliant path resolution
-  inventory/              ← vault-tag-safe YAML loading, ExtractHostsFromInventory
-  tunnel/                 ← GetUniquePort, IsTunnelRunning, CreateTunnel, KillTunnel, SaveTunnelPID
-  kubeconfig/             ← UpdateKubeconfigServer, MergeKubeconfig
-  network/                ← GetNetworkMetadata, ValidateContextNetwork, CheckSshuttleActive
-  application/
-    ports.go              ← Go interfaces: ClusterConnector, InventoryCatalog, ContextSwitcher, etc.
-    usecases/             ← connect, contexts, discovery, inventory, status, tunnels
-  ssh/                    ← LoadSSHConfig, ResolveConnectionTarget, GetInternalIP,
-  │                          MakeRemoteRunner, FetchRemoteFileCached
-  infrastructure/         ← YamlInventoryCatalog, KubectlContextSwitcher, LocalTunnelManager,
-  │                          LocalStatusReader, GitInventoryRefresher,
-  │                          LocalClusterConnector, LocalArgocdConnector
-  bootstrap/              ← ServiceContainer, Build()
-go.mod                    ← module github.com/systemframe/k3ctx
-```
-
-## Stack
-
-Go 1.25, `github.com/spf13/cobra`, `gopkg.in/yaml.v3`, `github.com/stretchr/testify`. SSH connections use subprocess `ssh` (no crypto/ssh dependency).
-
-## Build, Test, and Development Commands
-
-```bash
-# Build
-go build -o k3ctx ./cmd/k3ctx/
-
-# Run all tests
-go test ./...
-
-# Run a specific package
-go test ./internal/domain/ -v
-
-# Vet
-go vet ./...
-
-# CLI (after build)
-./k3ctx --help
-./k3ctx init
-./k3ctx clients
-./k3ctx hosts <client>
-./k3ctx connect [identifiers...]
-./k3ctx status
-./k3ctx tunnel-list
-./k3ctx tunnel-kill <context>
-./k3ctx tunnel-kill-all
-./k3ctx k9s
-```
-
-Environment overrides (same as Python version):
-
-| Env var | Purpose |
-|---|---|
-| `CONFIG_FILE` | Override config file path |
-| `INVENTORY_PATH` | Override inventory directory |
-| `K3S_API_PORT` | Override K3s API port |
-| `SSH_KEY_PATH` | Override SSH key path |
-| `PORT_RANGE_START` | Override port range start |
-| `PORT_RANGE_SIZE` | Override port range size |
-| `XDG_DATA_HOME` | Override XDG data home |
-
-## Coding Style & Naming Conventions
-
-- `MixedCaps` for exported identifiers; `mixedCaps` for unexported.
-- Acronyms all-caps: `SSH`, `URL`, `ID`, `API`.
-- Interfaces defined in `internal/application/ports.go`; sized to what callers need.
-- `cmd/k3ctx/main.go` only calls `cli.Execute()` — no logic there.
-- `cli/` handlers stay thin: load config, call use case, format output.
-- Domain and use-case logic stays in `internal/`; nothing SSH- or subprocess-related goes into CLI handlers.
-- Return `error` as the last value; never panic in normal flow.
-- Use value types for domain structs (no pointer receivers on small structs).
-- Packages: one clear responsibility; avoid `util`, `manager`, `helper` names.
-
-**TDD**: Write the failing test first, then implement the minimum code to make it pass, then refactor. No production code without a corresponding test.
-
-## Testing Guidelines
-
-- Test files: `<file>_test.go` in the same package (e.g., `internal/domain/models_test.go`).
-- Test functions: `TestXxx_DescribedBehavior(t *testing.T)`.
-- Use `github.com/stretchr/testify/assert` and `require`.
-- Define stub implementations inline in `_test.go` files (implement the port interface directly; no mock framework needed for simple cases).
-- Infrastructure adapters that call subprocess or SSH: use injectable function parameters (e.g., `checkSshuttle func(string) bool`) for testability.
-- `t.TempDir()` for filesystem isolation; `t.Setenv()` for env var isolation.
-- Layer ordering for tests: domain → config/paths → primitives → use cases → infrastructure → CLI.
-
-## Commit & Pull Request Guidelines
-
-Use Conventional Commit style: `feat:`, `fix:`, `chore:`, `test:`, `refactor:`. PRs should include: purpose, behavior impact, test evidence (`go test ./...`, `go vet ./...`), and terminal excerpts when changing interactive flows.
-
-## ArgoCD Inventory Keys
-
-Add these to a host entry or group_vars to enable the ArgoCD integration:
-
-```yaml
-argocd_enabled: true          # required — activates tunnel + argocd login
-argocd_namespace: argocd      # optional, default "argocd"
-argocd_node_port: 30080       # required — NodePort of argocd-server
-argocd_plaintext: true        # optional, default false — use --plaintext instead of --insecure
-```
-
-ArgoCD tunnel state is saved under `~/.local/state/k9s-tunnels/<context>-argocd.pid`. Kill it with:
-
-```bash
-./k3ctx tunnel-kill <context>-argocd
-```
-
-`argocd login` uses the `argocd-initial-admin-secret` Kubernetes secret in the configured namespace. If the secret is absent or `argocd` CLI is not in PATH, the K3s connection still succeeds; only the login step is skipped with a message.
-
-## Security & Configuration Tips
-
-Do not commit generated kubeconfigs, SSH keys, or local state files. Treat `~/.local/share/k3ctx/yaml/config/config.yaml` as machine-specific; verify `inventory_path`, `ssh_key_path`, and port range settings before testing against real clusters. The tracked config template lives in `examples/config/config.yaml`. Do not assume a local `./inventory`; this workspace commonly points `inventory_path` to an external Ansible inventory via `config.yaml` or `INVENTORY_PATH`. Contexts are merged into `~/.kube/config`, generated kubeconfig cache files live in `~/.local/share/k3ctx/yaml/kubeconfigs/`, and tunnel PID files live in `~/.local/state/k9s-tunnels`.
+## Safety
+- Do not commit kubeconfigs, inventory, `.env`, keys, local state, or generated `bin/`.
+- Ask before running commands that modify external state, especially real `connect`, tunnel kill commands, package installs, or git commits.
