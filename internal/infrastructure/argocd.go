@@ -2,10 +2,12 @@ package infrastructure
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -30,7 +32,39 @@ type LocalArgocdConnector struct {
 	saveTunnelPID   func(contextName string, pid *int, stateDir string)
 	which           func(name string) string
 	fetchPassword   func(contextName, namespace string) *string
+	discoverService func(contextName string) *discoveredArgocdService
 	runArgocd       func(args []string, timeout time.Duration) error
+}
+
+type discoveredArgocdService struct {
+	Namespace string
+	NodePort  int
+}
+
+type serviceList struct {
+	Items []serviceItem `json:"items"`
+}
+
+type serviceItem struct {
+	Metadata serviceMetadata `json:"metadata"`
+	Spec     serviceSpec     `json:"spec"`
+}
+
+type serviceMetadata struct {
+	Namespace string            `json:"namespace"`
+	Name      string            `json:"name"`
+	Labels    map[string]string `json:"labels"`
+}
+
+type serviceSpec struct {
+	Type  string        `json:"type"`
+	Ports []servicePort `json:"ports"`
+}
+
+type servicePort struct {
+	Name     string `json:"name"`
+	Port     int    `json:"port"`
+	NodePort int    `json:"nodePort"`
 }
 
 // NewLocalArgocdConnector returns a connector with real subprocess defaults.
@@ -45,6 +79,9 @@ func NewLocalArgocdConnector() *LocalArgocdConnector {
 	}
 	c.fetchPassword = func(contextName, namespace string) *string {
 		return fetchArgocdPassword(contextName, namespace, defaultKubectlRun)
+	}
+	c.discoverService = func(contextName string) *discoveredArgocdService {
+		return discoverArgocdService(contextName, defaultKubectlRun)
 	}
 	c.runArgocd = func(args []string, timeout time.Duration) error {
 		cmd := exec.Command("argocd", args...) //nolint:gosec
@@ -72,10 +109,22 @@ func (c *LocalArgocdConnector) Setup(
 	proxycmd *string,
 	internalIP string,
 ) (application.ArgocdLoginResult, error) {
-	if !cfg.Enabled || cfg.NodePort == nil {
+	if !cfg.Enabled {
 		return application.ArgocdLoginResult{
 			Skipped: true,
 			Message: "ArgoCD not configured for this cluster",
+		}, nil
+	}
+	if cfg.NodePort == nil && cfg.Discovery {
+		if discovered := c.discoverService(contextName); discovered != nil {
+			cfg.Namespace = discovered.Namespace
+			cfg.NodePort = &discovered.NodePort
+		}
+	}
+	if cfg.NodePort == nil {
+		return application.ArgocdLoginResult{
+			Skipped: true,
+			Message: "ArgoCD not discovered for this cluster",
 		}, nil
 	}
 
@@ -159,6 +208,109 @@ func fetchArgocdPassword(contextName, namespace string, kubectlRun func([]string
 	}
 	s := string(data)
 	return &s
+}
+
+func discoverArgocdService(contextName string, kubectlRun func([]string) (string, error)) *discoveredArgocdService {
+	args := []string{"kubectl", "get", "svc", "-A", "-o", "json", "--context", contextName}
+	out, err := kubectlRun(args)
+	if err != nil {
+		return nil
+	}
+
+	var services serviceList
+	if err := json.Unmarshal([]byte(out), &services); err != nil {
+		return nil
+	}
+
+	type candidate struct {
+		item      serviceItem
+		port      servicePort
+		svcRank   int
+		portRank  int
+		itemIndex int
+	}
+
+	var candidates []candidate
+	for i, item := range services.Items {
+		svcRank := argocdServiceRank(item)
+		if svcRank == 0 {
+			continue
+		}
+		port, portRank, ok := bestNodePort(item.Spec.Ports)
+		if !ok {
+			continue
+		}
+		candidates = append(candidates, candidate{item: item, port: port, svcRank: svcRank, portRank: portRank, itemIndex: i})
+	}
+	if len(candidates) == 0 {
+		return nil
+	}
+
+	sort.SliceStable(candidates, func(i, j int) bool {
+		if candidates[i].svcRank != candidates[j].svcRank {
+			return candidates[i].svcRank > candidates[j].svcRank
+		}
+		if candidates[i].portRank != candidates[j].portRank {
+			return candidates[i].portRank > candidates[j].portRank
+		}
+		return candidates[i].itemIndex < candidates[j].itemIndex
+	})
+
+	best := candidates[0]
+	return &discoveredArgocdService{Namespace: best.item.Metadata.Namespace, NodePort: best.port.NodePort}
+}
+
+func argocdServiceRank(item serviceItem) int {
+	name := strings.ToLower(item.Metadata.Name)
+	namespace := strings.ToLower(item.Metadata.Namespace)
+	if item.Metadata.Labels["app.kubernetes.io/name"] == "argocd-server" {
+		return 5
+	}
+	if name == "argocd-server" {
+		return 4
+	}
+	if namespace == "argocd" {
+		return 3
+	}
+	if strings.Contains(name, "argocd") {
+		return 2
+	}
+	if strings.Contains(namespace, "argocd") {
+		return 1
+	}
+	return 0
+}
+
+func bestNodePort(ports []servicePort) (servicePort, int, bool) {
+	var best servicePort
+	bestRank := 0
+	for _, port := range ports {
+		if port.NodePort == 0 {
+			continue
+		}
+		rank := argocdPortRank(port)
+		if rank > bestRank {
+			best = port
+			bestRank = rank
+		}
+	}
+	return best, bestRank, bestRank > 0
+}
+
+func argocdPortRank(port servicePort) int {
+	switch strings.ToLower(port.Name) {
+	case "https":
+		return 5
+	case "http":
+		return 3
+	}
+	switch port.Port {
+	case 443:
+		return 4
+	case 80:
+		return 2
+	}
+	return 1
 }
 
 func defaultKubectlRun(args []string) (string, error) {

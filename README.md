@@ -181,18 +181,9 @@ MY-HOST:
 
 ## ArgoCD
 
-Add these fields to a host to enable ArgoCD handling during `connect`:
+During `connect`, k3ctx automatically looks for an ArgoCD NodePort Service in the connected Kubernetes context.
 
-```yaml
-MY-HOST:
-  ansible_host: 1.2.3.4
-  argocd_enabled: true
-  argocd_namespace: argocd
-  argocd_node_port: 30080
-  argocd_plaintext: true
-```
-
-When enabled, `connect` also opens a managed tunnel for the ArgoCD NodePort and attempts `argocd login` using the initial admin secret.
+When found, `connect` opens a managed tunnel for the discovered ArgoCD NodePort and attempts `argocd login` using the initial admin secret from the discovered namespace. No inventory fields are required.
 
 If the `argocd` CLI is missing or login fails, the cluster connection can still succeed. Use the reported local ArgoCD port for manual login.
 

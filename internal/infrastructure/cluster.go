@@ -121,15 +121,12 @@ func (c *LocalClusterConnector) Connect(
 
 	var argocdLocalPort *int
 	if c.ArgocdAdapter != nil {
-		argocdCfg := domain.ArgocdConfigFromHostConfig(target.HostConfig(), target.GroupVars())
-		if argocdCfg.Enabled {
-			argocdResult, argocdErr := c.ArgocdAdapter.Setup(
-				target.ContextName(), argocdCfg,
-				hostname, username, keyfile, sshPort, proxycmd, internalIP,
-			)
-			if argocdErr == nil {
-				argocdLocalPort = argocdResult.LocalPort
-			}
+		argocdResult, argocdErr := c.ArgocdAdapter.Setup(
+			target.ContextName(), domain.AutoDiscoverArgocdConfig(),
+			hostname, username, keyfile, sshPort, proxycmd, internalIP,
+		)
+		if argocdErr == nil {
+			argocdLocalPort = argocdResult.LocalPort
 		}
 	}
 

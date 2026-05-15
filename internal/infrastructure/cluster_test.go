@@ -47,6 +47,17 @@ func stubEnsureTunnel(pid int, reused bool) func(string, string, string, string,
 
 func noopMerge(content, contextName string) (string, error) { return "/tmp/.kube/config", nil }
 
+type stubArgocdConnector struct {
+	calls []domain.ArgocdConfig
+	err   error
+	port  *int
+}
+
+func (s *stubArgocdConnector) Setup(_ string, cfg domain.ArgocdConfig, _, _ string, _ *string, _ int, _ *string, _ string) (application.ArgocdLoginResult, error) {
+	s.calls = append(s.calls, cfg)
+	return application.ArgocdLoginResult{LocalPort: s.port}, s.err
+}
+
 // --- Orchestration tests ---
 
 func TestLocalClusterConnector_AbortsWhenAPICheckFailsOnFreshTunnel(t *testing.T) {
@@ -163,6 +174,56 @@ func TestLocalClusterConnector_SkipsAPICheckWhenDisabled(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, apiCalled)
 	assert.True(t, mergeCalled)
+}
+
+func TestLocalClusterConnector_UsesAutoDiscoveryArgocdConfig(t *testing.T) {
+	argocd := &stubArgocdConnector{}
+	target := domain.NewClusterTarget("acme", "prod", "k3s_cluster", map[string]any{
+		"ansible_host":       "203.0.113.10",
+		"argocd_enabled":     false,
+		"argocd_node_port":   30080,
+		"argocd_namespace":   "inventory-ns",
+		"argocd_plaintext":   true,
+		"argocd_extra_noise": true,
+	}, nil)
+
+	conn := NewLocalClusterConnector(argocd)
+	conn.StateDir = t.TempDir()
+	conn.sshConnect = stubSSHConnect
+	conn.prepareKubeconfig = stubPrepareKubeconfig
+	conn.ensureTunnel = stubEnsureTunnel(1234, false)
+	conn.pollAPIReady = func(_ int, _ string, _, _ time.Duration) error { return nil }
+	conn.killTunnel = func(_, _ string) {}
+	conn.mergeKubeconfig = noopMerge
+
+	_, err := conn.Connect(target, makeEffectiveConfig(t), domain.NoNetworkRequirement())
+
+	require.NoError(t, err)
+	require.Len(t, argocd.calls, 1)
+	assert.True(t, argocd.calls[0].Enabled)
+	assert.True(t, argocd.calls[0].Discovery)
+	assert.Nil(t, argocd.calls[0].NodePort)
+	assert.Equal(t, "argocd", argocd.calls[0].Namespace)
+	assert.False(t, argocd.calls[0].Plaintext)
+}
+
+func TestLocalClusterConnector_IgnoresArgocdSetupError(t *testing.T) {
+	argocd := &stubArgocdConnector{err: fmt.Errorf("discovery failed")}
+
+	conn := NewLocalClusterConnector(argocd)
+	conn.StateDir = t.TempDir()
+	conn.sshConnect = stubSSHConnect
+	conn.prepareKubeconfig = stubPrepareKubeconfig
+	conn.ensureTunnel = stubEnsureTunnel(1234, false)
+	conn.pollAPIReady = func(_ int, _ string, _, _ time.Duration) error { return nil }
+	conn.killTunnel = func(_, _ string) {}
+	conn.mergeKubeconfig = noopMerge
+
+	result, err := conn.Connect(makeTarget(), makeEffectiveConfig(t), domain.NoNetworkRequirement())
+
+	require.NoError(t, err)
+	assert.Equal(t, 16443, result.LocalPort)
+	require.Len(t, argocd.calls, 1)
 }
 
 // --- pollAPIReadyWithDoer ---

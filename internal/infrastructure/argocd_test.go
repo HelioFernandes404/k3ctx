@@ -25,6 +25,21 @@ func argocdPlaintext(nodePort int) domain.ArgocdConfig {
 	return domain.ArgocdConfig{Enabled: true, Namespace: "argocd", NodePort: &nodePort, Plaintext: true}
 }
 
+func servicesJSON(items string) string {
+	return fmt.Sprintf(`{"items":[%s]}`, items)
+}
+
+func serviceJSON(namespace, name, labels, svcType, ports string) string {
+	return fmt.Sprintf(`{
+		"metadata":{"namespace":%q,"name":%q,"labels":%s},
+		"spec":{"type":%q,"ports":[%s]}
+	}`, namespace, name, labels, svcType, ports)
+}
+
+func nodePortJSON(name string, port, nodePort int) string {
+	return fmt.Sprintf(`{"name":%q,"port":%d,"nodePort":%d}`, name, port, nodePort)
+}
+
 // --- Skipped ---
 
 func TestLocalArgocdConnector_SkipsWhenDisabled(t *testing.T) {
@@ -44,6 +59,89 @@ func TestLocalArgocdConnector_SkipsWhenNodePortMissing(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, result.Skipped)
 	assert.Nil(t, result.LocalPort)
+}
+
+// --- Discovery ---
+
+func TestDiscoverArgocdService_SelectsLabeledNodePortService(t *testing.T) {
+	out := servicesJSON(serviceJSON(
+		"argocd-system", "server", `{"app.kubernetes.io/name":"argocd-server"}`, "NodePort",
+		nodePortJSON("https", 443, 30443),
+	))
+
+	result := discoverArgocdService("acme-prod", func(args []string) (string, error) {
+		assert.Equal(t, []string{"kubectl", "get", "svc", "-A", "-o", "json", "--context", "acme-prod"}, args)
+		return out, nil
+	})
+
+	require.NotNil(t, result)
+	assert.Equal(t, "argocd-system", result.Namespace)
+	assert.Equal(t, 30443, result.NodePort)
+}
+
+func TestDiscoverArgocdService_RanksCandidates(t *testing.T) {
+	out := servicesJSON(fmt.Sprintf("%s,%s,%s,%s,%s",
+		serviceJSON("tools", "argocd-helper", `{}`, "NodePort", nodePortJSON("https", 443, 30001)),
+		serviceJSON("argocd", "web", `{}`, "NodePort", nodePortJSON("https", 443, 30002)),
+		serviceJSON("other", "argocd-server", `{}`, "NodePort", nodePortJSON("https", 443, 30003)),
+		serviceJSON("other", "anything", `{"app.kubernetes.io/name":"argocd-server"}`, "NodePort", nodePortJSON("https", 443, 30004)),
+		serviceJSON("argocd-prod", "web", `{}`, "NodePort", nodePortJSON("https", 443, 30005)),
+	))
+
+	result := discoverArgocdService("acme-prod", func(_ []string) (string, error) { return out, nil })
+
+	require.NotNil(t, result)
+	assert.Equal(t, "other", result.Namespace)
+	assert.Equal(t, 30004, result.NodePort)
+}
+
+func TestDiscoverArgocdService_RanksPorts(t *testing.T) {
+	cases := []struct {
+		name     string
+		ports    string
+		expected int
+	}{
+		{"https name", fmt.Sprintf("%s,%s", nodePortJSON("http", 80, 30080), nodePortJSON("https", 8443, 30443)), 30443},
+		{"port 443", fmt.Sprintf("%s,%s", nodePortJSON("admin", 8080, 30080), nodePortJSON("web", 443, 30443)), 30443},
+		{"http name", fmt.Sprintf("%s,%s", nodePortJSON("grpc", 8080, 30081), nodePortJSON("http", 8081, 30080)), 30080},
+		{"port 80", fmt.Sprintf("%s,%s", nodePortJSON("grpc", 8080, 30081), nodePortJSON("web", 80, 30080)), 30080},
+		{"first nodeport", fmt.Sprintf("%s,%s", nodePortJSON("grpc", 8080, 30081), nodePortJSON("web", 8081, 30080)), 30081},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			out := servicesJSON(serviceJSON("argocd", "argocd-server", `{}`, "NodePort", tc.ports))
+
+			result := discoverArgocdService("acme-prod", func(_ []string) (string, error) { return out, nil })
+
+			require.NotNil(t, result)
+			assert.Equal(t, tc.expected, result.NodePort)
+		})
+	}
+}
+
+func TestDiscoverArgocdService_SkipsWhenKubectlFails(t *testing.T) {
+	result := discoverArgocdService("acme-prod", func(_ []string) (string, error) {
+		return "", fmt.Errorf("forbidden")
+	})
+
+	assert.Nil(t, result)
+}
+
+func TestDiscoverArgocdService_SkipsWhenNoCandidateExists(t *testing.T) {
+	out := servicesJSON(serviceJSON("default", "web", `{}`, "NodePort", nodePortJSON("https", 443, 30443)))
+
+	result := discoverArgocdService("acme-prod", func(_ []string) (string, error) { return out, nil })
+
+	assert.Nil(t, result)
+}
+
+func TestDiscoverArgocdService_SkipsClusterIPService(t *testing.T) {
+	out := servicesJSON(serviceJSON("argocd", "argocd-server", `{}`, "ClusterIP", `{"name":"https","port":443}`))
+
+	result := discoverArgocdService("acme-prod", func(_ []string) (string, error) { return out, nil })
+
+	assert.Nil(t, result)
 }
 
 // --- Tunnel management ---
