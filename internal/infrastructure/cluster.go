@@ -42,12 +42,12 @@ type LocalClusterConnector struct {
 // NewLocalClusterConnector returns a connector with real subprocess defaults.
 func NewLocalClusterConnector(argocd application.ArgocdConnector) *LocalClusterConnector {
 	verifyAPI := true
-	if v := os.Getenv("K9S_VERIFY_API_READY"); v != "" {
+	if v := os.Getenv("K3CTX_VERIFY_API_READY"); v != "" {
 		v = strings.ToLower(strings.TrimSpace(v))
 		verifyAPI = v != "0" && v != "false" && v != "no" && v != "off"
 	}
 	timeout := 15 * time.Second
-	if v := os.Getenv("K9S_API_READY_TIMEOUT_SECONDS"); v != "" {
+	if v := os.Getenv("K3CTX_API_READY_TIMEOUT_SECONDS"); v != "" {
 		if f, err := strconv.ParseFloat(v, 64); err == nil {
 			timeout = time.Duration(f * float64(time.Second))
 		}
@@ -74,7 +74,7 @@ func (c *LocalClusterConnector) stateDir() string {
 	if c.StateDir != "" {
 		return c.StateDir
 	}
-	return filepath.Join(os.Getenv("HOME"), ".local", "state", "k9s-tunnels")
+	return filepath.Join(os.Getenv("HOME"), ".local", "state", "k3ctx-tunnels")
 }
 
 // Connect implements application.ClusterConnector.

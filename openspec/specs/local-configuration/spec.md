@@ -34,8 +34,8 @@ The system SHALL use XDG-style local data paths for config and kubeconfig cache 
 - **WHEN** `XDG_DATA_HOME` is not set
 - **THEN** the system resolves app data paths under `$HOME/.local/share/k3ctx`
 
-#### Scenario: K9S_CONFIG_DIR overrides config directory
-- **WHEN** `K9S_CONFIG_DIR` is set
+#### Scenario: K3CTX_CONFIG_DIR overrides config directory
+- **WHEN** `K3CTX_CONFIG_DIR` is set
 - **THEN** the system resolves the config file as `config.yaml` inside that directory
 
 ### Requirement: Resolve inventory path

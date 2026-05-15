@@ -49,7 +49,6 @@ k3ctx init
 k3ctx clients
 k3ctx hosts acme
 k3ctx connect acme
-k3ctx k9s
 k3ctx tunnel-list
 k3ctx status
 ```
@@ -69,7 +68,6 @@ go run ./cmd/k3ctx clients
 | `k3ctx clients [query]` | List clients with host counts. |
 | `k3ctx hosts CLIENT [query]` | List or search hosts inside one client. |
 | `k3ctx connect [IDENTIFIER]` | Resolve one host and connect to it. |
-| `k3ctx k9s` | Launch `k9s` using the active context. |
 | `k3ctx tunnel-list` | List managed tunnels that are running. |
 | `k3ctx tunnel-kill CONTEXT` | Kill one managed tunnel. |
 | `k3ctx tunnel-kill-all` | Kill all managed tunnels. |
@@ -134,10 +132,10 @@ Rules:
 Config lookup order:
 
 1. `CONFIG_FILE`, when set
-2. `K9S_CONFIG_DIR/config.yaml`, when `K9S_CONFIG_DIR` is set
+2. `K3CTX_CONFIG_DIR/config.yaml`, when `K3CTX_CONFIG_DIR` is set
 3. `~/.local/share/k3ctx/yaml/config/config.yaml`
 4. `config.yaml` in the current project directory
-5. `~/.k9s-config/config.yaml`
+5. `~/.k3ctx-config/config.yaml`
 
 `XDG_DATA_HOME` changes the base for `~/.local/share` paths.
 
@@ -199,7 +197,7 @@ k3ctx tunnel-kill <context>-argocd
 | --- | --- |
 | `~/.local/share/k3ctx/yaml/config/config.yaml` | Default config file. |
 | `~/.local/share/k3ctx/yaml/kubeconfigs/` | Generated kubeconfig cache. |
-| `~/.local/state/k9s-tunnels/` | Managed tunnel PID files. |
+| `~/.local/state/k3ctx-tunnels/` | Managed tunnel PID files. |
 | `~/.kube/config` | User kubeconfig updated by `connect`. |
 
 ## Development

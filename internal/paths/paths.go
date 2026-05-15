@@ -10,7 +10,7 @@ const (
 	yamlDirname      = "yaml"
 	configDirname    = "config"
 	kubeconfigDirname = "kubeconfigs"
-	legacyConfigDir  = ".k9s-config"
+	legacyConfigDir  = ".k3ctx-config"
 )
 
 func DataHome() string {
@@ -33,7 +33,7 @@ func UserDataConfigDir() string {
 }
 
 func ConfigFilePathXDG() string {
-	if v := os.Getenv("K9S_CONFIG_DIR"); v != "" {
+	if v := os.Getenv("K3CTX_CONFIG_DIR"); v != "" {
 		return filepath.Join(filepath.Clean(v), "config.yaml")
 	}
 	return filepath.Join(UserDataConfigDir(), "config.yaml")

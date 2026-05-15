@@ -18,7 +18,7 @@ func (r LocalStatusReader) stateDir() string {
 	if r.StateDir != "" {
 		return r.StateDir
 	}
-	return filepath.Join(os.Getenv("HOME"), ".local", "state", "k9s-tunnels")
+	return filepath.Join(os.Getenv("HOME"), ".local", "state", "k3ctx-tunnels")
 }
 
 func (r LocalStatusReader) ListContextStatus() ([]map[string]any, error) {

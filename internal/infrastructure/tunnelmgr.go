@@ -16,7 +16,7 @@ func (m LocalTunnelManager) stateDir() string {
 	if m.StateDir != "" {
 		return m.StateDir
 	}
-	return filepath.Join(os.Getenv("HOME"), ".local", "state", "k9s-tunnels")
+	return filepath.Join(os.Getenv("HOME"), ".local", "state", "k3ctx-tunnels")
 }
 
 func (m LocalTunnelManager) KillTunnel(contextName string) error {

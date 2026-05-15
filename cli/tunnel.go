@@ -53,7 +53,7 @@ func runTunnelKill(_ *cobra.Command, args []string) error {
 }
 
 func runTunnelKillAll(_ *cobra.Command, _ []string) error {
-	stateDir := filepath.Join(os.Getenv("HOME"), ".local", "state", "k9s-tunnels")
+	stateDir := filepath.Join(os.Getenv("HOME"), ".local", "state", "k3ctx-tunnels")
 	entries, _ := filepath.Glob(filepath.Join(stateDir, "*.pid"))
 	for _, pidFile := range entries {
 		base := filepath.Base(pidFile)

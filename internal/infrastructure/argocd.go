@@ -96,7 +96,7 @@ func (c *LocalArgocdConnector) stateDir() string {
 	if c.StateDir != "" {
 		return c.StateDir
 	}
-	return filepath.Join(os.Getenv("HOME"), ".local", "state", "k9s-tunnels")
+	return filepath.Join(os.Getenv("HOME"), ".local", "state", "k3ctx-tunnels")
 }
 
 // Setup implements application.ArgocdConnector.

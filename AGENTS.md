@@ -27,13 +27,13 @@
 ## Runtime Config And State
 - `CONFIG_FILE` overrides config path.
 - Default config path: `~/.local/share/k3ctx/yaml/config/config.yaml`.
-- `K9S_CONFIG_DIR` overrides the config directory.
+- `K3CTX_CONFIG_DIR` overrides the config directory.
 - Kubeconfig cache: `~/.local/share/k3ctx/yaml/kubeconfigs/`.
-- Tunnel PID files: `~/.local/state/k9s-tunnels/`.
+- Tunnel PID files: `~/.local/state/k3ctx-tunnels/`.
 
 ## Gotchas
 - `connect` opens SSH tunnels and merges kubeconfig into the user kubeconfig.
-- API readiness is enabled by default; disable with `K9S_VERIFY_API_READY=0` or tune with `K9S_API_READY_TIMEOUT_SECONDS`.
+- API readiness is enabled by default; disable with `K3CTX_VERIFY_API_READY=0` or tune with `K3CTX_API_READY_TIMEOUT_SECONDS`.
 - Inventory refresh is explicit via `--refresh-inventory`; it runs `git pull --ff-only` only when the inventory repo is clean.
 - Inventory files are Ansible YAML matching `*_hosts.yml`; unknown YAML tags like `!vault` are ignored.
 

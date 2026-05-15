@@ -41,4 +41,4 @@ The system SHALL use the local state tunnel directory for managed tunnel PID fil
 
 #### Scenario: Default state directory is used
 - **WHEN** runtime code needs the managed tunnel state directory
-- **THEN** the system uses `$HOME/.local/state/k9s-tunnels`
+- **THEN** the system uses `$HOME/.local/state/k3ctx-tunnels`

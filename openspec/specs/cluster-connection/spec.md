@@ -75,7 +75,7 @@ The system SHALL verify the local Kubernetes API endpoint by default before comp
 - **THEN** the system kills it, opens a new tunnel, and checks readiness again
 
 #### Scenario: Readiness verification can be disabled
-- **WHEN** `K9S_VERIFY_API_READY` disables readiness verification
+- **WHEN** `K3CTX_VERIFY_API_READY` disables readiness verification
 - **THEN** the system skips API readiness polling during connection
 
 ### Requirement: Switch kubectl context after connection
