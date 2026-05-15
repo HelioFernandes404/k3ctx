@@ -5,7 +5,7 @@ Tool local do workspace `systemframe` para gerenciar túneis SSH e contextos kub
 ## Local certo
 
 ```bash
-cd /home/helio/Obsidian/work/02-trabalho/systemframe/custom-tools/k3s-context-tunnel-manager
+cd /home/helio/Obsidian/02-trabalho/systemframe/custom-tools/k3ctx
 ```
 
 ## Modos de uso
@@ -44,7 +44,7 @@ Aliases compativeis:
 
 ```bash
 uv run context-tunnel-manager connect acme prod
-uv run k3s-context-tunnel-manager connect acme prod
+./k3ctx connect acme prod
 ```
 
 Regras de uso:
@@ -67,13 +67,13 @@ Regras de uso:
 `uv run k3ctx init` prepara o caminho oficial de YAML em:
 
 ```bash
-~/.local/share/k3s-context-tunnel-manager/yaml/
+~/.local/share/k3ctx/yaml/
 ```
 
 Estrutura:
 
 ```text
-~/.local/share/k3s-context-tunnel-manager/yaml/
+~/.local/share/k3ctx/yaml/
 ├── config/config.yaml
 └── kubeconfigs/<context>.yml
 ```
@@ -142,14 +142,14 @@ Se o `argocd` CLI nao estiver instalado ou o secret nao existir, o `connect` ain
 - `connect` abre tunel SSH, le inventario e altera `~/.kube/config`.
 - `tunnel-kill` encerra apenas um tunel por contexto; `tunnel-kill-all` encerra todos.
 - Se o cluster exigir VPN ou `sshuttle`, a CLI retorna erro estruturado sem prompt interativo.
-- Nao versione `~/.local/share/k3s-context-tunnel-manager/yaml/config/config.yaml`, kubeconfigs gerados, chaves SSH ou estado local.
+- Nao versione `~/.local/share/k3ctx/yaml/config/config.yaml`, kubeconfigs gerados, chaves SSH ou estado local.
 - Use `k3ctx ...` como alias curto ou `context-tunnel-manager ...`.
 
 ## Como funciona no `systemframe`
 
 - O inventario vem de `/home/helio/Work/systemframe/ansible/inventory`
 - O contexto final e mesclado em `~/.kube/config`
-- Os YAMLs locais ficam em `~/.local/share/k3s-context-tunnel-manager/yaml/`
+- Os YAMLs locais ficam em `~/.local/share/k3ctx/yaml/`
 - Os PIDs dos tuneis ficam em `~/.local/state/k9s-tunnels`
 - Logs locais ficam em `~/.local/state/k9s/`
 

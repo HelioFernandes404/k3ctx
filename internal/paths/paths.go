@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	appName          = "k3s-context-tunnel-manager"
+	appName          = "k3ctx"
 	yamlDirname      = "yaml"
 	configDirname    = "config"
 	kubeconfigDirname = "kubeconfigs"
