@@ -1,98 +1,150 @@
 # K3s Context Tunnel Manager
 
-Tool local do workspace `systemframe` para gerenciar túneis SSH e contextos kubeconfig para acesso a clusters K3s via CLI.
+Go CLI for managing SSH tunnels and kubeconfig contexts for K3s clusters.
 
-## Local certo
+It discovers hosts from an Ansible inventory, opens a local SSH tunnel to the K3s API, merges the generated kubeconfig into `~/.kube/config`, and switches the active kubectl context.
 
-```bash
-cd /home/helio/Obsidian/02-trabalho/systemframe/custom-tools/k3ctx
-```
-
-## Modos de uso
-
-### CLI oficial
-
-Fluxo principal para descoberta e conexao:
+## Local Path
 
 ```bash
-uv run k3ctx init
-uv run k3ctx clients
-uv run k3ctx hosts acme
-uv run k3ctx connect acme prod
-uv run k3ctx k9s
-uv run k3ctx tunnel-list
-uv run k3ctx status
-
-make help
-make run
-make status
+cd /home/helio/Obsidian/03-projetos/k3ctx
 ```
 
-Exemplos de refinamento:
+## Project Structure
+
+```text
+.
+├── cmd/k3ctx/                  # CLI entrypoint
+├── cli/                        # Cobra commands
+├── internal/application/        # Use cases and ports
+├── internal/domain/             # Core models and decisions
+├── internal/infrastructure/     # Local adapters
+├── internal/config/             # Config loading and env overlays
+├── internal/paths/              # XDG/local path resolution
+├── internal/inventory/          # Ansible inventory parsing
+├── internal/kubeconfig/         # Kubeconfig helpers
+├── internal/network/            # Local port selection
+├── internal/ssh/                # SSH command helpers
+├── internal/tunnel/             # Tunnel process state
+└── examples/config/config.yaml  # Example config
+```
+
+## Build And Install
 
 ```bash
-uv run k3ctx hosts acme --host api --limit 10
-uv run k3ctx connect --ip 10.0.0.10
-uv run k3ctx connect --context acme-prod
-uv run k3ctx connect --id sf-1042 --json
-uv run k3ctx tunnel-kill acme-prod
-uv run k3ctx tunnel-kill-all
-uv run k3ctx status --json
+make build
+make install
 ```
 
-Aliases compativeis:
+`make build` writes `bin/k3ctx`.
+
+`make install` installs to `$(HOME)/.local/bin/k3ctx` by default. Override with `PREFIX=/some/path make install`.
+
+The Makefile uses Go `1.25.0`. If `mise` is available, it runs Go through `mise`; otherwise it uses `go` from `PATH`.
+
+## Main Flow
 
 ```bash
-uv run context-tunnel-manager connect acme prod
-./k3ctx connect acme prod
+k3ctx init
+k3ctx clients
+k3ctx hosts acme
+k3ctx connect acme
+k3ctx k9s
+k3ctx tunnel-list
+k3ctx status
 ```
 
-Regras de uso:
-
-- `clients` mostra apenas clientes e contagem de hosts.
-- `hosts <client>` exige escopo de cliente e evita listagem global.
-- `connect` aceita 1 a 3 identificadores e conecta apenas quando a resolucao for unica.
-- `connect` valida a API Kubernetes forwarded em `https://127.0.0.1:<port>` antes de reportar sucesso.
-- `connect` sem identificadores falha com erro deterministico; nao existe prompt interativo.
-- se o host tiver `argocd_enabled: true` no inventario, `connect` abre um tunel SSH para o NodePort do ArgoCD e executa `argocd login` automaticamente.
-- refresh do inventory nao roda automaticamente; use `--refresh-inventory` ou `K9S_REFRESH_INVENTORY=1` quando quiser atualizar explicitamente.
-- `--json` funciona bem sem TTY e retorna saida estruturada (inclui `argocd_local_port` quando disponivel).
-- logs da CLI sao legiveis em nivel INFO por padrao; use `K9S_LOG_LEVEL=DEBUG` para debug e `K9S_LOG_FORMAT=json` para logs estruturados no stderr.
-- o readiness check da API pode ser ajustado com `K9S_API_READY_TIMEOUT_SECONDS` ou desabilitado com `K9S_VERIFY_API_READY=0`.
-
-`make run` agora chama `connect`. Os atalhos antigos baseados em prompt foram removidos.
-
-## Config canônica
-
-`uv run k3ctx init` prepara o caminho oficial de YAML em:
+From the repo without installing:
 
 ```bash
-~/.local/share/k3ctx/yaml/
+go run ./cmd/k3ctx --help
+go run ./cmd/k3ctx clients
 ```
 
-Estrutura:
+## Commands
+
+| Command | Purpose |
+| --- | --- |
+| `k3ctx init` | Create local config and kubeconfig cache directories. |
+| `k3ctx clients [query]` | List clients with host counts. |
+| `k3ctx hosts CLIENT [query]` | List or search hosts inside one client. |
+| `k3ctx connect [IDENTIFIER]` | Resolve one host and connect to it. |
+| `k3ctx k9s` | Launch `k9s` using the active context. |
+| `k3ctx tunnel-list` | List managed tunnels that are running. |
+| `k3ctx tunnel-kill CONTEXT` | Kill one managed tunnel. |
+| `k3ctx tunnel-kill-all` | Kill all managed tunnels. |
+| `k3ctx status` | Show active contexts and tunnel state. |
+
+Global flag:
+
+```bash
+k3ctx --json <command>
+```
+
+## Discovery Examples
+
+```bash
+k3ctx clients --limit 20
+k3ctx clients --cursor <cursor>
+k3ctx clients --refresh-inventory
+
+k3ctx hosts acme
+k3ctx hosts acme api
+k3ctx hosts acme --host api --limit 10
+k3ctx hosts acme --id sf-1042
+k3ctx hosts acme --ip 10.0.0.10
+k3ctx hosts acme --refresh-inventory
+```
+
+Rules:
+
+- `clients` returns client names and host counts.
+- `hosts CLIENT` requires a client scope.
+- Pagination uses `--limit` and `--cursor`.
+- Inventory refresh is explicit with `--refresh-inventory`.
+
+## Connect Examples
+
+```bash
+k3ctx connect acme
+k3ctx connect --client acme --host prod
+k3ctx connect --ip 10.0.0.10
+k3ctx connect --context acme-prod
+k3ctx connect --id sf-1042 --json
+```
+
+Rules:
+
+- `connect` succeeds only when the resolver finds one unique host.
+- Ambiguous matches exit with an error and list matching contexts.
+- No-match results exit with an error and a hint when available.
+- On success, the generated kubeconfig is merged into `~/.kube/config`.
+- The active kubectl context is switched to the connected context.
+
+## Config
+
+`k3ctx init` creates:
 
 ```text
 ~/.local/share/k3ctx/yaml/
 ├── config/config.yaml
-└── kubeconfigs/<context>.yml
+└── kubeconfigs/
 ```
 
-`XDG_DATA_HOME` altera a base automaticamente. `init` tambem migra:
+Config lookup order:
 
-- `config.yaml` no root do projeto
-- `~/.k9s-config/config.yaml`
-- kubeconfigs `.yml` ou `.yaml` deixados no root do projeto
+1. `CONFIG_FILE`, when set
+2. `K9S_CONFIG_DIR/config.yaml`, when `K9S_CONFIG_DIR` is set
+3. `~/.local/share/k3ctx/yaml/config/config.yaml`
+4. `config.yaml` in the current project directory
+5. `~/.k9s-config/config.yaml`
 
-Template versionado:
+`XDG_DATA_HOME` changes the base for `~/.local/share` paths.
 
-- `examples/config/config.yaml`
-
-Exemplo de `config.yaml`:
+Example:
 
 ```yaml
-inventory_path: /caminho/para/inventory
-ssh_config_path: ~/.ssh/config
+inventory_path: /home/helio/Work/systemframe/ansible/inventory
 ssh_key_path: ~/.ssh/id_ed25519
 remote_k3s_config_path: /etc/rancher/k3s/k3s.yaml
 k3s_api_port: 6443
@@ -100,77 +152,85 @@ port_range_start: 16443
 port_range_size: 10000
 ```
 
-## Integracao ArgoCD
+Supported environment overlays:
 
-Adicione ao host no inventario Ansible para ativar login automatico no `connect`:
+| Config key | Environment variable |
+| --- | --- |
+| `inventory_path` | `INVENTORY_PATH` |
+| `ssh_key_path` | `SSH_KEY_PATH` |
+| `remote_k3s_config_path` | `REMOTE_K3S_CONFIG_PATH` |
+| `k3s_api_port` | `K3S_API_PORT` |
+| `port_range_start` | `PORT_RANGE_START` |
+| `port_range_size` | `PORT_RANGE_SIZE` |
+
+`ssh_config_path` is currently fixed to `~/.ssh/config`.
+
+## Inventory
+
+The inventory parser reads Ansible YAML files matching `*_hosts.yml`.
+
+Unknown YAML tags, including tags like `!vault`, are ignored.
+
+Expected host fields include:
+
+```yaml
+MY-HOST:
+  ansible_host: 1.2.3.4
+  systemframe_id: sf-1042
+```
+
+## ArgoCD
+
+Add these fields to a host to enable ArgoCD handling during `connect`:
 
 ```yaml
 MY-HOST:
   ansible_host: 1.2.3.4
   argocd_enabled: true
-  argocd_namespace: argocd      # default "argocd"
-  argocd_node_port: 30080       # NodePort do argocd-server (obrigatorio)
-  argocd_plaintext: true        # usar --plaintext em vez de --insecure
+  argocd_namespace: argocd
+  argocd_node_port: 30080
+  argocd_plaintext: true
 ```
 
-O que acontece no `connect` quando `argocd_enabled: true`:
+When enabled, `connect` also opens a managed tunnel for the ArgoCD NodePort and attempts `argocd login` using the initial admin secret.
 
-1. Tunel SSH para K3s API abre em `localhost:<porta-k3s>`
-2. Kubeconfig mesclado em `~/.kube/config`
-3. Tunel SSH para ArgoCD NodePort abre em `localhost:<porta-argocd>`
-4. Senha lida do secret `argocd-initial-admin-secret` via kubectl
-5. `argocd login` executado automaticamente
-6. Saida mostra `✓ ArgoCD available at localhost:<porta>`
+If the `argocd` CLI is missing or login fails, the cluster connection can still succeed. Use the reported local ArgoCD port for manual login.
 
-Para matar o tunel ArgoCD separadamente:
+To kill only the ArgoCD tunnel:
 
 ```bash
-uv run k3ctx tunnel-kill <context>-argocd
+k3ctx tunnel-kill <context>-argocd
 ```
 
-Se o `argocd` CLI nao estiver instalado ou o secret nao existir, o `connect` ainda completa com sucesso — apenas o login e ignorado e a porta do tunel e reportada para login manual.
+## Runtime State
 
-## Troubleshooting rapido
+| Path | Purpose |
+| --- | --- |
+| `~/.local/share/k3ctx/yaml/config/config.yaml` | Default config file. |
+| `~/.local/share/k3ctx/yaml/kubeconfigs/` | Generated kubeconfig cache. |
+| `~/.local/state/k9s-tunnels/` | Managed tunnel PID files. |
+| `~/.kube/config` | User kubeconfig updated by `connect`. |
 
-- Se `connect` falhar com `Kubernetes API did not become ready on https://127.0.0.1:<port>/version`, teste primeiro com `K9S_API_READY_TIMEOUT_SECONDS=10`.
-- Se o tunel estiver funcional mas o readiness check ainda falhar no seu ambiente, use `K9S_VERIFY_API_READY=0` temporariamente e valide com `kubectl --request-timeout=10s get --raw=/version`.
-- Se o `argocd login` falhar, o tunel ainda fica aberto. Verifique: `argocd` CLI instalado? Secret `argocd-initial-admin-secret` existe no namespace? `argocd_plaintext` correto para o cluster?
-- Para relogar no ArgoCD sem reconectar o cluster: `uv run k3ctx tunnel-kill <context>-argocd` e depois `uv run k3ctx connect <identifier>`.
-
-## Limites e acoes sensiveis
-
-- `connect` abre tunel SSH, le inventario e altera `~/.kube/config`.
-- `tunnel-kill` encerra apenas um tunel por contexto; `tunnel-kill-all` encerra todos.
-- Se o cluster exigir VPN ou `sshuttle`, a CLI retorna erro estruturado sem prompt interativo.
-- Nao versione `~/.local/share/k3ctx/yaml/config/config.yaml`, kubeconfigs gerados, chaves SSH ou estado local.
-- Use `k3ctx ...` como alias curto ou `context-tunnel-manager ...`.
-
-## Como funciona no `systemframe`
-
-- O inventario vem de `/home/helio/Work/systemframe/ansible/inventory`
-- O contexto final e mesclado em `~/.kube/config`
-- Os YAMLs locais ficam em `~/.local/share/k3ctx/yaml/`
-- Os PIDs dos tuneis ficam em `~/.local/state/k9s-tunnels`
-- Logs locais ficam em `~/.local/state/k9s/`
-
-## Comandos principais
+## Development
 
 ```bash
-make init
-make sync
-make run
-make k9s
-make status
-make tunnel-list
-make tunnel-kill CONTEXT=empresa-host
-make tunnel-kill-all
 make test
+go test ./...
+go test ./internal/application/usecases -run TestName
+gofmt -w <files>
 ```
 
-## Validacao
+Useful Make targets:
 
-```bash
-uv run python -m pytest tests/unit -q
-uv run python -m pytest tests/smoke -q
-uv run python -m mypy src tests
-```
+| Target | Action |
+| --- | --- |
+| `make test` | Run `go test ./...`. |
+| `make build` | Build `bin/k3ctx`. |
+| `make install` | Install the binary. |
+| `make clean` | Remove `bin/`. |
+
+## Safety
+
+- `connect` opens SSH tunnels and modifies `~/.kube/config`.
+- `tunnel-kill` and `tunnel-kill-all` terminate managed tunnel processes.
+- Do not commit generated kubeconfigs, local config, SSH keys, inventory secrets, `.env`, or `bin/`.
