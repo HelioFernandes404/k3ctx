@@ -5,77 +5,117 @@
 At the start of each session:
 
 - Read this file before proposing commands, edits, or architecture changes.
-- Treat `src/interfaces/cli/app.py` as the official entrypoint.
-- Do not reintroduce repository-root helper scripts or interactive prompt flows.
+- Treat `cmd/k3ctx/main.go` as the binary entrypoint and `cli/` as the cobra command layer.
 - Prefer the discovery-first CLI flow: `init`, `clients`, `hosts`, `connect`, `status`, `k9s`.
 - Assume local YAML data belongs under `~/.local/share/k3s-context-tunnel-manager/yaml/`, not in the repository root.
 - Keep the default CLI non-interactive and automation-safe; preserve clean `--json` stdout contracts.
-- Refresh inventory only when explicitly requested via `--refresh-inventory` or `K9S_REFRESH_INVENTORY=1`.
-- Before changing behavior, read the affected module and its current tests in `tests/unit/` and `tests/smoke/`.
+- Refresh inventory only when explicitly requested via `--refresh-inventory`.
+- Before changing behavior, read the affected Go module and its `_test.go` file in the same package.
 - When validating a real cluster flow, verify the tunnel, current context, and a real `kubectl` call instead of trusting setup messages alone.
 
 ## Project Overview
 
 This project is a local K3s context tunnel manager for the `systemframe` workspace. It fetches kubeconfig files over SSH, opens local tunnels to K3s API servers, merges contexts into `~/.kube/config`, and supports local workflows with `kubectl`, `k9s`, and related tools.
 
-When a cluster has ArgoCD configured in its inventory (`argocd_enabled: true`), `connect` also opens a parallel SSH tunnel to the ArgoCD NodePort and runs `argocd login` automatically. This removes the need to manually choose between CLI vs port-forward on every session.
+When a cluster has ArgoCD configured in its inventory (`argocd_enabled: true`), `connect` also opens a parallel SSH tunnel to the ArgoCD NodePort and runs `argocd login` automatically.
 
-## Project Structure & Module Organization
+## Project Structure
 
-The codebase is organized in layers. Core domain models and pure policies live in `src/domain/`. Application orchestration lives in `src/application/use_cases/`. Infrastructure adapters live in `src/infrastructure/adapters/` and handle inventory access, connection, context switching, tunnel management, and status reads. The user-facing entrypoint is `src/interfaces/cli/`. Repository-root helper scripts have been removed in favor of the CLI entrypoint under `src`. Tests stay split between `tests/unit/` and `tests/smoke/`. Local YAML data now lives under `~/.local/share/k3s-context-tunnel-manager/yaml/`, with config in `config/config.yaml` and generated kubeconfig cache files in `kubeconfigs/<context>.yml`. `XDG_DATA_HOME` overrides the base location.
-
-Key domain files:
-- `src/domain/models.py` — `ClusterTarget`, `ConnectResult` (includes `argocd_local_port`), `EffectiveConfig`, `NetworkRequirement`
-- `src/domain/argocd.py` — `ArgocdConfig`: reads `argocd_enabled`, `argocd_namespace`, `argocd_node_port`, `argocd_plaintext` from inventory
-- `src/domain/network.py` — VPN/sshuttle detection; primary flag is `k3s_use_socks5_proxy` (legacy `argocd_use_socks5_proxy` still accepted)
-- `src/infrastructure/adapters/argocd_connector.py` — `LocalArgocdConnector`: opens ArgoCD SSH tunnel, fetches admin password from k8s secret, runs `argocd login`
-- `src/infrastructure/adapters/cluster_connector.py` — `LocalClusterConnector`: accepts optional `argocd_connector`; calls it after `merge_kubeconfig` when `argocd_enabled`
+```
+cmd/k3ctx/main.go         ← binary entrypoint; only calls cli.Execute()
+cli/                      ← cobra commands (root, clients, hosts, connect, status, k9s, tunnel)
+internal/
+  domain/                 ← ClusterTarget, ConnectResult, EffectiveConfig, NetworkRequirement,
+  │                          OperationError, ArgocdConfig, network policies, discovery models
+  config/                 ← LoadConfig, LoadEffectiveConfig (YAML + env override)
+  paths/                  ← XDG-compliant path resolution
+  inventory/              ← vault-tag-safe YAML loading, ExtractHostsFromInventory
+  tunnel/                 ← GetUniquePort, IsTunnelRunning, CreateTunnel, KillTunnel, SaveTunnelPID
+  kubeconfig/             ← UpdateKubeconfigServer, MergeKubeconfig
+  network/                ← GetNetworkMetadata, ValidateContextNetwork, CheckSshuttleActive
+  application/
+    ports.go              ← Go interfaces: ClusterConnector, InventoryCatalog, ContextSwitcher, etc.
+    usecases/             ← connect, contexts, discovery, inventory, status, tunnels
+  ssh/                    ← LoadSSHConfig, ResolveConnectionTarget, GetInternalIP,
+  │                          MakeRemoteRunner, FetchRemoteFileCached
+  infrastructure/         ← YamlInventoryCatalog, KubectlContextSwitcher, LocalTunnelManager,
+  │                          LocalStatusReader, GitInventoryRefresher,
+  │                          LocalClusterConnector, LocalArgocdConnector
+  bootstrap/              ← ServiceContainer, Build()
+go.mod                    ← module github.com/systemframe/k3ctx
+```
 
 ## Stack
 
-The main stack is Python 3, `uv`, `paramiko`, `PyYAML`, and Bash.
+Go 1.25, `github.com/spf13/cobra`, `gopkg.in/yaml.v3`, `github.com/stretchr/testify`. SSH connections use subprocess `ssh` (no crypto/ssh dependency).
 
 ## Build, Test, and Development Commands
 
-- `make init`: first-time setup for local development plus legacy YAML migration.
-- `make sync`: install or sync dependencies with `uv`.
-- `make run`: start the discovery-first `connect` flow.
-- `make k9s`: launch `k9s` after tunnel validation.
-- `make status`: show active cluster and tunnel state.
-- `make tunnel-list`: list active SSH tunnels.
-- `make tunnel-kill CONTEXT=<name>`: stop one tunnel by context.
-- `make tunnel-kill-all`: stop all managed tunnels.
-- `make test`: run the full test suite with verbose output.
-- `uv run context-tunnel-manager init`: prepare local config, YAML storage, and log directories.
-- `uv run context-tunnel-manager clients`: list clients with host counts.
-- `uv run context-tunnel-manager hosts <client>`: list or search hosts inside one client.
-- `uv run context-tunnel-manager clients --refresh-inventory`: explicitly refresh inventory before listing.
-- `uv run context-tunnel-manager hosts <client> --refresh-inventory`: explicitly refresh inventory before search.
-- `uv run context-tunnel-manager connect [identifiers...]`: resolve identifiers, verify the forwarded Kubernetes API, and connect if unique.
-- `uv run context-tunnel-manager k9s`: validate current tunnel and launch `k9s`.
-- `uv run context-tunnel-manager tunnel-list`: list active SSH tunnels.
-- `uv run context-tunnel-manager tunnel-kill <context>`: stop one managed tunnel.
-- `uv run context-tunnel-manager tunnel-kill-all`: stop all managed tunnels.
-- `uv run context-tunnel-manager status`: show active contexts and tunnels.
-- `uv run python -m pytest tests/unit -q`: fast unit test pass.
-- `uv run python -m pytest tests/smoke -q`: smoke validation for user-facing entrypoints and docs.
-- `uv run python -m mypy src tests`: run static type checks.
+```bash
+# Build
+go build -o k3ctx ./cmd/k3ctx/
+
+# Run all tests
+go test ./...
+
+# Run a specific package
+go test ./internal/domain/ -v
+
+# Vet
+go vet ./...
+
+# CLI (after build)
+./k3ctx --help
+./k3ctx init
+./k3ctx clients
+./k3ctx hosts <client>
+./k3ctx connect [identifiers...]
+./k3ctx status
+./k3ctx tunnel-list
+./k3ctx tunnel-kill <context>
+./k3ctx tunnel-kill-all
+./k3ctx k9s
+```
+
+Environment overrides (same as Python version):
+
+| Env var | Purpose |
+|---|---|
+| `CONFIG_FILE` | Override config file path |
+| `INVENTORY_PATH` | Override inventory directory |
+| `K3S_API_PORT` | Override K3s API port |
+| `SSH_KEY_PATH` | Override SSH key path |
+| `PORT_RANGE_START` | Override port range start |
+| `PORT_RANGE_SIZE` | Override port range size |
+| `XDG_DATA_HOME` | Override XDG data home |
 
 ## Coding Style & Naming Conventions
 
-Use Python 3.10+ compatible code and 4-space indentation. Keep transport concerns thin in `src/interfaces/cli/`; reusable behavior belongs in `src/application/use_cases/`, with side-effecting implementations in `src/infrastructure/adapters/`. Do not move SSH, tunnel, or kubeconfig business rules into CLI handlers. Follow existing naming patterns: `snake_case` for files, functions, variables, and test modules like `test_tunnel.py`. Keep shell scripts focused on orchestration. `mypy.ini` enables strict checks, so add or update type hints when changing behavior.
+- `MixedCaps` for exported identifiers; `mixedCaps` for unexported.
+- Acronyms all-caps: `SSH`, `URL`, `ID`, `API`.
+- Interfaces defined in `internal/application/ports.go`; sized to what callers need.
+- `cmd/k3ctx/main.go` only calls `cli.Execute()` — no logic there.
+- `cli/` handlers stay thin: load config, call use case, format output.
+- Domain and use-case logic stays in `internal/`; nothing SSH- or subprocess-related goes into CLI handlers.
+- Return `error` as the last value; never panic in normal flow.
+- Use value types for domain structs (no pointer receivers on small structs).
+- Packages: one clear responsibility; avoid `util`, `manager`, `helper` names.
 
 **TDD**: Write the failing test first, then implement the minimum code to make it pass, then refactor. No production code without a corresponding test.
 
 ## Testing Guidelines
 
-Use `pytest`. Place unit tests under `tests/unit/` and smoke coverage under `tests/smoke/`. Name files `test_*.py` and test functions `test_*`. Update tests together with behavior changes, especially around discovery queries, connect resolution, config parsing, SSH validation, tunnel cleanup, and kubeconfig generation. Interactive CLI flows require a real TTY and should fail with a clear error when run non-interactively, while `--json` flows must remain non-interactive-safe.
-
-When writing or reviewing tests, use the `/pytest-quality` skill. It provides isolation patterns per layer, stub/mock conventions, naming rules, and a quality checklist.
+- Test files: `<file>_test.go` in the same package (e.g., `internal/domain/models_test.go`).
+- Test functions: `TestXxx_DescribedBehavior(t *testing.T)`.
+- Use `github.com/stretchr/testify/assert` and `require`.
+- Define stub implementations inline in `_test.go` files (implement the port interface directly; no mock framework needed for simple cases).
+- Infrastructure adapters that call subprocess or SSH: use injectable function parameters (e.g., `checkSshuttle func(string) bool`) for testability.
+- `t.TempDir()` for filesystem isolation; `t.Setenv()` for env var isolation.
+- Layer ordering for tests: domain → config/paths → primitives → use cases → infrastructure → CLI.
 
 ## Commit & Pull Request Guidelines
 
-Local Git history is not available in this directory, so no verified project-specific commit pattern could be derived from `git log`. Use short imperative commit messages, preferably Conventional Commit style, for example `feat: add tunnel-kill-all command`. PRs should include: purpose, behavior impact, test evidence (`uv run python -m pytest tests/unit -q`, `uv run python -m pytest tests/smoke -q`, `uv run mypy src tests`), and terminal excerpts when changing interactive flows.
+Use Conventional Commit style: `feat:`, `fix:`, `chore:`, `test:`, `refactor:`. PRs should include: purpose, behavior impact, test evidence (`go test ./...`, `go vet ./...`), and terminal excerpts when changing interactive flows.
 
 ## ArgoCD Inventory Keys
 
@@ -89,12 +129,13 @@ argocd_plaintext: true        # optional, default false — use --plaintext inst
 ```
 
 ArgoCD tunnel state is saved under `~/.local/state/k9s-tunnels/<context>-argocd.pid`. Kill it with:
+
 ```bash
-uv run context-tunnel-manager tunnel-kill <context>-argocd
+./k3ctx tunnel-kill <context>-argocd
 ```
 
 `argocd login` uses the `argocd-initial-admin-secret` Kubernetes secret in the configured namespace. If the secret is absent or `argocd` CLI is not in PATH, the K3s connection still succeeds; only the login step is skipped with a message.
 
 ## Security & Configuration Tips
 
-Do not commit generated kubeconfigs, SSH keys, or local state files. Treat `~/.local/share/k3s-context-tunnel-manager/yaml/config/config.yaml` as machine-specific; verify `inventory_path`, `ssh_key_path`, and port range settings before testing against real clusters. The tracked config template now lives in `examples/config/config.yaml`. Do not assume a local `./inventory`; this workspace commonly points `inventory_path` to an external Ansible inventory via `config.yaml` or `INVENTORY_PATH`. CLI inventory refresh is explicit via `--refresh-inventory` or `K9S_REFRESH_INVENTORY=1`, default CLI logging is human-readable INFO unless `K9S_LOG_LEVEL=DEBUG` or `K9S_LOG_FORMAT=json` is enabled, and the post-tunnel API readiness check can be tuned with `K9S_API_READY_TIMEOUT_SECONDS` or disabled with `K9S_VERIFY_API_READY=0`. Contexts are merged into `~/.kube/config`, generated kubeconfig cache files live in `~/.local/share/k3s-context-tunnel-manager/yaml/kubeconfigs/`, tunnel PID files live in `~/.local/state/k9s-tunnels`, and local logs live in `~/.local/state/k9s/`. Avoid removing `.venv` by default on local setups unless you are intentionally resetting the environment. See `README.md` for the discovery-first CLI flow and current validation examples.
+Do not commit generated kubeconfigs, SSH keys, or local state files. Treat `~/.local/share/k3s-context-tunnel-manager/yaml/config/config.yaml` as machine-specific; verify `inventory_path`, `ssh_key_path`, and port range settings before testing against real clusters. The tracked config template lives in `examples/config/config.yaml`. Do not assume a local `./inventory`; this workspace commonly points `inventory_path` to an external Ansible inventory via `config.yaml` or `INVENTORY_PATH`. Contexts are merged into `~/.kube/config`, generated kubeconfig cache files live in `~/.local/share/k3s-context-tunnel-manager/yaml/kubeconfigs/`, and tunnel PID files live in `~/.local/state/k9s-tunnels`.
