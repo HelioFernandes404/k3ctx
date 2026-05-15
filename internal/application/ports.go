@@ -29,16 +29,24 @@ func (e *ClusterConnectionError) ToOperationError() domain.OperationError {
 
 // ConnectionArtifacts holds the outputs of a successful cluster connection.
 type ConnectionArtifacts struct {
-	LocalPort      int
-	InternalIP     string
-	TunnelPID      *int
-	UsedCache      bool
-	ArgocdLocalPort *int
+	LocalPort             int
+	InternalIP            string
+	TunnelPID             *int
+	UsedCache             bool
+	ArgocdLocalPort       *int
+	AlertmanagerLocalPort *int
 }
 
 // ArgocdLoginResult describes the outcome of an ArgoCD login attempt.
 type ArgocdLoginResult struct {
 	Success   bool
+	LocalPort *int
+	Skipped   bool
+	Message   string
+}
+
+// AlertmanagerResult describes the outcome of an Alertmanager tunnel attempt.
+type AlertmanagerResult struct {
 	LocalPort *int
 	Skipped   bool
 	Message   string
@@ -78,4 +86,9 @@ type TunnelManager interface {
 // ArgocdConnector sets up the ArgoCD tunnel and login.
 type ArgocdConnector interface {
 	Setup(contextName string, cfg domain.ArgocdConfig, hostname, username string, keyfile *string, port int, proxycmd *string, internalIP string) (ArgocdLoginResult, error)
+}
+
+// AlertmanagerConnector sets up the Alertmanager tunnel.
+type AlertmanagerConnector interface {
+	Setup(contextName string, cfg domain.AlertmanagerConfig, hostname, username string, keyfile *string, port int, proxycmd *string, internalIP string) (AlertmanagerResult, error)
 }

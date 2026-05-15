@@ -64,7 +64,7 @@ func TestLocalClusterConnector_AbortsWhenAPICheckFailsOnFreshTunnel(t *testing.T
 	var killCalled []string
 	mergeCalled := false
 
-	conn := NewLocalClusterConnector(nil)
+	conn := NewLocalClusterConnector(nil, nil)
 	conn.StateDir = t.TempDir()
 	conn.sshConnect = stubSSHConnect
 	conn.prepareKubeconfig = stubPrepareKubeconfig
@@ -98,7 +98,7 @@ func TestLocalClusterConnector_RecreatesStaleReusedTunnelOnAPIFailure(t *testing
 		reused bool
 	}{{4242, true}, {4343, false}}
 
-	conn := NewLocalClusterConnector(nil)
+	conn := NewLocalClusterConnector(nil, nil)
 	conn.StateDir = t.TempDir()
 	conn.sshConnect = stubSSHConnect
 	conn.prepareKubeconfig = stubPrepareKubeconfig
@@ -129,7 +129,7 @@ func TestLocalClusterConnector_RecreatesStaleReusedTunnelOnAPIFailure(t *testing
 func TestLocalClusterConnector_MergesKubeconfigOnSuccess(t *testing.T) {
 	var mergedContent, mergedContext string
 
-	conn := NewLocalClusterConnector(nil)
+	conn := NewLocalClusterConnector(nil, nil)
 	conn.StateDir = t.TempDir()
 	conn.sshConnect = stubSSHConnect
 	conn.prepareKubeconfig = stubPrepareKubeconfig
@@ -153,7 +153,7 @@ func TestLocalClusterConnector_SkipsAPICheckWhenDisabled(t *testing.T) {
 	apiCalled := false
 	mergeCalled := false
 
-	conn := NewLocalClusterConnector(nil)
+	conn := NewLocalClusterConnector(nil, nil)
 	conn.StateDir = t.TempDir()
 	conn.VerifyAPIReady = false
 	conn.sshConnect = stubSSHConnect
@@ -187,7 +187,7 @@ func TestLocalClusterConnector_UsesAutoDiscoveryArgocdConfig(t *testing.T) {
 		"argocd_extra_noise": true,
 	}, nil)
 
-	conn := NewLocalClusterConnector(argocd)
+	conn := NewLocalClusterConnector(argocd, nil)
 	conn.StateDir = t.TempDir()
 	conn.sshConnect = stubSSHConnect
 	conn.prepareKubeconfig = stubPrepareKubeconfig
@@ -210,7 +210,7 @@ func TestLocalClusterConnector_UsesAutoDiscoveryArgocdConfig(t *testing.T) {
 func TestLocalClusterConnector_IgnoresArgocdSetupError(t *testing.T) {
 	argocd := &stubArgocdConnector{err: fmt.Errorf("discovery failed")}
 
-	conn := NewLocalClusterConnector(argocd)
+	conn := NewLocalClusterConnector(argocd, nil)
 	conn.StateDir = t.TempDir()
 	conn.sshConnect = stubSSHConnect
 	conn.prepareKubeconfig = stubPrepareKubeconfig

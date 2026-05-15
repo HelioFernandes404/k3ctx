@@ -101,6 +101,9 @@ func runConnect(cmd *cobra.Command, args []string) error {
 		localPort = fmt.Sprintf(" (local port %d)", *result.LocalPort())
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "Connected: %s%s\n", result.ContextName(), localPort)
+	if result.AlertmanagerLocalPort() != nil {
+		fmt.Fprintf(cmd.OutOrStdout(), "Alertmanager: http://127.0.0.1:%d\n", *result.AlertmanagerLocalPort())
+	}
 	return nil
 }
 

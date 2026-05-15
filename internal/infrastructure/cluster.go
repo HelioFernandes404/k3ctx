@@ -24,11 +24,12 @@ import (
 
 // LocalClusterConnector implements application.ClusterConnector using SSH tunnels.
 type LocalClusterConnector struct {
-	VerifyAPIReady   bool
-	APIReadyTimeout  time.Duration
-	APIReadyInterval time.Duration
-	StateDir         string
-	ArgocdAdapter    application.ArgocdConnector
+	VerifyAPIReady       bool
+	APIReadyTimeout      time.Duration
+	APIReadyInterval     time.Duration
+	StateDir             string
+	ArgocdAdapter        application.ArgocdConnector
+	AlertmanagerAdapter  application.AlertmanagerConnector
 
 	// Injectable for testing:
 	sshConnect        func(target domain.ClusterTarget, cfg domain.EffectiveConfig) (hostname, username string, keyfile *string, sshPort int, proxycmd *string, runner func(string) (string, error), err error)
@@ -40,7 +41,7 @@ type LocalClusterConnector struct {
 }
 
 // NewLocalClusterConnector returns a connector with real subprocess defaults.
-func NewLocalClusterConnector(argocd application.ArgocdConnector) *LocalClusterConnector {
+func NewLocalClusterConnector(argocd application.ArgocdConnector, alertmanager application.AlertmanagerConnector) *LocalClusterConnector {
 	verifyAPI := true
 	if v := os.Getenv("K3CTX_VERIFY_API_READY"); v != "" {
 		v = strings.ToLower(strings.TrimSpace(v))
@@ -54,10 +55,11 @@ func NewLocalClusterConnector(argocd application.ArgocdConnector) *LocalClusterC
 	}
 
 	c := &LocalClusterConnector{
-		VerifyAPIReady:   verifyAPI,
-		APIReadyTimeout:  timeout,
-		APIReadyInterval: 250 * time.Millisecond,
-		ArgocdAdapter:    argocd,
+		VerifyAPIReady:      verifyAPI,
+		APIReadyTimeout:     timeout,
+		APIReadyInterval:    250 * time.Millisecond,
+		ArgocdAdapter:       argocd,
+		AlertmanagerAdapter: alertmanager,
 	}
 	c.sshConnect = defaultSSHConnect
 	c.prepareKubeconfig = defaultPrepareKubeconfig
@@ -130,12 +132,24 @@ func (c *LocalClusterConnector) Connect(
 		}
 	}
 
+	var alertmanagerLocalPort *int
+	if c.AlertmanagerAdapter != nil {
+		alertmanagerResult, alertmanagerErr := c.AlertmanagerAdapter.Setup(
+			target.ContextName(), domain.AutoDiscoverAlertmanagerConfig(),
+			hostname, username, keyfile, sshPort, proxycmd, internalIP,
+		)
+		if alertmanagerErr == nil {
+			alertmanagerLocalPort = alertmanagerResult.LocalPort
+		}
+	}
+
 	return application.ConnectionArtifacts{
-		LocalPort:       localPort,
-		InternalIP:      internalIP,
-		TunnelPID:       tunnelPID,
-		UsedCache:       usedCache,
-		ArgocdLocalPort: argocdLocalPort,
+		LocalPort:             localPort,
+		InternalIP:            internalIP,
+		TunnelPID:             tunnelPID,
+		UsedCache:             usedCache,
+		ArgocdLocalPort:       argocdLocalPort,
+		AlertmanagerLocalPort: alertmanagerLocalPort,
 	}, nil
 }
 

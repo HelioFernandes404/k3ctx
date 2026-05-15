@@ -7,26 +7,29 @@ import (
 
 // ServiceContainer holds all infrastructure adapters.
 type ServiceContainer struct {
-	Catalog   application.InventoryCatalog
-	Refresher application.InventoryRefresher
-	Switcher  application.ContextSwitcher
-	Status    application.StatusReader
-	Tunnels   application.TunnelManager
-	Connector application.ClusterConnector
-	Argocd    application.ArgocdConnector
+	Catalog      application.InventoryCatalog
+	Refresher    application.InventoryRefresher
+	Switcher     application.ContextSwitcher
+	Status       application.StatusReader
+	Tunnels      application.TunnelManager
+	Connector    application.ClusterConnector
+	Argocd       application.ArgocdConnector
+	Alertmanager application.AlertmanagerConnector
 }
 
 // Build creates a ServiceContainer with default local adapters.
 func Build() ServiceContainer {
 	argocd := infrastructure.NewLocalArgocdConnector()
-	connector := infrastructure.NewLocalClusterConnector(argocd)
+	alertmanager := infrastructure.NewLocalAlertmanagerConnector()
+	connector := infrastructure.NewLocalClusterConnector(argocd, alertmanager)
 	return ServiceContainer{
-		Catalog:   infrastructure.YamlInventoryCatalog{},
-		Refresher: infrastructure.GitInventoryRefresher{},
-		Switcher:  infrastructure.KubectlContextSwitcher{},
-		Status:    infrastructure.LocalStatusReader{},
-		Tunnels:   infrastructure.LocalTunnelManager{},
-		Connector: connector,
-		Argocd:    argocd,
+		Catalog:      infrastructure.YamlInventoryCatalog{},
+		Refresher:    infrastructure.GitInventoryRefresher{},
+		Switcher:     infrastructure.KubectlContextSwitcher{},
+		Status:       infrastructure.LocalStatusReader{},
+		Tunnels:      infrastructure.LocalTunnelManager{},
+		Connector:    connector,
+		Argocd:       argocd,
+		Alertmanager: alertmanager,
 	}
 }
