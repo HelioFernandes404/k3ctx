@@ -24,44 +24,16 @@ cogcs.yml.bak
 .kube/
 /inventory/
 !/inventory/.gitkeep
-!src/kubeconfig.py
 !examples/config/config.yaml
 
 # ==============================================================================
-# Python
+# Go
 # ==============================================================================
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-pip-wheel-metadata/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Virtual environments
-venv/
-env/
-ENV/
-.venv
-.env
-.virtualenv
-virtualenv/
+/bin/
+*.test
+*.out
+coverage.out
+coverage.html
 
 # ==============================================================================
 # IDE & Editor
@@ -71,35 +43,11 @@ virtualenv/
 *.swp
 *.swo
 *~
-.DS_Store
 *.sublime-workspace
 *.sublime-project
 .project
-.pydevproject
 .settings/
 *.iml
-
-# ==============================================================================
-# Testing & Coverage
-# ==============================================================================
-.pytest_cache/
-.coverage
-.coverage.*
-htmlcov/
-.tox/
-.hypothesis/
-*.cover
-
-# ==============================================================================
-# Build & Dependencies
-# ==============================================================================
-/bin/
-.cache/
-*.log
-uv.lock
-Pipfile.lock
-poetry.lock
-!uv.lock
 
 # ==============================================================================
 # Local & Temporary
@@ -108,17 +56,15 @@ poetry.lock
 tmp/
 *.bak
 *.backup
-*.swp
-*.swo
-*~
-.DS_Store
+.cache/
+*.log
+
 # ==============================================================================
 # OS & Desktop
 # ==============================================================================
 .DS_Store
 Thumbs.db
 desktop.ini
-*~
 
 # ==============================================================================
 # Local State (XDG compliance)
@@ -141,7 +87,15 @@ ansible.cfg
 !ansible/ansible.cfg
 
 # ==============================================================================
-# Worktrees (safe to add after main .worktrees/ pattern above)
+# Worktrees
 # ==============================================================================
 .worktrees/
 .worktrees-*
+.worktree/
+
+# Python caches (leftover cleanup)
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.venv/

@@ -5,7 +5,6 @@
 At the start of each session:
 
 - Read this file before proposing commands, edits, or architecture changes.
-- **Active branch**: `k3ctx-go` — this is the Go rewrite. The Python source under `src/` is the migration reference; do not modify it.
 - Treat `cmd/k3ctx/main.go` as the binary entrypoint and `cli/` as the cobra command layer.
 - Prefer the discovery-first CLI flow: `init`, `clients`, `hosts`, `connect`, `status`, `k9s`.
 - Assume local YAML data belongs under `~/.local/share/k3s-context-tunnel-manager/yaml/`, not in the repository root.
@@ -20,28 +19,7 @@ This project is a local K3s context tunnel manager for the `systemframe` workspa
 
 When a cluster has ArgoCD configured in its inventory (`argocd_enabled: true`), `connect` also opens a parallel SSH tunnel to the ArgoCD NodePort and runs `argocd login` automatically.
 
-## Migration Status
-
-The project is being rewritten from Python to Go on branch `k3ctx-go` using TDD. The Python source under `src/` remains as the authoritative reference during migration — use it to understand expected behavior, then port tests first, then implement.
-
-| Layer | Status | Go location |
-|---|---|---|
-| Domain models + network policies | Done | `internal/domain/` |
-| Config + XDG paths | Done | `internal/config/`, `internal/paths/` |
-| Tunnel PID lifecycle | Done | `internal/tunnel/` |
-| Kubeconfig merge/update | Done | `internal/kubeconfig/` |
-| Inventory YAML loading | Done | `internal/inventory/` |
-| Network validator | Done | `internal/network/` |
-| Application ports (interfaces) | Done | `internal/application/ports.go` |
-| Use cases (all 6 modules) | Done | `internal/application/usecases/` |
-| Infrastructure adapters (all) | Done | `internal/infrastructure/` |
-| SSH utilities | Done | `internal/ssh/` |
-| Bootstrap / service container | Done | `internal/bootstrap/` |
-| CLI (cobra, all 9 commands) | Done | `cli/`, `cmd/k3ctx/` |
-| SSH cluster connector | Done | `internal/infrastructure/cluster.go` |
-| ArgoCD connector | Done | `internal/infrastructure/argocd.go` |
-
-## Go Project Structure
+## Project Structure
 
 ```
 cmd/k3ctx/main.go         ← binary entrypoint; only calls cli.Execute()
@@ -65,12 +43,6 @@ internal/
   │                          LocalClusterConnector, LocalArgocdConnector
   bootstrap/              ← ServiceContainer, Build()
 go.mod                    ← module github.com/systemframe/k3ctx
-```
-
-Python reference (do not modify):
-```
-src/                      ← original Python source; read for behavior reference only
-tests/unit/               ← original Python tests; use as porting blueprint
 ```
 
 ## Stack
