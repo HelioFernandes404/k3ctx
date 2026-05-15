@@ -12,15 +12,21 @@ type ServiceContainer struct {
 	Switcher  application.ContextSwitcher
 	Status    application.StatusReader
 	Tunnels   application.TunnelManager
+	Connector application.ClusterConnector
+	Argocd    application.ArgocdConnector
 }
 
 // Build creates a ServiceContainer with default local adapters.
 func Build() ServiceContainer {
+	argocd := infrastructure.NewLocalArgocdConnector()
+	connector := infrastructure.NewLocalClusterConnector(argocd)
 	return ServiceContainer{
 		Catalog:   infrastructure.YamlInventoryCatalog{},
 		Refresher: infrastructure.GitInventoryRefresher{},
 		Switcher:  infrastructure.KubectlContextSwitcher{},
 		Status:    infrastructure.LocalStatusReader{},
 		Tunnels:   infrastructure.LocalTunnelManager{},
+		Connector: connector,
+		Argocd:    argocd,
 	}
 }

@@ -34,11 +34,12 @@ The project is being rewritten from Python to Go on branch `k3ctx-go` using TDD.
 | Network validator | Done | `internal/network/` |
 | Application ports (interfaces) | Done | `internal/application/ports.go` |
 | Use cases (all 6 modules) | Done | `internal/application/usecases/` |
-| Infrastructure adapters (partial) | Done | `internal/infrastructure/` |
+| Infrastructure adapters (all) | Done | `internal/infrastructure/` |
+| SSH utilities | Done | `internal/ssh/` |
 | Bootstrap / service container | Done | `internal/bootstrap/` |
 | CLI (cobra, all 9 commands) | Done | `cli/`, `cmd/k3ctx/` |
-| SSH cluster connector | **Pending** | `internal/infrastructure/cluster.go` |
-| ArgoCD connector | **Pending** | `internal/infrastructure/argocd.go` |
+| SSH cluster connector | Done | `internal/infrastructure/cluster.go` |
+| ArgoCD connector | Done | `internal/infrastructure/argocd.go` |
 
 ## Go Project Structure
 
@@ -57,8 +58,11 @@ internal/
   application/
     ports.go              ← Go interfaces: ClusterConnector, InventoryCatalog, ContextSwitcher, etc.
     usecases/             ← connect, contexts, discovery, inventory, status, tunnels
+  ssh/                    ← LoadSSHConfig, ResolveConnectionTarget, GetInternalIP,
+  │                          MakeRemoteRunner, FetchRemoteFileCached
   infrastructure/         ← YamlInventoryCatalog, KubectlContextSwitcher, LocalTunnelManager,
-  │                          LocalStatusReader, GitInventoryRefresher
+  │                          LocalStatusReader, GitInventoryRefresher,
+  │                          LocalClusterConnector, LocalArgocdConnector
   bootstrap/              ← ServiceContainer, Build()
 go.mod                    ← module github.com/systemframe/k3ctx
 ```
@@ -71,7 +75,7 @@ tests/unit/               ← original Python tests; use as porting blueprint
 
 ## Stack
 
-Go 1.25, `github.com/spf13/cobra`, `gopkg.in/yaml.v3`, `golang.org/x/crypto/ssh` (pending), `github.com/stretchr/testify`.
+Go 1.25, `github.com/spf13/cobra`, `gopkg.in/yaml.v3`, `github.com/stretchr/testify`. SSH connections use subprocess `ssh` (no crypto/ssh dependency).
 
 ## Build, Test, and Development Commands
 

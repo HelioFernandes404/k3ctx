@@ -78,16 +78,29 @@ func runConnect(cmd *cobra.Command, args []string) error {
 		os.Exit(1)
 	}
 
-	// Connector not yet wired; print target info
+	result, err := usecases.ConnectCluster(*target, cfg, svcs.Connector, false)
+	if err != nil {
+		return err
+	}
+	if !result.Success() {
+		opErr := result.Err()
+		fmt.Fprintf(cmd.ErrOrStderr(), "Connection failed [%s]: %s\n", opErr.Code, opErr.Message)
+		os.Exit(2)
+	}
+
+	if switchErr := svcs.Switcher.SwitchContext(result.ContextName()); switchErr != nil {
+		fmt.Fprintf(cmd.ErrOrStderr(), "Context switch failed: %s\n", switchErr.Message)
+	}
+
 	if jsonOutput {
 		enc := json.NewEncoder(cmd.OutOrStdout())
-		return enc.Encode(map[string]any{
-			"context_name": target.ContextName(),
-			"company":      target.Company(),
-			"host_alias":   target.HostAlias(),
-		})
+		return enc.Encode(result.ToPublicDict())
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Resolved: %s\n", target.ContextName())
+	localPort := ""
+	if result.LocalPort() != nil {
+		localPort = fmt.Sprintf(" (local port %d)", *result.LocalPort())
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "Connected: %s%s\n", result.ContextName(), localPort)
 	return nil
 }
 
