@@ -29,12 +29,13 @@ func (e *ClusterConnectionError) ToOperationError() domain.OperationError {
 
 // ConnectionArtifacts holds the outputs of a successful cluster connection.
 type ConnectionArtifacts struct {
-	LocalPort             int
-	InternalIP            string
-	TunnelPID             *int
-	UsedCache             bool
-	ArgocdLocalPort       *int
-	AlertmanagerLocalPort *int
+	LocalPort                int
+	InternalIP               string
+	TunnelPID                *int
+	UsedCache                bool
+	ArgocdLocalPort          *int
+	AlertmanagerLocalPort    *int
+	VictoriaMetricsLocalPort *int
 }
 
 // ArgocdLoginResult describes the outcome of an ArgoCD login attempt.
@@ -47,6 +48,13 @@ type ArgocdLoginResult struct {
 
 // AlertmanagerResult describes the outcome of an Alertmanager tunnel attempt.
 type AlertmanagerResult struct {
+	LocalPort *int
+	Skipped   bool
+	Message   string
+}
+
+// VictoriaMetricsResult describes the outcome of a VictoriaMetrics tunnel attempt.
+type VictoriaMetricsResult struct {
 	LocalPort *int
 	Skipped   bool
 	Message   string
@@ -91,4 +99,9 @@ type ArgocdConnector interface {
 // AlertmanagerConnector sets up the Alertmanager tunnel.
 type AlertmanagerConnector interface {
 	Setup(contextName string, cfg domain.AlertmanagerConfig, hostname, username string, keyfile *string, port int, proxycmd *string, internalIP string) (AlertmanagerResult, error)
+}
+
+// VictoriaMetricsConnector sets up the VictoriaMetrics tunnel.
+type VictoriaMetricsConnector interface {
+	Setup(contextName string, cfg domain.VictoriaMetricsConfig, hostname, username string, keyfile *string, port int, proxycmd *string, internalIP string) (VictoriaMetricsResult, error)
 }

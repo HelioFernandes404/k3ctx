@@ -24,12 +24,13 @@ import (
 
 // LocalClusterConnector implements application.ClusterConnector using SSH tunnels.
 type LocalClusterConnector struct {
-	VerifyAPIReady       bool
-	APIReadyTimeout      time.Duration
-	APIReadyInterval     time.Duration
-	StateDir             string
-	ArgocdAdapter        application.ArgocdConnector
-	AlertmanagerAdapter  application.AlertmanagerConnector
+	VerifyAPIReady             bool
+	APIReadyTimeout            time.Duration
+	APIReadyInterval           time.Duration
+	StateDir                   string
+	ArgocdAdapter              application.ArgocdConnector
+	AlertmanagerAdapter        application.AlertmanagerConnector
+	VictoriaMetricsAdapter     application.VictoriaMetricsConnector
 
 	// Injectable for testing:
 	sshConnect        func(target domain.ClusterTarget, cfg domain.EffectiveConfig) (hostname, username string, keyfile *string, sshPort int, proxycmd *string, runner func(string) (string, error), err error)
@@ -41,7 +42,7 @@ type LocalClusterConnector struct {
 }
 
 // NewLocalClusterConnector returns a connector with real subprocess defaults.
-func NewLocalClusterConnector(argocd application.ArgocdConnector, alertmanager application.AlertmanagerConnector) *LocalClusterConnector {
+func NewLocalClusterConnector(argocd application.ArgocdConnector, alertmanager application.AlertmanagerConnector, victoriaMetrics application.VictoriaMetricsConnector) *LocalClusterConnector {
 	verifyAPI := true
 	if v := os.Getenv("K3CTX_VERIFY_API_READY"); v != "" {
 		v = strings.ToLower(strings.TrimSpace(v))
@@ -55,11 +56,12 @@ func NewLocalClusterConnector(argocd application.ArgocdConnector, alertmanager a
 	}
 
 	c := &LocalClusterConnector{
-		VerifyAPIReady:      verifyAPI,
-		APIReadyTimeout:     timeout,
-		APIReadyInterval:    250 * time.Millisecond,
-		ArgocdAdapter:       argocd,
-		AlertmanagerAdapter: alertmanager,
+		VerifyAPIReady:         verifyAPI,
+		APIReadyTimeout:        timeout,
+		APIReadyInterval:       250 * time.Millisecond,
+		ArgocdAdapter:          argocd,
+		AlertmanagerAdapter:    alertmanager,
+		VictoriaMetricsAdapter: victoriaMetrics,
 	}
 	c.sshConnect = defaultSSHConnect
 	c.prepareKubeconfig = defaultPrepareKubeconfig
@@ -143,13 +145,25 @@ func (c *LocalClusterConnector) Connect(
 		}
 	}
 
+	var victoriaMetricsLocalPort *int
+	if c.VictoriaMetricsAdapter != nil {
+		vmResult, vmErr := c.VictoriaMetricsAdapter.Setup(
+			target.ContextName(), domain.AutoDiscoverVictoriaMetricsConfig(),
+			hostname, username, keyfile, sshPort, proxycmd, internalIP,
+		)
+		if vmErr == nil {
+			victoriaMetricsLocalPort = vmResult.LocalPort
+		}
+	}
+
 	return application.ConnectionArtifacts{
-		LocalPort:             localPort,
-		InternalIP:            internalIP,
-		TunnelPID:             tunnelPID,
-		UsedCache:             usedCache,
-		ArgocdLocalPort:       argocdLocalPort,
-		AlertmanagerLocalPort: alertmanagerLocalPort,
+		LocalPort:                localPort,
+		InternalIP:               internalIP,
+		TunnelPID:                tunnelPID,
+		UsedCache:                usedCache,
+		ArgocdLocalPort:          argocdLocalPort,
+		AlertmanagerLocalPort:    alertmanagerLocalPort,
+		VictoriaMetricsLocalPort: victoriaMetricsLocalPort,
 	}, nil
 }
 

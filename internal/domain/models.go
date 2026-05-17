@@ -86,9 +86,10 @@ type ConnectResult struct {
 	tunnelPID          *int
 	usedCache          bool
 	networkRequirement NetworkRequirement
-	err                    *OperationError
-	argocdLocalPort        *int
-	alertmanagerLocalPort  *int
+	err                        *OperationError
+	argocdLocalPort            *int
+	alertmanagerLocalPort      *int
+	victoriaMetricsLocalPort   *int
 }
 
 // ConnectResultParams groups the inputs for NewConnectResult.
@@ -100,9 +101,10 @@ type ConnectResultParams struct {
 	TunnelPID          *int
 	UsedCache          bool
 	NetworkRequirement NetworkRequirement
-	Error                  *OperationError
-	ArgocdLocalPort        *int
-	AlertmanagerLocalPort  *int
+	Error                      *OperationError
+	ArgocdLocalPort            *int
+	AlertmanagerLocalPort      *int
+	VictoriaMetricsLocalPort   *int
 }
 
 // NewConnectResult validates and constructs a ConnectResult.
@@ -121,9 +123,10 @@ func NewConnectResult(p ConnectResultParams) (ConnectResult, error) {
 		tunnelPID:          p.TunnelPID,
 		usedCache:          p.UsedCache,
 		networkRequirement: p.NetworkRequirement,
-		err:                   p.Error,
-		argocdLocalPort:       p.ArgocdLocalPort,
-		alertmanagerLocalPort: p.AlertmanagerLocalPort,
+		err:                      p.Error,
+		argocdLocalPort:          p.ArgocdLocalPort,
+		alertmanagerLocalPort:    p.AlertmanagerLocalPort,
+		victoriaMetricsLocalPort: p.VictoriaMetricsLocalPort,
 	}, nil
 }
 
@@ -137,6 +140,7 @@ func (r ConnectResult) NetworkRequirement() NetworkRequirement { return r.networ
 func (r ConnectResult) Err() *OperationError                  { return r.err }
 func (r ConnectResult) ArgocdLocalPort() *int                 { return r.argocdLocalPort }
 func (r ConnectResult) AlertmanagerLocalPort() *int           { return r.alertmanagerLocalPort }
+func (r ConnectResult) VictoriaMetricsLocalPort() *int        { return r.victoriaMetricsLocalPort }
 
 // ToPublicDict returns a JSON-safe representation.
 func (r ConnectResult) ToPublicDict() map[string]any {
@@ -145,7 +149,7 @@ func (r ConnectResult) ToPublicDict() map[string]any {
 		errDict = r.err.ToPublicDict()
 	}
 
-	var localPort, tunnelPID, argocdLocalPort, alertmanagerLocalPort any
+	var localPort, tunnelPID, argocdLocalPort, alertmanagerLocalPort, victoriaMetricsLocalPort any
 	if r.localPort != nil {
 		localPort = *r.localPort
 	}
@@ -157,6 +161,9 @@ func (r ConnectResult) ToPublicDict() map[string]any {
 	}
 	if r.alertmanagerLocalPort != nil {
 		alertmanagerLocalPort = *r.alertmanagerLocalPort
+	}
+	if r.victoriaMetricsLocalPort != nil {
+		victoriaMetricsLocalPort = *r.victoriaMetricsLocalPort
 	}
 
 	var internalIP any
@@ -176,9 +183,10 @@ func (r ConnectResult) ToPublicDict() map[string]any {
 			"network_range": r.networkRequirement.NetworkRange,
 			"needs_vpn":     r.networkRequirement.NeedsVPN,
 		},
-		"error":                   errDict,
-		"argocd_local_port":       argocdLocalPort,
-		"alertmanager_local_port": alertmanagerLocalPort,
+		"error":                        errDict,
+		"argocd_local_port":            argocdLocalPort,
+		"alertmanager_local_port":      alertmanagerLocalPort,
+		"victoriametrics_local_port":   victoriaMetricsLocalPort,
 	}
 }
 

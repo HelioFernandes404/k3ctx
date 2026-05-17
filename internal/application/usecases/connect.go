@@ -63,15 +63,16 @@ func ConnectCluster(
 	}
 
 	return domain.NewConnectResult(domain.ConnectResultParams{
-		Success:               true,
-		ContextName:           target.ContextName(),
-		LocalPort:             &artifacts.LocalPort,
-		InternalIP:            &artifacts.InternalIP,
-		TunnelPID:             artifacts.TunnelPID,
-		UsedCache:             artifacts.UsedCache,
-		NetworkRequirement:    req,
-		ArgocdLocalPort:       artifacts.ArgocdLocalPort,
-		AlertmanagerLocalPort: artifacts.AlertmanagerLocalPort,
+		Success:                  true,
+		ContextName:              target.ContextName(),
+		LocalPort:                &artifacts.LocalPort,
+		InternalIP:               &artifacts.InternalIP,
+		TunnelPID:                artifacts.TunnelPID,
+		UsedCache:                artifacts.UsedCache,
+		NetworkRequirement:       req,
+		ArgocdLocalPort:          artifacts.ArgocdLocalPort,
+		AlertmanagerLocalPort:    artifacts.AlertmanagerLocalPort,
+		VictoriaMetricsLocalPort: artifacts.VictoriaMetricsLocalPort,
 	})
 }
 

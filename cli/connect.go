@@ -101,8 +101,14 @@ func runConnect(cmd *cobra.Command, args []string) error {
 		localPort = fmt.Sprintf(" (local port %d)", *result.LocalPort())
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "Connected: %s%s\n", result.ContextName(), localPort)
+	if result.ArgocdLocalPort() != nil {
+		fmt.Fprintf(cmd.OutOrStdout(), "ArgoCD:            http://127.0.0.1:%d\n", *result.ArgocdLocalPort())
+	}
 	if result.AlertmanagerLocalPort() != nil {
-		fmt.Fprintf(cmd.OutOrStdout(), "Alertmanager: http://127.0.0.1:%d\n", *result.AlertmanagerLocalPort())
+		fmt.Fprintf(cmd.OutOrStdout(), "Alertmanager:      http://127.0.0.1:%d\n", *result.AlertmanagerLocalPort())
+	}
+	if result.VictoriaMetricsLocalPort() != nil {
+		fmt.Fprintf(cmd.OutOrStdout(), "VictoriaMetrics:   http://127.0.0.1:%d\n", *result.VictoriaMetricsLocalPort())
 	}
 	return nil
 }
