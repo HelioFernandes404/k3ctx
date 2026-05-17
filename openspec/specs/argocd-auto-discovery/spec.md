@@ -1,9 +1,7 @@
 ## Purpose
 
 Define how `k3ctx connect` discovers ArgoCD and prepares local ArgoCD access without requiring Ansible inventory fields.
-
 ## Requirements
-
 ### Requirement: Automatic ArgoCD discovery during connect
 The system SHALL attempt ArgoCD discovery after a cluster connection has successfully established Kubernetes access and merged the kubeconfig context.
 
@@ -55,3 +53,15 @@ The system SHALL NOT fail the cluster connection because ArgoCD discovery, tunne
 #### Scenario: Login failure does not fail connect
 - **WHEN** the ArgoCD tunnel opens but `argocd login` fails
 - **THEN** the cluster connection still succeeds and the ArgoCD result reports the login issue
+
+### Requirement: ArgoCD local port is shown after connect
+The system SHALL print the ArgoCD local URL to stdout after a successful connect when the service was discovered and a tunnel was opened.
+
+#### Scenario: ArgoCD URL is printed on successful discovery
+- **WHEN** `k3ctx connect` succeeds and an ArgoCD tunnel was opened
+- **THEN** the system prints `ArgoCD: http://127.0.0.1:<port>` to stdout
+
+#### Scenario: ArgoCD line is omitted when not discovered
+- **WHEN** `k3ctx connect` succeeds but no ArgoCD service was found or no tunnel was opened
+- **THEN** the system does not print an ArgoCD line
+
