@@ -6,11 +6,11 @@ import (
 )
 
 const (
-	appName          = "k3ctx"
-	yamlDirname      = "yaml"
-	configDirname    = "config"
+	appName           = "k3ctx"
+	yamlDirname       = "yaml"
+	configDirname     = "config"
 	kubeconfigDirname = "kubeconfigs"
-	legacyConfigDir  = ".k3ctx-config"
+	legacyConfigDir   = ".k3ctx-config"
 )
 
 func DataHome() string {

@@ -79,9 +79,9 @@ func ValidateContextNetworkDetails(contextName, stateDir string, checkSshuttle f
 	}
 
 	return map[string]any{
-		"context_name":    contextName,
-		"ok":              ok,
-		"warning":         warningAny,
+		"context_name":     contextName,
+		"ok":               ok,
+		"warning":          warningAny,
 		"network_metadata": metadata,
 	}
 }

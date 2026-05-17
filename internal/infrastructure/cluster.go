@@ -24,13 +24,13 @@ import (
 
 // LocalClusterConnector implements application.ClusterConnector using SSH tunnels.
 type LocalClusterConnector struct {
-	VerifyAPIReady             bool
-	APIReadyTimeout            time.Duration
-	APIReadyInterval           time.Duration
-	StateDir                   string
-	ArgocdAdapter              application.ArgocdConnector
-	AlertmanagerAdapter        application.AlertmanagerConnector
-	VictoriaMetricsAdapter     application.VictoriaMetricsConnector
+	VerifyAPIReady         bool
+	APIReadyTimeout        time.Duration
+	APIReadyInterval       time.Duration
+	StateDir               string
+	ArgocdAdapter          application.ArgocdConnector
+	AlertmanagerAdapter    application.AlertmanagerConnector
+	VictoriaMetricsAdapter application.VictoriaMetricsConnector
 
 	// Injectable for testing:
 	sshConnect        func(target domain.ClusterTarget, cfg domain.EffectiveConfig) (hostname, username string, keyfile *string, sshPort int, proxycmd *string, runner func(string) (string, error), err error)
@@ -320,7 +320,7 @@ func pollAPIReadyWithDoer(localPort int, timeout, interval time.Duration, tlsCon
 	if lastErr != nil {
 		detail = lastErr.Error()
 	}
-	return &application.ClusterConnectionError{
+	return &domain.OperationError{
 		Code:      "kubernetes_api_unreachable",
 		Message:   fmt.Sprintf("Kubernetes API did not become ready on %s", url),
 		Detail:    detail,

@@ -1,31 +1,8 @@
 package application
 
 import (
-	"fmt"
-
 	"github.com/systemframe/k3ctx/internal/domain"
 )
-
-// ClusterConnectionError is a structured connector failure.
-type ClusterConnectionError struct {
-	Code      string
-	Message   string
-	Detail    string
-	Retryable bool
-}
-
-func (e *ClusterConnectionError) Error() string {
-	return fmt.Sprintf("[%s] %s", e.Code, e.Message)
-}
-
-func (e *ClusterConnectionError) ToOperationError() domain.OperationError {
-	return domain.OperationError{
-		Code:      e.Code,
-		Message:   e.Message,
-		Detail:    e.Detail,
-		Retryable: e.Retryable,
-	}
-}
 
 // ConnectionArtifacts holds the outputs of a successful cluster connection.
 type ConnectionArtifacts struct {

@@ -70,7 +70,7 @@ func TestLocalClusterConnector_AbortsWhenAPICheckFailsOnFreshTunnel(t *testing.T
 	conn.prepareKubeconfig = stubPrepareKubeconfig
 	conn.ensureTunnel = stubEnsureTunnel(4242, false) // fresh tunnel
 	conn.pollAPIReady = func(_ int, _ string, _, _ time.Duration) error {
-		return &application.ClusterConnectionError{
+		return &domain.OperationError{
 			Code:    "kubernetes_api_unreachable",
 			Message: "Kubernetes API did not become ready on https://127.0.0.1:16443",
 		}
@@ -110,7 +110,7 @@ func TestLocalClusterConnector_RecreatesStaleReusedTunnelOnAPIFailure(t *testing
 	conn.pollAPIReady = func(_ int, _ string, _, _ time.Duration) error {
 		apiCalls++
 		if apiCalls == 1 {
-			return &application.ClusterConnectionError{Code: "kubernetes_api_unreachable", Message: "timeout"}
+			return &domain.OperationError{Code: "kubernetes_api_unreachable", Message: "timeout"}
 		}
 		return nil
 	}

@@ -207,4 +207,3 @@ func alertmanagerPortRank(p servicePort) int {
 	}
 	return 1
 }
-

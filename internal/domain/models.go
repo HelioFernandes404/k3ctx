@@ -79,32 +79,32 @@ func (e OperationError) ToPublicDict() map[string]any {
 
 // ConnectResult holds the outcome of a single cluster connection attempt.
 type ConnectResult struct {
-	success            bool
-	contextName        string
-	localPort          *int
-	internalIP         *string
-	tunnelPID          *int
-	usedCache          bool
-	networkRequirement NetworkRequirement
-	err                        *OperationError
-	argocdLocalPort            *int
-	alertmanagerLocalPort      *int
-	victoriaMetricsLocalPort   *int
+	success                  bool
+	contextName              string
+	localPort                *int
+	internalIP               *string
+	tunnelPID                *int
+	usedCache                bool
+	networkRequirement       NetworkRequirement
+	err                      *OperationError
+	argocdLocalPort          *int
+	alertmanagerLocalPort    *int
+	victoriaMetricsLocalPort *int
 }
 
 // ConnectResultParams groups the inputs for NewConnectResult.
 type ConnectResultParams struct {
-	Success            bool
-	ContextName        string
-	LocalPort          *int
-	InternalIP         *string
-	TunnelPID          *int
-	UsedCache          bool
-	NetworkRequirement NetworkRequirement
-	Error                      *OperationError
-	ArgocdLocalPort            *int
-	AlertmanagerLocalPort      *int
-	VictoriaMetricsLocalPort   *int
+	Success                  bool
+	ContextName              string
+	LocalPort                *int
+	InternalIP               *string
+	TunnelPID                *int
+	UsedCache                bool
+	NetworkRequirement       NetworkRequirement
+	Error                    *OperationError
+	ArgocdLocalPort          *int
+	AlertmanagerLocalPort    *int
+	VictoriaMetricsLocalPort *int
 }
 
 // NewConnectResult validates and constructs a ConnectResult.
@@ -116,13 +116,13 @@ func NewConnectResult(p ConnectResultParams) (ConnectResult, error) {
 		return ConnectResult{}, fmt.Errorf("success=false requires error to be set")
 	}
 	return ConnectResult{
-		success:            p.Success,
-		contextName:        p.ContextName,
-		localPort:          p.LocalPort,
-		internalIP:         p.InternalIP,
-		tunnelPID:          p.TunnelPID,
-		usedCache:          p.UsedCache,
-		networkRequirement: p.NetworkRequirement,
+		success:                  p.Success,
+		contextName:              p.ContextName,
+		localPort:                p.LocalPort,
+		internalIP:               p.InternalIP,
+		tunnelPID:                p.TunnelPID,
+		usedCache:                p.UsedCache,
+		networkRequirement:       p.NetworkRequirement,
 		err:                      p.Error,
 		argocdLocalPort:          p.ArgocdLocalPort,
 		alertmanagerLocalPort:    p.AlertmanagerLocalPort,
@@ -130,17 +130,17 @@ func NewConnectResult(p ConnectResultParams) (ConnectResult, error) {
 	}, nil
 }
 
-func (r ConnectResult) Success() bool                    { return r.success }
-func (r ConnectResult) ContextName() string              { return r.contextName }
-func (r ConnectResult) LocalPort() *int                  { return r.localPort }
-func (r ConnectResult) InternalIP() *string              { return r.internalIP }
-func (r ConnectResult) TunnelPID() *int                  { return r.tunnelPID }
-func (r ConnectResult) UsedCache() bool                  { return r.usedCache }
+func (r ConnectResult) Success() bool                          { return r.success }
+func (r ConnectResult) ContextName() string                    { return r.contextName }
+func (r ConnectResult) LocalPort() *int                        { return r.localPort }
+func (r ConnectResult) InternalIP() *string                    { return r.internalIP }
+func (r ConnectResult) TunnelPID() *int                        { return r.tunnelPID }
+func (r ConnectResult) UsedCache() bool                        { return r.usedCache }
 func (r ConnectResult) NetworkRequirement() NetworkRequirement { return r.networkRequirement }
-func (r ConnectResult) Err() *OperationError                  { return r.err }
-func (r ConnectResult) ArgocdLocalPort() *int                 { return r.argocdLocalPort }
-func (r ConnectResult) AlertmanagerLocalPort() *int           { return r.alertmanagerLocalPort }
-func (r ConnectResult) VictoriaMetricsLocalPort() *int        { return r.victoriaMetricsLocalPort }
+func (r ConnectResult) Err() *OperationError                   { return r.err }
+func (r ConnectResult) ArgocdLocalPort() *int                  { return r.argocdLocalPort }
+func (r ConnectResult) AlertmanagerLocalPort() *int            { return r.alertmanagerLocalPort }
+func (r ConnectResult) VictoriaMetricsLocalPort() *int         { return r.victoriaMetricsLocalPort }
 
 // ToPublicDict returns a JSON-safe representation.
 func (r ConnectResult) ToPublicDict() map[string]any {
@@ -183,10 +183,10 @@ func (r ConnectResult) ToPublicDict() map[string]any {
 			"network_range": r.networkRequirement.NetworkRange,
 			"needs_vpn":     r.networkRequirement.NeedsVPN,
 		},
-		"error":                        errDict,
-		"argocd_local_port":            argocdLocalPort,
-		"alertmanager_local_port":      alertmanagerLocalPort,
-		"victoriametrics_local_port":   victoriaMetricsLocalPort,
+		"error":                      errDict,
+		"argocd_local_port":          argocdLocalPort,
+		"alertmanager_local_port":    alertmanagerLocalPort,
+		"victoriametrics_local_port": victoriaMetricsLocalPort,
 	}
 }
 

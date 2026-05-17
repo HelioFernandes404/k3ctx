@@ -21,6 +21,7 @@ cogcs.yml.bak
 *.yaml
 *.yml.bak
 *.yaml.bak
+!.golangci.yml
 .kube/
 /inventory/
 !/inventory/.gitkeep

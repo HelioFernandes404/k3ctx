@@ -101,7 +101,7 @@ func TestConnectMultiple_PreservesTargetOrder(t *testing.T) {
 }
 
 func TestConnectCluster_ReturnsSpecificPublicErrorForAPIReadinessFailure(t *testing.T) {
-	stub := &stubConnector{err: &application.ClusterConnectionError{
+	stub := &stubConnector{err: &domain.OperationError{
 		Code:    "kubernetes_api_unreachable",
 		Message: "Kubernetes API did not become ready on https://127.0.0.1:16443",
 	}}

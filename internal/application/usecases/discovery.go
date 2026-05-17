@@ -156,10 +156,10 @@ func SearchHostRecords(records []domain.HostRecord, query domain.HostQuery, limi
 	return domain.HostPage{
 		Items: page,
 		Page: domain.PageInfo{
-			Limit:     limit,
-			Returned:  len(page),
-			Total:     total,
-			HasMore:   hasMore,
+			Limit:      limit,
+			Returned:   len(page),
+			Total:      total,
+			HasMore:    hasMore,
 			NextCursor: nextCursor,
 		},
 		Query: query,

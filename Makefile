@@ -4,7 +4,7 @@ BIN_DIR    := $(PREFIX)/bin
 GO_VERSION := 1.25.0
 GO         ?= sh -c 'if command -v mise >/dev/null 2>&1; then exec mise exec go@$(GO_VERSION) -- go "$$@"; else exec go "$$@"; fi' --
 
-.PHONY: test build install clean
+.PHONY: test build install clean lint
 
 test:
 	$(GO) test ./...
@@ -19,3 +19,6 @@ install: build
 
 clean:
 	rm -rf bin/
+
+lint:
+	golangci-lint run ./...

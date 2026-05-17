@@ -47,12 +47,10 @@ func ConnectCluster(
 
 	artifacts, connErr := connector.Connect(target, config, req)
 	if connErr != nil {
-		var cce *application.ClusterConnectionError
-		var opErr domain.OperationError
-		if errors.As(connErr, &cce) {
-			opErr = cce.ToOperationError()
-		} else {
-			opErr = domain.OperationError{Code: "connect_failed", Message: "Cluster connection failed"}
+		opErr := domain.OperationError{Code: "connect_failed", Message: "Cluster connection failed"}
+		var matched *domain.OperationError
+		if errors.As(connErr, &matched) {
+			opErr = *matched
 		}
 		return domain.NewConnectResult(domain.ConnectResultParams{
 			Success:            false,

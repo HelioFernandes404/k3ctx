@@ -20,12 +20,12 @@ var hostsCmd = &cobra.Command{
 }
 
 var (
-	hostsLimit           int
-	hostsCursor          string
+	hostsLimit            int
+	hostsCursor           string
 	hostsRefreshInventory bool
-	hostsHostFilter      string
-	hostsIDFilter        string
-	hostsIPFilter        string
+	hostsHostFilter       string
+	hostsIDFilter         string
+	hostsIPFilter         string
 )
 
 func init() {

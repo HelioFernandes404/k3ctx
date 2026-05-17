@@ -19,8 +19,8 @@ var clientsCmd = &cobra.Command{
 }
 
 var (
-	clientsLimit           int
-	clientsCursor          string
+	clientsLimit            int
+	clientsCursor           string
 	clientsRefreshInventory bool
 )
 

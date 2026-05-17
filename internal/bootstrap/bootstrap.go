@@ -7,15 +7,15 @@ import (
 
 // ServiceContainer holds all infrastructure adapters.
 type ServiceContainer struct {
-	Catalog          application.InventoryCatalog
-	Refresher        application.InventoryRefresher
-	Switcher         application.ContextSwitcher
-	Status           application.StatusReader
-	Tunnels          application.TunnelManager
-	Connector        application.ClusterConnector
-	Argocd           application.ArgocdConnector
-	Alertmanager     application.AlertmanagerConnector
-	VictoriaMetrics  application.VictoriaMetricsConnector
+	Catalog         application.InventoryCatalog
+	Refresher       application.InventoryRefresher
+	Switcher        application.ContextSwitcher
+	Status          application.StatusReader
+	Tunnels         application.TunnelManager
+	Connector       application.ClusterConnector
+	Argocd          application.ArgocdConnector
+	Alertmanager    application.AlertmanagerConnector
+	VictoriaMetrics application.VictoriaMetricsConnector
 }
 
 // Build creates a ServiceContainer with default local adapters.

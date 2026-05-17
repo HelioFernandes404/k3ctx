@@ -105,7 +105,7 @@ func TestExtractHostsFromInventory_ExtractsHosts(t *testing.T) {
 			"vars": map[string]any{"company": "acme"},
 			"children": map[string]any{
 				"k3s_cluster": map[string]any{
-					"vars":  map[string]any{"gateway": "bastion.example"},
+					"vars": map[string]any{"gateway": "bastion.example"},
 					"hosts": map[string]any{
 						"host1": map[string]any{"ansible_host": "1.2.3.4"},
 						"host2": map[string]any{"ansible_host": "5.6.7.8"},

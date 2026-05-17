@@ -10,9 +10,9 @@ import (
 )
 
 type stubStatusReader struct {
-	statusItems []map[string]any
-	netResult   map[string]any
-	listCalls   int
+	statusItems   []map[string]any
+	netResult     map[string]any
+	listCalls     int
 	validateCalls []string
 }
 

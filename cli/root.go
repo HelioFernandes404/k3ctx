@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	svcs      bootstrap.ServiceContainer
-	cfg       = mustDefaultConfig()
+	svcs       bootstrap.ServiceContainer
+	cfg        = mustDefaultConfig()
 	jsonOutput bool
 )
 

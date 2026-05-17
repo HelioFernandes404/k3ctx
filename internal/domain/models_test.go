@@ -10,13 +10,13 @@ import (
 
 func TestEffectiveConfig_ExposesExpectedFields(t *testing.T) {
 	cfg := domain.EffectiveConfig{
-		InventoryPath:        "/tmp/inventory",
-		SSHConfigPath:        "~/.ssh/config",
-		SSHKeyPath:           "~/.ssh/id_ed25519",
-		RemoteK3sConfigPath:  "/etc/rancher/k3s/k3s.yaml",
-		K3sAPIPort:           6443,
-		PortRangeStart:       16443,
-		PortRangeSize:        10000,
+		InventoryPath:       "/tmp/inventory",
+		SSHConfigPath:       "~/.ssh/config",
+		SSHKeyPath:          "~/.ssh/id_ed25519",
+		RemoteK3sConfigPath: "/etc/rancher/k3s/k3s.yaml",
+		K3sAPIPort:          6443,
+		PortRangeStart:      16443,
+		PortRangeSize:       10000,
 	}
 
 	assert.Equal(t, "/tmp/inventory", cfg.InventoryPath)
@@ -85,14 +85,14 @@ func TestConnectResult_RequiresErrorToMatchSuccessState(t *testing.T) {
 	req := domain.NoNetworkRequirement()
 
 	_, err := domain.NewConnectResult(domain.ConnectResultParams{
-		Success:             true,
-		ContextName:         "acme-prod",
-		LocalPort:           intPtr(16443),
-		InternalIP:          strPtr("10.0.0.10"),
-		TunnelPID:           intPtr(4242),
-		UsedCache:           false,
-		NetworkRequirement:  req,
-		Error:               &opErr,
+		Success:            true,
+		ContextName:        "acme-prod",
+		LocalPort:          intPtr(16443),
+		InternalIP:         strPtr("10.0.0.10"),
+		TunnelPID:          intPtr(4242),
+		UsedCache:          false,
+		NetworkRequirement: req,
+		Error:              &opErr,
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "success=true requires error=nil")
@@ -159,5 +159,5 @@ func TestConnectResult_ToPublicDictIncludesErrorPayload(t *testing.T) {
 	assert.Equal(t, true, errPub["retryable"])
 }
 
-func intPtr(v int) *int    { return &v }
+func intPtr(v int) *int       { return &v }
 func strPtr(v string) *string { return &v }

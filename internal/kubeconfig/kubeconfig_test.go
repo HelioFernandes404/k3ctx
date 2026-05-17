@@ -115,10 +115,10 @@ func TestMergeKubeconfig_MergesIntoExisting(t *testing.T) {
 	require.NoError(t, os.Mkdir(kubeDir, 0o755))
 
 	existing := map[string]any{
-		"apiVersion": "v1",
-		"clusters":   []any{map[string]any{"name": "existing-cluster", "cluster": map[string]any{"server": "https://old:6443"}}},
-		"contexts":   []any{map[string]any{"name": "existing-context", "context": map[string]any{"cluster": "existing-cluster", "user": "existing-user"}}},
-		"users":      []any{map[string]any{"name": "existing-user", "user": map[string]any{"token": "old-token"}}},
+		"apiVersion":      "v1",
+		"clusters":        []any{map[string]any{"name": "existing-cluster", "cluster": map[string]any{"server": "https://old:6443"}}},
+		"contexts":        []any{map[string]any{"name": "existing-context", "context": map[string]any{"cluster": "existing-cluster", "user": "existing-user"}}},
+		"users":           []any{map[string]any{"name": "existing-user", "user": map[string]any{"token": "old-token"}}},
 		"current-context": "existing-context",
 	}
 	writeYAML(t, filepath.Join(kubeDir, "config"), existing)

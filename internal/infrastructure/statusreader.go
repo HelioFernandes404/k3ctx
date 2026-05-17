@@ -10,7 +10,7 @@ import (
 
 // LocalStatusReader reads context and tunnel status from the local filesystem.
 type LocalStatusReader struct {
-	StateDir   string
+	StateDir       string
 	KubeconfigPath string
 }
 

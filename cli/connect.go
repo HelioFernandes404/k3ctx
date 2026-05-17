@@ -19,11 +19,11 @@ var connectCmd = &cobra.Command{
 }
 
 var (
-	connectClient          string
-	connectHost            string
-	connectID              string
-	connectIP              string
-	connectContext         string
+	connectClient           string
+	connectHost             string
+	connectID               string
+	connectIP               string
+	connectContext          string
 	connectRefreshInventory bool
 )
 

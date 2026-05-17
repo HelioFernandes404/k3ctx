@@ -65,9 +65,9 @@ func TestLoadConfig_InventoryPathOverriddenByEnvVar(t *testing.T) {
 
 func TestLoadConfig_NumericStringsInYAMLNormalized(t *testing.T) {
 	p := writeYAML(t, t.TempDir(), map[string]any{
-		"k3s_api_port":    "7443",
+		"k3s_api_port":     "7443",
 		"port_range_start": "20000",
-		"port_range_size": "5000",
+		"port_range_size":  "5000",
 	})
 	cfg, err := config.LoadConfig(p)
 	require.NoError(t, err)
@@ -135,12 +135,12 @@ func TestLoadEffectiveConfig_BuildsCanonicalConfig(t *testing.T) {
 	require.NoError(t, os.Mkdir(inv, 0o755))
 	cfgFile := filepath.Join(tmp, "config.yaml")
 	require.NoError(t, os.WriteFile(cfgFile, mustYAML(map[string]any{
-		"inventory_path":          inv,
+		"inventory_path":         inv,
 		"remote_k3s_config_path": "/file/path/k3s.yaml",
-		"ssh_key_path":            "~/.ssh/from-file",
-		"k3s_api_port":            7443,
-		"port_range_start":        20000,
-		"port_range_size":         5000,
+		"ssh_key_path":           "~/.ssh/from-file",
+		"k3s_api_port":           7443,
+		"port_range_start":       20000,
+		"port_range_size":        5000,
 	}), 0o644))
 
 	t.Setenv("K3S_API_PORT", "8443")
@@ -161,9 +161,9 @@ func TestLoadEffectiveConfig_InvalidNumericEnvUsesDefault(t *testing.T) {
 	tmp := t.TempDir()
 	cfgFile := filepath.Join(tmp, "config.yaml")
 	require.NoError(t, os.WriteFile(cfgFile, mustYAML(map[string]any{
-		"k3s_api_port":    7443,
+		"k3s_api_port":     7443,
 		"port_range_start": 20000,
-		"port_range_size": 5000,
+		"port_range_size":  5000,
 	}), 0o644))
 	t.Setenv("K3S_API_PORT", "not-a-number")
 
@@ -178,9 +178,9 @@ func TestLoadEffectiveConfig_InvalidNumericFileUsesDefault(t *testing.T) {
 	tmp := t.TempDir()
 	cfgFile := filepath.Join(tmp, "config.yaml")
 	require.NoError(t, os.WriteFile(cfgFile, mustYAML(map[string]any{
-		"k3s_api_port":    "broken",
+		"k3s_api_port":     "broken",
 		"port_range_start": "also-broken",
-		"port_range_size": 5000,
+		"port_range_size":  5000,
 	}), 0o644))
 
 	cfg, err := config.LoadEffectiveConfig(tmp, cfgFile)

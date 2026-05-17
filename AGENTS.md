@@ -10,6 +10,14 @@
 - Build: `make build` writes `bin/k3ctx`.
 - Install: `make install` installs to `$(HOME)/.local/bin` unless `PREFIX` is set.
 - Format Go edits: `gofmt -w <files>`.
+- Lint: `make lint` (requires `golangci-lint`; install with `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest`).
+
+## Code Quality
+- All Go files must be `gofmt`-clean before committing; run `gofmt -l ./...` to check.
+- `go vet ./...` and `go test -race ./...` must pass.
+- `make lint` runs `golangci-lint` with `.golangci.yml`; fix all reported issues.
+- Use `domain.OperationError` as the single structured error type — do not introduce new error structs with the same fields.
+- Wrap errors with `fmt.Errorf("context: %w", err)`; use `errors.As` for type-specific handling.
 
 ## TDD Workflow
 - For any implementation, write or update the focused test first and run it to see it fail.
