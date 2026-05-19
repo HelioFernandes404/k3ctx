@@ -72,7 +72,7 @@ func runHosts(cmd *cobra.Command, args []string) error {
 	if jsonOutput {
 		enc := json.NewEncoder(cmd.OutOrStdout())
 		enc.SetIndent("", "  ")
-		return enc.Encode(hostPageToMap(page))
+		return enc.Encode(jsonEnvelope(cmd, hostPageToMap(page)))
 	}
 
 	for _, item := range page.Items {
@@ -84,10 +84,10 @@ func runHosts(cmd *cobra.Command, args []string) error {
 		if item.SystemframeID != nil {
 			sfID = *item.SystemframeID
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "%-30s  %-15s  %s\n", item.ContextName, ip, sfID)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%-30s  %-15s  %s\n", item.ContextName, ip, sfID)
 	}
 	if page.Page.HasMore {
-		fmt.Fprintf(cmd.OutOrStdout(), "(more: --cursor %s)\n", *page.Page.NextCursor)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "(more: --cursor %s)\n", *page.Page.NextCursor)
 	}
 	return nil
 }

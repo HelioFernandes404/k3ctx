@@ -56,14 +56,14 @@ func runClients(cmd *cobra.Command, args []string) error {
 	if jsonOutput {
 		enc := json.NewEncoder(cmd.OutOrStdout())
 		enc.SetIndent("", "  ")
-		return enc.Encode(clientPageToMap(page))
+		return enc.Encode(jsonEnvelope(cmd, clientPageToMap(page)))
 	}
 
 	for _, item := range page.Items {
-		fmt.Fprintf(cmd.OutOrStdout(), "%-30s  %d hosts\n", item.Client, item.HostCount)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%-30s  %d hosts\n", item.Client, item.HostCount)
 	}
 	if page.Page.HasMore {
-		fmt.Fprintf(cmd.OutOrStdout(), "(more: --cursor %s)\n", *page.Page.NextCursor)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "(more: --cursor %s)\n", *page.Page.NextCursor)
 	}
 	return nil
 }

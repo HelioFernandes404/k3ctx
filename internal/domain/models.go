@@ -62,6 +62,7 @@ func (t ClusterTarget) GroupVars() map[string]any { return shallowCopy(t.groupVa
 type OperationError struct {
 	Code      string
 	Message   string
+	Hint      string
 	Detail    string
 	Retryable bool
 }
@@ -73,6 +74,7 @@ func (e OperationError) ToPublicDict() map[string]any {
 	return map[string]any{
 		"code":      e.Code,
 		"message":   e.Message,
+		"hint":      e.Hint,
 		"retryable": e.Retryable,
 	}
 }

@@ -118,9 +118,8 @@ func CreateTunnel(sshHost, internalIP string, localPort, remotePort int, opts Cr
 		sshHost,
 	)
 
-	out, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create SSH tunnel: %s", string(out))
+	if _, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("SSH tunnel process failed: %w", err)
 	}
 
 	time.Sleep(500 * time.Millisecond)

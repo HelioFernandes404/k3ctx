@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -56,26 +57,29 @@ func runConnect(cmd *cobra.Command, args []string) error {
 
 	switch resolution.Status {
 	case domain.ResolutionNoMatch:
-		fmt.Fprintln(cmd.ErrOrStderr(), "No matching hosts found.")
+		hint := ""
 		if resolution.Hint != nil {
-			fmt.Fprintln(cmd.ErrOrStderr(), *resolution.Hint)
+			hint = *resolution.Hint
 		}
-		os.Exit(4)
+		return newExitErr(4, "NO_MATCH", "No matching hosts found.", hint)
+
 	case domain.ResolutionAmbiguous:
-		fmt.Fprintln(cmd.ErrOrStderr(), "Multiple hosts matched:")
+		var sb strings.Builder
+		sb.WriteString("Multiple hosts matched:")
 		for _, m := range resolution.Matches {
-			fmt.Fprintf(cmd.ErrOrStderr(), "  %s\n", m.ContextName)
+			sb.WriteString("\n  " + m.ContextName)
 		}
+		hint := ""
 		if resolution.Hint != nil {
-			fmt.Fprintln(cmd.ErrOrStderr(), *resolution.Hint)
+			hint = *resolution.Hint
 		}
-		os.Exit(3)
+		return newExitErr(3, "AMBIGUOUS_MATCH", sb.String(), hint)
 	}
 
 	target, findErr := usecases.FindTargetByContextName(*resolution.ContextName, cfg.InventoryPath, svcs.Catalog)
 	if findErr != nil || target == nil {
-		fmt.Fprintln(cmd.ErrOrStderr(), "Failed to load target for context:", *resolution.ContextName)
-		os.Exit(1)
+		return newExitErr(1, "TARGET_NOT_FOUND",
+			"Failed to load target for context: "+*resolution.ContextName, "")
 	}
 
 	result, err := usecases.ConnectCluster(*target, cfg, svcs.Connector, false)
@@ -84,31 +88,31 @@ func runConnect(cmd *cobra.Command, args []string) error {
 	}
 	if !result.Success() {
 		opErr := result.Err()
-		fmt.Fprintf(cmd.ErrOrStderr(), "Connection failed [%s]: %s\n", opErr.Code, opErr.Message)
-		os.Exit(2)
+		return newExitErr(2, "CONNECTION_FAILED", opErr.Message, opErr.Hint)
 	}
 
 	if switchErr := svcs.Switcher.SwitchContext(result.ContextName()); switchErr != nil {
-		fmt.Fprintf(cmd.ErrOrStderr(), "Context switch failed: %s\n", switchErr.Message)
+		_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "Context switch failed: %s\n", switchErr.Message)
 	}
 
 	if jsonOutput {
 		enc := json.NewEncoder(cmd.OutOrStdout())
-		return enc.Encode(result.ToPublicDict())
+		return enc.Encode(jsonEnvelope(cmd, result.ToPublicDict()))
 	}
+
 	localPort := ""
 	if result.LocalPort() != nil {
 		localPort = fmt.Sprintf(" (local port %d)", *result.LocalPort())
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Connected: %s%s\n", result.ContextName(), localPort)
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Connected: %s%s\n", result.ContextName(), localPort)
 	if result.ArgocdLocalPort() != nil {
-		fmt.Fprintf(cmd.OutOrStdout(), "ArgoCD:            http://127.0.0.1:%d\n", *result.ArgocdLocalPort())
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "ArgoCD:            http://127.0.0.1:%d\n", *result.ArgocdLocalPort())
 	}
 	if result.AlertmanagerLocalPort() != nil {
-		fmt.Fprintf(cmd.OutOrStdout(), "Alertmanager:      http://127.0.0.1:%d\n", *result.AlertmanagerLocalPort())
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Alertmanager:      http://127.0.0.1:%d\n", *result.AlertmanagerLocalPort())
 	}
 	if result.VictoriaMetricsLocalPort() != nil {
-		fmt.Fprintf(cmd.OutOrStdout(), "VictoriaMetrics:   http://127.0.0.1:%d\n", *result.VictoriaMetricsLocalPort())
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "VictoriaMetrics:   http://127.0.0.1:%d\n", *result.VictoriaMetricsLocalPort())
 	}
 	return nil
 }

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -27,6 +28,10 @@ func runInit(cmd *cobra.Command, _ []string) error {
 			return fmt.Errorf("failed to create %s: %w", d, err)
 		}
 	}
-	fmt.Fprintln(cmd.OutOrStdout(), "k3ctx initialized.")
+	if jsonOutput {
+		enc := json.NewEncoder(cmd.OutOrStdout())
+		return enc.Encode(jsonEnvelope(cmd, map[string]any{"initialized": true}))
+	}
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), "k3ctx initialized.")
 	return nil
 }

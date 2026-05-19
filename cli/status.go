@@ -26,11 +26,11 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	if jsonOutput {
 		enc := json.NewEncoder(cmd.OutOrStdout())
 		enc.SetIndent("", "  ")
-		return enc.Encode(items)
+		return enc.Encode(jsonEnvelope(cmd, items))
 	}
 
 	if len(items) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), "No active tunnels.")
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No active tunnels.")
 		return nil
 	}
 	for _, item := range items {
@@ -38,7 +38,7 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 		if v, ok := item["tunnel_running"].(bool); ok && v {
 			running = " [tunnel running]"
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n", item["context_name"], running)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n", item["context_name"], running)
 	}
 	return nil
 }

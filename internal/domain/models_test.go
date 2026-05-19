@@ -67,6 +67,7 @@ func TestOperationError_ToPublicDictRedactsDetail(t *testing.T) {
 	err := domain.OperationError{
 		Code:      "ssh_connect_failed",
 		Message:   "SSH connection failed",
+		Hint:      "Check your SSH key",
 		Detail:    "token=secret",
 		Retryable: true,
 	}
@@ -75,6 +76,7 @@ func TestOperationError_ToPublicDictRedactsDetail(t *testing.T) {
 
 	assert.Equal(t, "ssh_connect_failed", pub["code"])
 	assert.Equal(t, "SSH connection failed", pub["message"])
+	assert.Equal(t, "Check your SSH key", pub["hint"])
 	assert.Equal(t, true, pub["retryable"])
 	_, hasDetail := pub["detail"]
 	assert.False(t, hasDetail)
@@ -138,6 +140,7 @@ func TestConnectResult_ToPublicDictIncludesErrorPayload(t *testing.T) {
 	opErr := domain.OperationError{
 		Code:      "ssh_connect_failed",
 		Message:   "SSH connection failed",
+		Hint:      "Verify SSH access",
 		Detail:    "token=secret",
 		Retryable: true,
 	}
@@ -156,6 +159,7 @@ func TestConnectResult_ToPublicDictIncludesErrorPayload(t *testing.T) {
 	errPub := pub["error"].(map[string]any)
 	assert.Equal(t, "ssh_connect_failed", errPub["code"])
 	assert.Equal(t, "SSH connection failed", errPub["message"])
+	assert.Equal(t, "Verify SSH access", errPub["hint"])
 	assert.Equal(t, true, errPub["retryable"])
 }
 
