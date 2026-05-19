@@ -1,13 +1,11 @@
 ---
 name: k3ctx
 description: >
-  Workflow guide for k3ctx — the tool that opens SSH tunnels,
-  merges kubeconfig contexts, and enables kubectl/k9s access to k3s clusters in
-  the systemframe workspace. Use this skill whenever the user wants to connect to
-  a cluster, open or kill a tunnel, switch kubectl contexts, use k9s, list available
-  clusters, check tunnel status, or debug a failing kubectl command that might be
-  missing a tunnel. Also triggers when the user mentions "prod-primaria", "thinkpad",
-  "k3ctx", "k3s cluster", "tunnel", or "context" in a cluster-access context.
+  Workflow guide for k3ctx, the CLI that opens SSH tunnels, merges kubeconfig
+  contexts, and enables kubectl/k9s access to k3s clusters. Use this skill when
+  the user wants to connect to a cluster, manage tunnels, switch kubectl contexts,
+  use k9s, list available clusters, check tunnel status, or debug kubectl access
+  that might be missing a tunnel.
 ---
 
 ## Tool location
@@ -18,14 +16,14 @@ k3ctx
 
 Use the installed `k3ctx` binary from `PATH`.
 
-Verified installed binary:
+Typical local install path:
 
 ```bash
-/home/helio/.local/bin/k3ctx
+~/.local/bin/k3ctx
 ```
 
-The MCP server (`k3ctx-mcp-stdio`) exposes the same use cases
-when Claude has the MCP server registered.
+Prefer the `k3ctx` executable resolved from `PATH`. Do not hardcode a user-specific
+absolute path unless the user asks you to diagnose that exact installation.
 
 ---
 
@@ -87,29 +85,6 @@ Structured output: pass the global `--json` flag, for example `k3ctx --json stat
 When user says "prod-primaria" → target `sf-prd-us-00001`.
 When user says "thinkpad" or "test machine" → target `sf-tst-sp-00001`.
 
----
-
-## MCP tools (when MCP server is active)
-
-Mutating tools — require explicit confirmation before calling:
-
-- `connect_cluster(context_name)` — tunnel + kubeconfig for one context
-- `connect_multiple(context_names=[...])` — parallel connect for multiple contexts
-- `set_current_context(context_name, require_confirmation=True, confirmed=False)` — switches active kubectl context; always set `confirmed=True` only after user confirms
-- `kill_tunnel(context_name)` — stops one tunnel
-
-Validation (safe, read-only):
-
-- `validate_context_network(context_name)` — checks reachability without changing state
-
-Read-only resources:
-
-- `inventory://clusters` — full cluster list from Ansible inventory
-- `status://contexts` — active contexts + tunnel states
-- `config://effective` — runtime config values
-
----
-
 ## Config and state paths
 
 | What | Path |
@@ -118,8 +93,7 @@ Read-only resources:
 | Runtime config | `~/.local/share/k3ctx/yaml/config/config.yaml` |
 | Kubeconfig cache | `~/.local/share/k3ctx/yaml/kubeconfigs/<ctx>.yml` |
 | Merged kubeconfig | `~/.kube/config` |
-| Tunnel PID files | `~/.local/state/k9s-tunnels/` |
-| Logs | `~/.local/state/k9s/` |
+| Tunnel PID files | `~/.local/state/k3ctx-tunnels/` |
 | Inventory (Ansible) | value of `inventory_path` in config.yaml |
 
 `XDG_DATA_HOME` overrides the base data path.
@@ -133,21 +107,15 @@ Do not commit config.yaml, kubeconfigs, SSH keys, or state files.
 **`connect` reports "Kubernetes API did not become ready"**
 The tunnel opened but the API health check timed out. Try:
 ```bash
-K9S_API_READY_TIMEOUT_SECONDS=30 k3ctx connect --context <ctx>
+K3CTX_API_READY_TIMEOUT_SECONDS=30 k3ctx connect --context <ctx>
 # or disable the check temporarily and validate manually:
-K9S_VERIFY_API_READY=0 k3ctx connect --context <ctx>
+K3CTX_VERIFY_API_READY=0 k3ctx connect --context <ctx>
 kubectl --request-timeout=10s get --raw=/version
 ```
 
 **Inventory outdated**
 ```bash
 k3ctx clients --refresh-inventory
-```
-
-**Debug logging**
-```bash
-K9S_LOG_LEVEL=DEBUG k3ctx connect --context <ctx>
-K9S_LOG_FORMAT=json k3ctx status
 ```
 
 **VPN / sshuttle required**

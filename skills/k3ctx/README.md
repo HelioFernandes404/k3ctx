@@ -4,18 +4,22 @@ Workflow guide for using `k3ctx` to open SSH tunnels, merge kubeconfig contexts,
 
 ## Install
 
+Install the `skills/k3ctx` directory with an Agent Skills-compatible installer.
+
+If your installer supports GitHub repository specs, use:
+
 ```bash
 npx skills add HelioFernandes404/k3ctx@k3ctx
 ```
 
-Install for a specific agent:
+For a specific agent:
 
 ```bash
 npx skills add HelioFernandes404/k3ctx@k3ctx -a claude-code
 npx skills add HelioFernandes404/k3ctx@k3ctx -a codex
 ```
 
-Install globally without prompts:
+Globally without prompts:
 
 ```bash
 npx skills add HelioFernandes404/k3ctx@k3ctx -g -y
