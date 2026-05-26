@@ -51,6 +51,10 @@ func LegacyHomeConfigFilePath() string {
 	return filepath.Join(os.Getenv("HOME"), legacyConfigDir, "config.yaml")
 }
 
+func TelemetryDir() string {
+	return filepath.Join(AppDataDir(), "telemetry")
+}
+
 // DefaultConfigCandidates returns config paths in resolution order.
 func DefaultConfigCandidates(projectDir string) []string {
 	seen := map[string]bool{}
