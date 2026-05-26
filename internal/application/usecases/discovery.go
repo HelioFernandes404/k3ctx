@@ -13,7 +13,7 @@ func ProjectTargetToHostRecord(target domain.ClusterTarget) domain.HostRecord {
 	hc := target.HostConfig()
 	gv := target.GroupVars()
 
-	var sfID, ip *string
+	var sfID, ip, status *string
 	if v, ok := hc["systemframe_id"].(string); ok {
 		sfID = &v
 	} else if v, ok := gv["systemframe_id"].(string); ok {
@@ -21,6 +21,9 @@ func ProjectTargetToHostRecord(target domain.ClusterTarget) domain.HostRecord {
 	}
 	if v, ok := hc["ansible_host"].(string); ok {
 		ip = &v
+	}
+	if v, ok := hc["netbird_status"].(string); ok {
+		status = &v
 	}
 
 	return domain.HostRecord{
@@ -30,6 +33,7 @@ func ProjectTargetToHostRecord(target domain.ClusterTarget) domain.HostRecord {
 		AddrIP:        ip,
 		ContextName:   target.ContextName(),
 		Group:         target.Group(),
+		Status:        status,
 	}
 }
 

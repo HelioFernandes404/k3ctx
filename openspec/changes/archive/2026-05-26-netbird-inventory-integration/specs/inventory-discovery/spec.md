@@ -1,4 +1,4 @@
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Load inventory targets from NetBird peers
 The system SHALL load cluster targets from the NetBird peer list when no `inventory_path` is configured.
@@ -16,7 +16,7 @@ The system SHALL load cluster targets from the NetBird peer list when no `invent
 - **THEN** the system ignores those tags while loading usable inventory data
 
 ### Requirement: List clients with host counts
-The system SHALL provide a `clients` command that lists clients and host counts from inventory.
+The system SHALL provide a `clients` command that lists clients and host counts from the active catalog.
 
 #### Scenario: Clients are listed in text output
 - **WHEN** the user runs `k3ctx clients`
@@ -84,3 +84,9 @@ The system SHALL refresh the inventory only when explicitly requested by a comma
 #### Scenario: Missing inventory path skips refresh
 - **WHEN** the YAML inventory path does not exist
 - **THEN** the system skips refresh without failing the command for refresh alone
+
+## REMOVED Requirements
+
+### Requirement: Load Ansible YAML inventory targets
+**Reason**: NetBird peer discovery is now the default catalog. YAML loading is retained as an opt-in fallback when `inventory_path` is explicitly configured — not as the primary mechanism.
+**Migration**: Remove `inventory_path` from config to activate NetBird discovery. Hosts must follow the `{hostAlias}.{client}.{netbird-domain}` FQDN convention.

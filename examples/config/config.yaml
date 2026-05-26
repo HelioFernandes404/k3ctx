@@ -1,6 +1,6 @@
-# Example local configuration for k3s-context-tunnel-manager.
-# The official default path is ~/.local/share/k3s-context-tunnel-manager/yaml/config/config.yaml
-# or $XDG_DATA_HOME/k3s-context-tunnel-manager/yaml/config/config.yaml.
+# Example local configuration for k3ctx.
+# Default path: ~/.local/share/k3ctx/yaml/config/config.yaml
+# or $XDG_DATA_HOME/k3ctx/yaml/config/config.yaml.
 
 remote_k3s_config_path: /etc/rancher/k3s/k3s.yaml
 ssh_key_path: ~/.ssh/id_ed25519
@@ -8,8 +8,16 @@ k3s_api_port: 6443
 port_range_start: 16443
 port_range_size: 10000
 
-# Update this path to your inventory checkout.
-inventory_path: /path/to/ansible/inventory
+# NetBird peer discovery (default when inventory_path is not set).
+# Hosts are discovered via `netbird status --json`. FQDNs follow the convention:
+#   {hostAlias}.{client}.{netbird-domain}  e.g. sf-prd-us-00001.systemframe.vpn
+#
+# netbird_bin_path: netbird          # path to netbird binary (default: resolved from $PATH)
+# netbird_host_filter: ^sf-[a-z]{3}-(?:[a-z]{2}|us)-[0-9]{5}  # hostname regex filter
+
+# Optional: legacy Ansible YAML inventory (activates when path is set and exists).
+# Remove or comment out to use NetBird discovery.
+# inventory_path: /path/to/ansible/inventory
 
 # Optional: per-host ArgoCD integration (set in Ansible inventory host_config or group_vars)
 # argocd_enabled: true          # enable ArgoCD tunnel + argocd login after connect

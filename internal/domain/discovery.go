@@ -8,6 +8,7 @@ type HostRecord struct {
 	AddrIP        *string
 	ContextName   string
 	Group         string
+	Status        *string // peer connectivity status (e.g. "Connected", "Connecting", "Idle")
 }
 
 // ClientSummary holds the host count for a client.

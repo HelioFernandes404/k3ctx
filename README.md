@@ -2,7 +2,7 @@
 
 Go CLI for managing SSH tunnels and kubeconfig contexts for K3s clusters.
 
-It discovers hosts from an Ansible inventory, opens a local SSH tunnel to the K3s API, merges the generated kubeconfig into `~/.kube/config`, and switches the active kubectl context.
+It discovers hosts via the NetBird peer list (or from a legacy Ansible inventory), opens a local SSH tunnel to the K3s API, merges the generated kubeconfig into `~/.kube/config`, and switches the active kubectl context.
 
 ## Local Path
 
@@ -21,7 +21,8 @@ cd /home/helio/Obsidian/03-projetos/k3ctx
 ├── internal/infrastructure/     # Local adapters
 ├── internal/config/             # Config loading and env overlays
 ├── internal/paths/              # XDG/local path resolution
-├── internal/inventory/          # Ansible inventory parsing
+├── internal/netbird/            # NetBird CLI integration
+├── internal/inventory/          # Ansible inventory parsing (legacy)
 ├── internal/kubeconfig/         # Kubeconfig helpers
 ├── internal/network/            # Local port selection
 ├── internal/ssh/                # SSH command helpers
@@ -139,7 +140,19 @@ Config lookup order:
 
 `XDG_DATA_HOME` changes the base for `~/.local/share` paths.
 
-Example:
+Example (NetBird discovery — recommended):
+
+```yaml
+ssh_key_path: ~/.ssh/id_ed25519
+remote_k3s_config_path: /etc/rancher/k3s/k3s.yaml
+k3s_api_port: 6443
+port_range_start: 16443
+port_range_size: 10000
+# netbird_bin_path: netbird
+# netbird_host_filter: ^sf-[a-z]{3}-(?:[a-z]{2}|us)-[0-9]{5}
+```
+
+Example (legacy YAML inventory):
 
 ```yaml
 inventory_path: /home/helio/Work/systemframe/ansible/inventory
@@ -155,6 +168,8 @@ Supported environment overlays:
 | Config key | Environment variable |
 | --- | --- |
 | `inventory_path` | `INVENTORY_PATH` |
+| `netbird_bin_path` | `NETBIRD_BIN_PATH` |
+| `netbird_host_filter` | `NETBIRD_HOST_FILTER` |
 | `ssh_key_path` | `SSH_KEY_PATH` |
 | `remote_k3s_config_path` | `REMOTE_K3S_CONFIG_PATH` |
 | `k3s_api_port` | `K3S_API_PORT` |
@@ -163,13 +178,44 @@ Supported environment overlays:
 
 `ssh_config_path` is currently fixed to `~/.ssh/config`.
 
-## Inventory
+## Host Discovery
 
-The inventory parser reads Ansible YAML files matching `*_hosts.yml`.
+### NetBird (default)
 
-Unknown YAML tags, including tags like `!vault`, are ignored.
+When `inventory_path` is not set, k3ctx discovers cluster hosts from the local NetBird peer list by running `netbird status --json`.
 
-Expected host fields include:
+**FQDN convention** — peers must follow `{hostAlias}.{client}.{netbird-domain}`:
+
+```
+sf-prd-us-00001.systemframe.vpn
+│              │ client = systemframe
+│              └─ context name = systemframe-sf-prd-us-00001
+└─ host alias = sf-prd-us-00001
+```
+
+**Filter** — only peers whose hostname matches `netbird_host_filter` (default regex: `^sf-[a-z]{3}-(?:[a-z]{2}|us)-[0-9]{5}`) are included. Personal devices and laptops are excluded automatically.
+
+**Status** — all matching peers are listed regardless of connectivity status. The `hosts` command shows the current NetBird status (`Connected`, `Connecting`, `Idle`) for each host.
+
+Requirements:
+- `netbird` CLI must be installed and authenticated on the operator machine.
+- The NetBird daemon must be running (`netbird status`).
+
+### Migration from YAML Inventory
+
+1. Remove or comment out `inventory_path` from config.
+2. Ensure each K3s host is registered in NetBird with the FQDN convention above.
+3. Optionally override `netbird_host_filter` if your naming scheme differs.
+
+**Rollback**: restore `inventory_path` to reactivate the YAML catalog.
+
+### YAML Inventory (legacy)
+
+When `inventory_path` is set and the path exists, k3ctx reads Ansible YAML files matching `*_hosts.yml`.
+
+Unknown YAML tags, including `!vault`, are ignored.
+
+Expected host fields:
 
 ```yaml
 MY-HOST:

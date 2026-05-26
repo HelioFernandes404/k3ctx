@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/systemframe/k3ctx/internal/bootstrap"
+	"github.com/systemframe/k3ctx/internal/config"
 	"github.com/systemframe/k3ctx/internal/paths"
 	"github.com/systemframe/k3ctx/internal/telemetry"
 )
@@ -87,7 +88,9 @@ var rootCmd = &cobra.Command{
 		if !jsonOutput {
 			jsonOutput = !isTerminal(os.Stdout)
 		}
-		svcs = bootstrap.Build()
+		projectDir, _ := os.Getwd()
+		bootstrapCfg, _ := config.LoadEffectiveConfig(projectDir, os.Getenv("CONFIG_FILE"))
+		svcs = bootstrap.Build(bootstrapCfg)
 		cmdStart = time.Now()
 		telDir := paths.TelemetryDir()
 		w, err := telemetry.NewWriter(telDir, 10*1024*1024, 3)

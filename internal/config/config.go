@@ -18,6 +18,8 @@ const (
 	defaultK3sAPIPort          = 6443
 	defaultPortRangeStart      = 16443
 	defaultPortRangeSize       = 10000
+	defaultNetBirdBinPath      = "netbird"
+	defaultNetBirdHostFilter   = `^sf-[a-z]{3}-(?:[a-z]{2}|us)-[0-9]{5}`
 )
 
 var numericKeys = []string{"k3s_api_port", "port_range_start", "port_range_size"}
@@ -29,6 +31,8 @@ var envMapping = map[string]string{
 	"port_range_start":       "PORT_RANGE_START",
 	"port_range_size":        "PORT_RANGE_SIZE",
 	"inventory_path":         "INVENTORY_PATH",
+	"netbird_bin_path":       "NETBIRD_BIN_PATH",
+	"netbird_host_filter":    "NETBIRD_HOST_FILTER",
 }
 
 // LoadConfig loads config from a YAML file and overlays env vars.
@@ -72,6 +76,19 @@ func GetConfigValue(cfg map[string]any, key string, defaultVal any) any {
 		return v
 	}
 	return defaultVal
+}
+
+// resolveInventoryPathOptional returns the configured inventory path when
+// explicitly set via config or env; returns empty string otherwise.
+// Empty string signals that the NetBird catalog should be used instead.
+func resolveInventoryPathOptional(cfg map[string]any, projectDir string) string {
+	if raw, ok := cfg["inventory_path"].(string); ok && raw != "" {
+		expanded := expandHome(raw)
+		if stat, err := os.Stat(expanded); err == nil && stat.IsDir() {
+			return expanded
+		}
+	}
+	return ""
 }
 
 // ResolveInventoryPath finds the best inventory directory.
@@ -129,13 +146,15 @@ func LoadEffectiveConfig(projectDir, configFilePath string) (domain.EffectiveCon
 	}
 
 	return domain.EffectiveConfig{
-		InventoryPath:       ResolveInventoryPath(cfg, projectDir),
+		InventoryPath:       resolveInventoryPathOptional(cfg, projectDir),
 		SSHConfigPath:       expandHome(defaultSSHConfigPath),
 		SSHKeyPath:          expandHome(strVal(GetConfigValue(cfg, "ssh_key_path", defaultSSHKeyPath))),
 		RemoteK3sConfigPath: strVal(GetConfigValue(cfg, "remote_k3s_config_path", defaultRemoteK3sConfigPath)),
 		K3sAPIPort:          canonicalInt(cfg, "k3s_api_port", defaultK3sAPIPort),
 		PortRangeStart:      canonicalInt(cfg, "port_range_start", defaultPortRangeStart),
 		PortRangeSize:       canonicalInt(cfg, "port_range_size", defaultPortRangeSize),
+		NetBirdBinPath:      strVal(GetConfigValue(cfg, "netbird_bin_path", defaultNetBirdBinPath)),
+		NetBirdHostFilter:   strVal(GetConfigValue(cfg, "netbird_host_filter", defaultNetBirdHostFilter)),
 	}, nil
 }
 

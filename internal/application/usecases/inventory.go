@@ -64,11 +64,15 @@ func SelectTargetsByContextName(contextNames []string, inventoryPath string, cat
 	return selected, missing, nil
 }
 
-// RefreshInventoryIfPossible calls refresher when inventoryPath exists.
-// Returns nil when the path does not exist (skip silently).
+// RefreshInventoryIfPossible calls refresher when the path exists or is empty.
+// An empty path means the active catalog (e.g. NetBird) manages its own source;
+// the refresher is called directly without a filesystem check.
+// Returns nil when the path is non-empty but does not exist on disk.
 func RefreshInventoryIfPossible(inventoryPath string, refresher application.InventoryRefresher) *[2]any {
-	if _, err := os.Stat(inventoryPath); err != nil {
-		return nil
+	if inventoryPath != "" {
+		if _, err := os.Stat(inventoryPath); err != nil {
+			return nil
+		}
 	}
 	ok, msg := refresher.Refresh(inventoryPath)
 	result := [2]any{ok, msg}

@@ -84,7 +84,11 @@ func runHosts(cmd *cobra.Command, args []string) error {
 		if item.SystemframeID != nil {
 			sfID = *item.SystemframeID
 		}
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%-30s  %-15s  %s\n", item.ContextName, ip, sfID)
+		status := ""
+		if item.Status != nil {
+			status = "[" + *item.Status + "] "
+		}
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s%-40s  %-45s  %s\n", status, item.ContextName, ip, sfID)
 	}
 	if page.Page.HasMore {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "(more: --cursor %s)\n", *page.Page.NextCursor)
@@ -95,12 +99,15 @@ func runHosts(cmd *cobra.Command, args []string) error {
 func hostPageToMap(p domain.HostPage) map[string]any {
 	items := make([]map[string]any, len(p.Items))
 	for i, h := range p.Items {
-		var ip, sfID any
+		var ip, sfID, status any
 		if h.AddrIP != nil {
 			ip = *h.AddrIP
 		}
 		if h.SystemframeID != nil {
 			sfID = *h.SystemframeID
+		}
+		if h.Status != nil {
+			status = *h.Status
 		}
 		items[i] = map[string]any{
 			"client":         h.Client,
@@ -108,6 +115,7 @@ func hostPageToMap(p domain.HostPage) map[string]any {
 			"context_name":   h.ContextName,
 			"addr_ip":        ip,
 			"systemframe_id": sfID,
+			"status":         status,
 		}
 	}
 	cursor := any(nil)

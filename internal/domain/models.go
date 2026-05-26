@@ -4,13 +4,15 @@ import "fmt"
 
 // EffectiveConfig holds resolved configuration for a session.
 type EffectiveConfig struct {
-	InventoryPath       string
+	InventoryPath       string // optional; empty activates NetBird catalog
 	SSHConfigPath       string
 	SSHKeyPath          string
 	RemoteK3sConfigPath string
 	K3sAPIPort          int
 	PortRangeStart      int
 	PortRangeSize       int
+	NetBirdBinPath      string // path to netbird binary; default "netbird"
+	NetBirdHostFilter   string // regex applied to hostname label; empty = no filter
 }
 
 // NetworkRequirement describes the network setup needed to reach a cluster.
