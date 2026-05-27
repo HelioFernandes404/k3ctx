@@ -51,6 +51,11 @@ func ConnectCluster(
 		var matched *domain.OperationError
 		if errors.As(connErr, &matched) {
 			opErr = *matched
+			if opErr.Hint == "" && opErr.Detail != "" {
+				opErr.Hint = opErr.Detail
+			}
+		} else {
+			opErr.Hint = connErr.Error()
 		}
 		return domain.NewConnectResult(domain.ConnectResultParams{
 			Success:            false,

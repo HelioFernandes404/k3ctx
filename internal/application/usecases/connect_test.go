@@ -1,6 +1,8 @@
 package usecases_test
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -115,4 +117,36 @@ func TestConnectCluster_ReturnsSpecificPublicErrorForAPIReadinessFailure(t *test
 	require.NotNil(t, result.Err())
 	assert.Equal(t, "kubernetes_api_unreachable", result.Err().Code)
 	assert.Contains(t, result.Err().Message, "did not become ready")
+}
+
+func TestConnectCluster_SetsHintFromRawConnectorError(t *testing.T) {
+	stub := &stubConnector{err: fmt.Errorf("get internal IP: %w", errors.New("ssh: connect to host sf-tst-sp-00003.systemframe.vpn:22: No route to host"))}
+	cfg := buildConfig(t)
+	target := buildTarget("203.0.113.10")
+
+	result, err := usecases.ConnectCluster(target, cfg, stub, true)
+
+	require.NoError(t, err)
+	assert.False(t, result.Success())
+	require.NotNil(t, result.Err())
+	assert.Equal(t, "connect_failed", result.Err().Code)
+	assert.NotEmpty(t, result.Err().Hint, "hint must carry root cause for plain errors")
+	assert.Contains(t, result.Err().Hint, "No route to host")
+}
+
+func TestConnectCluster_SetsHintFromOperationErrorDetail(t *testing.T) {
+	stub := &stubConnector{err: &domain.OperationError{
+		Code:    "kubernetes_api_unreachable",
+		Message: "Kubernetes API did not become ready on https://127.0.0.1:16443",
+		Detail:  "connection refused",
+	}}
+	cfg := buildConfig(t)
+	target := buildTarget("203.0.113.10")
+
+	result, err := usecases.ConnectCluster(target, cfg, stub, true)
+
+	require.NoError(t, err)
+	assert.False(t, result.Success())
+	require.NotNil(t, result.Err())
+	assert.Equal(t, "connection refused", result.Err().Hint, "hint must be populated from Detail when Hint is empty")
 }
