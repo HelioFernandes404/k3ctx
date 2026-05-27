@@ -107,6 +107,9 @@ func runConnect(cmd *cobra.Command, args []string) error {
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Connected: %s%s\n", result.ContextName(), localPort)
 	if result.ArgocdLocalPort() != nil {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "ArgoCD:            http://127.0.0.1:%d\n", *result.ArgocdLocalPort())
+		if !result.ArgocdLoginSuccess() && result.ArgocdLoginMessage() != "" {
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  %s\n", result.ArgocdLoginMessage())
+		}
 	}
 	if result.AlertmanagerLocalPort() != nil {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Alertmanager:      http://127.0.0.1:%d\n", *result.AlertmanagerLocalPort())

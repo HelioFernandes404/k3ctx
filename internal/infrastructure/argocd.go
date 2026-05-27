@@ -39,6 +39,7 @@ type LocalArgocdConnector struct {
 type discoveredArgocdService struct {
 	Namespace string
 	NodePort  int
+	Plaintext bool
 }
 
 type serviceList struct {
@@ -119,6 +120,9 @@ func (c *LocalArgocdConnector) Setup(
 		if discovered := c.discoverService(contextName); discovered != nil {
 			cfg.Namespace = discovered.Namespace
 			cfg.NodePort = &discovered.NodePort
+			if discovered.Plaintext {
+				cfg.Plaintext = true
+			}
 		}
 	}
 	if cfg.NodePort == nil {
@@ -166,16 +170,22 @@ func (c *LocalArgocdConnector) Setup(
 	if cfg.Plaintext {
 		tlsFlag = "--plaintext"
 	}
-	loginArgs := []string{
-		"login", tlsFlag,
-		"--username", "admin",
-		"--password", *password,
-		fmt.Sprintf("127.0.0.1:%d", localPort),
+	buildLoginArgs := func(flag string) []string {
+		return []string{
+			"login", flag,
+			"--username", "admin",
+			"--password", *password,
+			fmt.Sprintf("127.0.0.1:%d", localPort),
+		}
 	}
-	if err := c.runArgocd(loginArgs, 30*time.Second); err != nil {
+	loginErr := c.runArgocd(buildLoginArgs(tlsFlag), 30*time.Second)
+	if loginErr != nil && !cfg.Plaintext {
+		loginErr = c.runArgocd(buildLoginArgs("--plaintext"), 30*time.Second)
+	}
+	if loginErr != nil {
 		return application.ArgocdLoginResult{
 			LocalPort: &localPort,
-			Message:   fmt.Sprintf("argocd login failed: %v", err),
+			Message:   fmt.Sprintf("argocd login failed: %v", loginErr),
 		}, nil
 	}
 
@@ -257,7 +267,11 @@ func discoverArgocdService(contextName string, kubectlRun func([]string) (string
 	})
 
 	best := candidates[0]
-	return &discoveredArgocdService{Namespace: best.item.Metadata.Namespace, NodePort: best.port.NodePort}
+	return &discoveredArgocdService{
+		Namespace: best.item.Metadata.Namespace,
+		NodePort:  best.port.NodePort,
+		Plaintext: isPlaintextPort(best.port),
+	}
 }
 
 func argocdServiceRank(item serviceItem) int {
@@ -295,6 +309,10 @@ func bestNodePort(ports []servicePort) (servicePort, int, bool) {
 		}
 	}
 	return best, bestRank, bestRank > 0
+}
+
+func isPlaintextPort(port servicePort) bool {
+	return strings.ToLower(port.Name) == "http" || port.Port == 80
 }
 
 func argocdPortRank(port servicePort) int {

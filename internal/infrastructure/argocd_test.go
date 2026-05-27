@@ -283,6 +283,81 @@ func TestLocalArgocdConnector_FailsOnLoginError(t *testing.T) {
 	assert.Contains(t, result.Message, "argocd login failed")
 }
 
+// --- Plaintext fallback ---
+
+func TestLocalArgocdConnector_UsesPlaintextForHttpPort(t *testing.T) {
+	var capturedArgs []string
+
+	conn := NewLocalArgocdConnector()
+	conn.isTunnelRunning = func(_, _ string) bool { return true }
+	conn.which = func(_ string) string { return "/usr/bin/argocd" }
+	pwd := "s3cr3t"
+	conn.fetchPassword = func(_, _ string) *string { return &pwd }
+	conn.runArgocd = func(args []string, _ time.Duration) error {
+		capturedArgs = args
+		return nil
+	}
+	conn.discoverService = func(_ string) *discoveredArgocdService {
+		port := 30080
+		return &discoveredArgocdService{Namespace: "argocd", NodePort: port, Plaintext: true}
+	}
+
+	h, u, kf, p, pc, ip := argocdSSHArgs()
+	cfg := domain.ArgocdConfig{Enabled: true, Namespace: "argocd", Discovery: true}
+	result, err := conn.Setup("acme-prod", cfg, h, u, kf, p, pc, ip)
+
+	require.NoError(t, err)
+	assert.True(t, result.Success)
+	assert.Contains(t, capturedArgs, "--plaintext")
+	assert.NotContains(t, capturedArgs, "--insecure")
+}
+
+func TestLocalArgocdConnector_RetriesWithPlaintextOnInsecureFailure(t *testing.T) {
+	callCount := 0
+	var lastArgs []string
+
+	conn := NewLocalArgocdConnector()
+	conn.isTunnelRunning = func(_, _ string) bool { return true }
+	conn.which = func(_ string) string { return "/usr/bin/argocd" }
+	pwd := "s3cr3t"
+	conn.fetchPassword = func(_, _ string) *string { return &pwd }
+	conn.runArgocd = func(args []string, _ time.Duration) error {
+		callCount++
+		lastArgs = args
+		if callCount == 1 {
+			return fmt.Errorf("EOF")
+		}
+		return nil
+	}
+
+	h, u, kf, p, pc, ip := argocdSSHArgs()
+	result, err := conn.Setup("acme-prod", argocdEnabled(30443), h, u, kf, p, pc, ip)
+
+	require.NoError(t, err)
+	assert.True(t, result.Success)
+	assert.Equal(t, 2, callCount)
+	assert.Contains(t, lastArgs, "--plaintext")
+}
+
+func TestLocalArgocdConnector_BothLoginAttemptsFail(t *testing.T) {
+	conn := NewLocalArgocdConnector()
+	conn.isTunnelRunning = func(_, _ string) bool { return true }
+	conn.which = func(_ string) string { return "/usr/bin/argocd" }
+	pwd := "s3cr3t"
+	conn.fetchPassword = func(_, _ string) *string { return &pwd }
+	conn.runArgocd = func(_ []string, _ time.Duration) error {
+		return fmt.Errorf("connection refused")
+	}
+
+	h, u, kf, p, pc, ip := argocdSSHArgs()
+	result, err := conn.Setup("acme-prod", argocdEnabled(30443), h, u, kf, p, pc, ip)
+
+	require.NoError(t, err)
+	assert.False(t, result.Success)
+	assert.NotNil(t, result.LocalPort)
+	assert.Contains(t, result.Message, "argocd login failed")
+}
+
 // --- fetchArgocdPassword ---
 
 func TestFetchArgocdPassword_ReturnsNilOnError(t *testing.T) {

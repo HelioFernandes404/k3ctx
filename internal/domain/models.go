@@ -92,6 +92,8 @@ type ConnectResult struct {
 	networkRequirement       NetworkRequirement
 	err                      *OperationError
 	argocdLocalPort          *int
+	argocdLoginSuccess       bool
+	argocdLoginMessage       string
 	alertmanagerLocalPort    *int
 	victoriaMetricsLocalPort *int
 }
@@ -107,6 +109,8 @@ type ConnectResultParams struct {
 	NetworkRequirement       NetworkRequirement
 	Error                    *OperationError
 	ArgocdLocalPort          *int
+	ArgocdLoginSuccess       bool
+	ArgocdLoginMessage       string
 	AlertmanagerLocalPort    *int
 	VictoriaMetricsLocalPort *int
 }
@@ -129,6 +133,8 @@ func NewConnectResult(p ConnectResultParams) (ConnectResult, error) {
 		networkRequirement:       p.NetworkRequirement,
 		err:                      p.Error,
 		argocdLocalPort:          p.ArgocdLocalPort,
+		argocdLoginSuccess:       p.ArgocdLoginSuccess,
+		argocdLoginMessage:       p.ArgocdLoginMessage,
 		alertmanagerLocalPort:    p.AlertmanagerLocalPort,
 		victoriaMetricsLocalPort: p.VictoriaMetricsLocalPort,
 	}, nil
@@ -143,6 +149,8 @@ func (r ConnectResult) UsedCache() bool                        { return r.usedCa
 func (r ConnectResult) NetworkRequirement() NetworkRequirement { return r.networkRequirement }
 func (r ConnectResult) Err() *OperationError                   { return r.err }
 func (r ConnectResult) ArgocdLocalPort() *int                  { return r.argocdLocalPort }
+func (r ConnectResult) ArgocdLoginSuccess() bool               { return r.argocdLoginSuccess }
+func (r ConnectResult) ArgocdLoginMessage() string             { return r.argocdLoginMessage }
 func (r ConnectResult) AlertmanagerLocalPort() *int            { return r.alertmanagerLocalPort }
 func (r ConnectResult) VictoriaMetricsLocalPort() *int         { return r.victoriaMetricsLocalPort }
 

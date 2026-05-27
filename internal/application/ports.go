@@ -11,6 +11,8 @@ type ConnectionArtifacts struct {
 	TunnelPID                *int
 	UsedCache                bool
 	ArgocdLocalPort          *int
+	ArgocdLoginSuccess       bool
+	ArgocdLoginMessage       string
 	AlertmanagerLocalPort    *int
 	VictoriaMetricsLocalPort *int
 }

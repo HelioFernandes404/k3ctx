@@ -124,6 +124,8 @@ func (c *LocalClusterConnector) Connect(
 	_ = tunnelReused // used only internally; not surfaced in artifacts
 
 	var argocdLocalPort *int
+	var argocdLoginSuccess bool
+	var argocdLoginMessage string
 	if c.ArgocdAdapter != nil {
 		argocdResult, argocdErr := c.ArgocdAdapter.Setup(
 			target.ContextName(), domain.AutoDiscoverArgocdConfig(),
@@ -131,6 +133,8 @@ func (c *LocalClusterConnector) Connect(
 		)
 		if argocdErr == nil {
 			argocdLocalPort = argocdResult.LocalPort
+			argocdLoginSuccess = argocdResult.Success
+			argocdLoginMessage = argocdResult.Message
 		}
 	}
 
@@ -162,6 +166,8 @@ func (c *LocalClusterConnector) Connect(
 		TunnelPID:                tunnelPID,
 		UsedCache:                usedCache,
 		ArgocdLocalPort:          argocdLocalPort,
+		ArgocdLoginSuccess:       argocdLoginSuccess,
+		ArgocdLoginMessage:       argocdLoginMessage,
 		AlertmanagerLocalPort:    alertmanagerLocalPort,
 		VictoriaMetricsLocalPort: victoriaMetricsLocalPort,
 	}, nil

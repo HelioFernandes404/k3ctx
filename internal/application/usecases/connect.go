@@ -69,6 +69,8 @@ func ConnectCluster(
 		UsedCache:                artifacts.UsedCache,
 		NetworkRequirement:       req,
 		ArgocdLocalPort:          artifacts.ArgocdLocalPort,
+		ArgocdLoginSuccess:       artifacts.ArgocdLoginSuccess,
+		ArgocdLoginMessage:       artifacts.ArgocdLoginMessage,
 		AlertmanagerLocalPort:    artifacts.AlertmanagerLocalPort,
 		VictoriaMetricsLocalPort: artifacts.VictoriaMetricsLocalPort,
 	})
