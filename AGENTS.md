@@ -45,6 +45,11 @@
 - Inventory refresh is explicit via `--refresh-inventory`; it runs `git pull --ff-only` only when the inventory repo is clean.
 - Inventory files are Ansible YAML matching `*_hosts.yml`; unknown YAML tags like `!vault` are ignored.
 
+## Release Workflow
+- When a fix or feature is complete and the user approves, always: commit → tag next patch version (`v0.x.y+1`) → `git push origin main --tags` → `make install`.
+- Determine next version with `git tag --sort=-version:refname | head -1` then increment the patch number.
+- Never release without user approval.
+
 ## Safety
 - Do not commit kubeconfigs, inventory, `.env`, keys, local state, or generated `bin/`.
 - Ask before running commands that modify external state, especially real `connect`, tunnel kill commands, package installs, or git commits.
