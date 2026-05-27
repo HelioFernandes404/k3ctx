@@ -8,23 +8,28 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/systemframe/k3ctx/internal/telemetry"
 )
 
-func TestRecordErrorTelemetry_CapturesCmdAndArgs(t *testing.T) {
+func TestRecordErrorTelemetry_CapturesCmdArgsAndFlags(t *testing.T) {
 	dir := t.TempDir()
 	w, err := telemetry.NewWriter(dir, 10*1024*1024, 3)
 	require.NoError(t, err)
 
+	cmd := &cobra.Command{Use: "connect"}
+	cmd.Flags().String("context", "", "context name")
+	require.NoError(t, cmd.Flags().Set("context", "sf-tst-sp-00003"))
+
 	telWriter = w
-	calledCmd = "connect"
-	calledArgs = []string{"--context", "sf-tst-sp-00003"}
+	calledCobraCmd = cmd
+	calledArgs = []string{}
 	t.Cleanup(func() {
 		telWriter = nil
-		calledCmd = ""
+		calledCobraCmd = nil
 		calledArgs = nil
 	})
 
@@ -37,9 +42,10 @@ func TestRecordErrorTelemetry_CapturesCmdAndArgs(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(strings.TrimSpace(string(data))), &evt))
 
 	assert.Equal(t, "connect", evt["cmd"], "cmd must be captured on error path")
-	require.NotNil(t, evt["args"], "args must not be null on error path")
-	args := evt["args"].([]any)
-	assert.Equal(t, []any{"--context", "sf-tst-sp-00003"}, args)
 	assert.Equal(t, false, evt["ok"])
 	assert.Equal(t, "Cluster connection failed", evt["error"])
+
+	require.NotNil(t, evt["flags"], "flags must not be null on error path")
+	flags := evt["flags"].([]any)
+	assert.Contains(t, flags, "--context", "used flags must be captured on error path")
 }

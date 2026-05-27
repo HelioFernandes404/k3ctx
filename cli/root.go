@@ -21,12 +21,12 @@ import (
 var Version = "dev"
 
 var (
-	svcs       bootstrap.ServiceContainer
-	jsonOutput bool
-	cmdStart   time.Time
-	telWriter  *telemetry.Writer
-	calledCmd  string
-	calledArgs []string
+	svcs          bootstrap.ServiceContainer
+	jsonOutput    bool
+	cmdStart      time.Time
+	telWriter     *telemetry.Writer
+	calledCobraCmd *cobra.Command
+	calledArgs    []string
 )
 
 // ExitErr carries a structured exit code through Cobra's error return path.
@@ -87,7 +87,7 @@ var rootCmd = &cobra.Command{
 	Short: "K3s context tunnel manager",
 	Long:  "Manage SSH tunnels and kubectl contexts for K3s clusters.",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		calledCmd = cmd.Name()
+		calledCobraCmd = cmd
 		calledArgs = args
 		if !jsonOutput {
 			jsonOutput = !isTerminal(os.Stdout)
@@ -145,9 +145,20 @@ func recordErrorTelemetry(err error) {
 		return
 	}
 	defer telWriter.Close()
+
+	cmdName := ""
+	var flags []string
+	if calledCobraCmd != nil {
+		cmdName = calledCobraCmd.Name()
+		calledCobraCmd.Flags().Visit(func(f *pflag.Flag) {
+			flags = append(flags, "--"+f.Name)
+		})
+	}
+
 	_ = telWriter.Record(telemetry.Event{
-		Cmd:        calledCmd,
+		Cmd:        cmdName,
 		Args:       calledArgs,
+		Flags:      flags,
 		DurationMs: time.Since(cmdStart).Milliseconds(),
 		Ok:         false,
 		Error:      err.Error(),
