@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -26,6 +27,7 @@ var (
 	connectIP               string
 	connectContext          string
 	connectRefreshInventory bool
+	connectSkipNetbirdCheck bool
 )
 
 func init() {
@@ -36,6 +38,7 @@ func init() {
 	connectCmd.Flags().StringVar(&connectIP, "ip", "", "IP address filter")
 	connectCmd.Flags().StringVar(&connectContext, "context", "", "Exact context name")
 	connectCmd.Flags().BoolVar(&connectRefreshInventory, "refresh-inventory", false, "Refresh inventory")
+	connectCmd.Flags().BoolVar(&connectSkipNetbirdCheck, "skip-netbird-check", false, "Skip NetBird daemon and peer preflight check")
 }
 
 func runConnect(cmd *cobra.Command, args []string) error {
@@ -47,6 +50,16 @@ func runConnect(cmd *cobra.Command, args []string) error {
 
 	if connectRefreshInventory {
 		usecases.RefreshInventoryIfPossible(cfg.InventoryPath, svcs.Refresher)
+	}
+
+	if svcs.Preflight != nil {
+		if preflightErr := svcs.Preflight.CheckDaemonReady(connectSkipNetbirdCheck); preflightErr != nil {
+			var opErr *domain.OperationError
+			if errors.As(preflightErr, &opErr) {
+				return newExitErr(2, opErr.Code, opErr.Message, opErr.Hint)
+			}
+			return newExitErr(2, "NETBIRD_NOT_READY", preflightErr.Error(), "")
+		}
 	}
 
 	q := buildConnectQuery(args)
@@ -82,7 +95,7 @@ func runConnect(cmd *cobra.Command, args []string) error {
 			"Failed to load target for context: "+*resolution.ContextName, "")
 	}
 
-	result, err := usecases.ConnectCluster(*target, cfg, svcs.Connector, false)
+	result, err := usecases.ConnectCluster(*target, cfg, svcs.Connector, svcs.Preflight, connectSkipNetbirdCheck, false)
 	if err != nil {
 		return err
 	}

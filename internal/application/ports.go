@@ -84,3 +84,13 @@ type AlertmanagerConnector interface {
 type VictoriaMetricsConnector interface {
 	Setup(contextName string, cfg domain.VictoriaMetricsConfig, hostname, username string, keyfile *string, port int, proxycmd *string, internalIP string) (VictoriaMetricsResult, error)
 }
+
+// NetBirdPreflightChecker validates NetBird daemon and peer readiness before SSH.
+type NetBirdPreflightChecker interface {
+	// CheckDaemonReady verifies the local NetBird daemon is Connected.
+	// Returns nil when binary is absent (non-NetBird env) or skipCheck is true.
+	CheckDaemonReady(skipCheck bool) error
+	// CheckPeerReady verifies that the target FQDN peer is connected.
+	// Must be called after CheckDaemonReady; returns nil when skipped.
+	CheckPeerReady(fqdn string, skipCheck bool) error
+}

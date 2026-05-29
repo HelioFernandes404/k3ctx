@@ -8,6 +8,19 @@ description: >
   tunnel status, or debug kubectl access that might be missing a tunnel.
 ---
 
+## Preflight check
+
+Before running `connect`, verify the environment is ready:
+
+```bash
+bash skills/k3ctx/scripts/preflight.sh
+```
+
+The script checks: k3ctx binary, config file, NetBird daemon status, SSH key, and active tunnels.
+Exit 0 = all clear. Exit 1 = one or more items need attention.
+
+---
+
 ## Tool location
 
 ```
@@ -68,6 +81,7 @@ will work.
 | Kill one tunnel | `k3ctx tunnel-kill <context>` |
 | Kill all tunnels | `k3ctx tunnel-kill-all` |
 | Re-query NetBird peers | add `--refresh-inventory` to `clients` or `hosts` |
+| Bypass NetBird preflight | `k3ctx connect --skip-netbird-check <target>` |
 
 Structured output: pass the global `--json` flag, e.g. `k3ctx --json hosts systemframe`.
 
@@ -147,16 +161,23 @@ kubectl --request-timeout=10s get --raw=/version
 3. Verify hostname matches the filter regex (`sf-prd-*` / `sf-tst-*` pattern)
 4. Re-query peers: `k3ctx hosts systemframe --refresh-inventory`
 
-**NetBird not running / unauthenticated**
+**`NETBIRD_NOT_READY` — daemon not authenticated or offline**
+`k3ctx connect` checks NetBird status automatically before resolving any host.
+If you see this error, the daemon is offline, not authenticated, or timed out.
 ```bash
-netbird status          # check daemon
-netbird up              # start if needed
+netbird up              # authenticate and start daemon
+# then retry connect
 ```
+Use `--skip-netbird-check` to bypass both preflight checks (non-NetBird environments or scripting).
 
-**Peer shows `[Connecting]` or `[Idle]`**
-The host is registered in NetBird but not reachable. Check the remote machine's
-NetBird daemon. `connect` will still attempt SSH — use `[Connected]` peers for
-reliable connections.
+**`PEER_NOT_CONNECTED` — peer not reachable**
+The target host is registered in NetBird but its status is not `Connected`.
+`connect` fails before SSH — it does not attempt a connection to an unreachable peer.
+Check the remote machine's NetBird daemon, then retry.
+
+**`PEER_NOT_FOUND` — target FQDN absent from peer list**
+The resolved FQDN does not appear in the NetBird peer list at all.
+Run `k3ctx hosts <client> --refresh-inventory` and verify the host exists.
 
 **VPN / sshuttle required**
 If the cluster requires VPN or `sshuttle`, the CLI returns a structured error
@@ -172,3 +193,4 @@ with remediation steps — no interactive prompt.
 - Don't skip `--refresh-inventory` when NetBird peer state may have changed.
 - Don't edit `~/.kube/config` manually — `connect` manages the merge.
 - Don't set `inventory_path` unless using the legacy YAML catalog.
+- Don't troubleshoot `NETBIRD_NOT_READY` with SSH — run `netbird up` first, then retry.

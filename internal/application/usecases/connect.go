@@ -24,12 +24,29 @@ func BuildNetworkRequirement(target domain.ClusterTarget) domain.NetworkRequirem
 
 // ConnectCluster orchestrates a single cluster connection.
 // Returns (result, nil) — errors are encoded into result.Err().
+// preflight may be nil, in which case the peer check is skipped.
 func ConnectCluster(
 	target domain.ClusterTarget,
 	config domain.EffectiveConfig,
 	connector application.ClusterConnector,
+	preflight application.NetBirdPreflightChecker,
+	skipNetbird bool,
 	allowManualNetwork bool,
 ) (domain.ConnectResult, error) {
+	if preflight != nil {
+		fqdn, _ := target.HostConfig()["ansible_host"].(string)
+		if err := preflight.CheckPeerReady(fqdn, skipNetbird); err != nil {
+			var opErr *domain.OperationError
+			if errors.As(err, &opErr) {
+				return domain.NewConnectResult(domain.ConnectResultParams{
+					Success:     false,
+					ContextName: target.ContextName(),
+					Error:       opErr,
+				})
+			}
+		}
+	}
+
 	req := BuildNetworkRequirement(target)
 
 	if !allowManualNetwork && (req.NeedsVPN || (req.Type != nil && *req.Type == "sshuttle")) {
@@ -86,11 +103,13 @@ func ConnectMultiple(
 	targets []domain.ClusterTarget,
 	config domain.EffectiveConfig,
 	connector application.ClusterConnector,
+	preflight application.NetBirdPreflightChecker,
+	skipNetbird bool,
 	allowManualNetwork bool,
 ) ([]domain.ConnectResult, error) {
 	results := make([]domain.ConnectResult, 0, len(targets))
 	for _, target := range targets {
-		r, err := ConnectCluster(target, config, connector, allowManualNetwork)
+		r, err := ConnectCluster(target, config, connector, preflight, skipNetbird, allowManualNetwork)
 		if err != nil {
 			return nil, err
 		}

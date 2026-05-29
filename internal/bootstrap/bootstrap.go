@@ -19,6 +19,7 @@ type ServiceContainer struct {
 	Argocd          application.ArgocdConnector
 	Alertmanager    application.AlertmanagerConnector
 	VictoriaMetrics application.VictoriaMetricsConnector
+	Preflight       application.NetBirdPreflightChecker
 }
 
 // Build creates a ServiceContainer with adapters selected from cfg.
@@ -57,5 +58,6 @@ func Build(cfg domain.EffectiveConfig) ServiceContainer {
 		Argocd:          argocd,
 		Alertmanager:    alertmanager,
 		VictoriaMetrics: victoriaMetrics,
+		Preflight:       infrastructure.NewNetBirdPreflightChecker(cfg.NetBirdBinPath),
 	}
 }

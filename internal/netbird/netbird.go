@@ -18,16 +18,32 @@ type peersSection struct {
 }
 
 type statusOutput struct {
-	Peers peersSection `json:"peers"`
+	Status string       `json:"status"`
+	Peers  peersSection `json:"peers"`
+}
+
+// StatusResult holds the parsed output of `netbird status --json`.
+type StatusResult struct {
+	DaemonStatus string
+	Peers        []Peer
+}
+
+// ParseStatus decodes the JSON output of `netbird status --json` into a StatusResult.
+func ParseStatus(data []byte) (StatusResult, error) {
+	var out statusOutput
+	if err := json.Unmarshal(data, &out); err != nil {
+		return StatusResult{}, fmt.Errorf("parse netbird status: %w", err)
+	}
+	return StatusResult{DaemonStatus: out.Status, Peers: out.Peers.Details}, nil
 }
 
 // ParsePeers decodes the JSON output of `netbird status --json`.
 func ParsePeers(data []byte) ([]Peer, error) {
-	var out statusOutput
-	if err := json.Unmarshal(data, &out); err != nil {
-		return nil, fmt.Errorf("parse netbird status: %w", err)
+	r, err := ParseStatus(data)
+	if err != nil {
+		return nil, err
 	}
-	return out.Peers.Details, nil
+	return r.Peers, nil
 }
 
 // RunStatus executes `netbird status --json` and returns raw JSON output.

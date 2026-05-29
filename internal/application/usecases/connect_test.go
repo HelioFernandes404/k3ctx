@@ -13,6 +13,28 @@ import (
 	"github.com/systemframe/k3ctx/internal/domain"
 )
 
+// --- Stub preflight ---
+
+type stubPreflight struct {
+	daemonErr   error
+	peerErr     error
+	daemonCalls int
+	peerCalls   int
+}
+
+func (s *stubPreflight) CheckDaemonReady(_ bool) error {
+	s.daemonCalls++
+	return s.daemonErr
+}
+
+func (s *stubPreflight) CheckPeerReady(_ string, skipCheck bool) error {
+	if skipCheck {
+		return nil
+	}
+	s.peerCalls++
+	return s.peerErr
+}
+
 // --- Stub connector ---
 
 type stubConnector struct {
@@ -60,7 +82,7 @@ func TestConnectCluster_DelegatesToConnectorAndReturnsStructuredResult(t *testin
 	cfg := buildConfig(t)
 	target := buildTarget("203.0.113.10")
 
-	result, err := usecases.ConnectCluster(target, cfg, stub, true)
+	result, err := usecases.ConnectCluster(target, cfg, stub, nil, false, true)
 
 	require.NoError(t, err)
 	assert.True(t, result.Success())
@@ -78,7 +100,7 @@ func TestConnectCluster_BlocksWhenManualNetworkSetupRequired(t *testing.T) {
 	cfg := buildConfig(t)
 	target := buildTarget("10.0.0.10") // private IP → sshuttle requirement
 
-	result, err := usecases.ConnectCluster(target, cfg, stub, false)
+	result, err := usecases.ConnectCluster(target, cfg, stub, nil, false, false)
 
 	require.NoError(t, err)
 	assert.False(t, result.Success())
@@ -94,7 +116,7 @@ func TestConnectMultiple_PreservesTargetOrder(t *testing.T) {
 	second := domain.NewClusterTarget("beta", "staging", "k3s_cluster",
 		map[string]any{"ansible_host": "203.0.113.11"}, nil)
 
-	results, err := usecases.ConnectMultiple([]domain.ClusterTarget{first, second}, cfg, stub, true)
+	results, err := usecases.ConnectMultiple([]domain.ClusterTarget{first, second}, cfg, stub, nil, false, true)
 
 	require.NoError(t, err)
 	require.Len(t, results, 2)
@@ -110,7 +132,7 @@ func TestConnectCluster_ReturnsSpecificPublicErrorForAPIReadinessFailure(t *test
 	cfg := buildConfig(t)
 	target := buildTarget("203.0.113.10")
 
-	result, err := usecases.ConnectCluster(target, cfg, stub, true)
+	result, err := usecases.ConnectCluster(target, cfg, stub, nil, false, true)
 
 	require.NoError(t, err)
 	assert.False(t, result.Success())
@@ -124,7 +146,7 @@ func TestConnectCluster_SetsHintFromRawConnectorError(t *testing.T) {
 	cfg := buildConfig(t)
 	target := buildTarget("203.0.113.10")
 
-	result, err := usecases.ConnectCluster(target, cfg, stub, true)
+	result, err := usecases.ConnectCluster(target, cfg, stub, nil, false, true)
 
 	require.NoError(t, err)
 	assert.False(t, result.Success())
@@ -143,10 +165,76 @@ func TestConnectCluster_SetsHintFromOperationErrorDetail(t *testing.T) {
 	cfg := buildConfig(t)
 	target := buildTarget("203.0.113.10")
 
-	result, err := usecases.ConnectCluster(target, cfg, stub, true)
+	result, err := usecases.ConnectCluster(target, cfg, stub, nil, false, true)
 
 	require.NoError(t, err)
 	assert.False(t, result.Success())
 	require.NotNil(t, result.Err())
 	assert.Equal(t, "connection refused", result.Err().Hint, "hint must be populated from Detail when Hint is empty")
+}
+
+func TestConnectCluster_PeerCheckFailure_AbortsBeforeConnector(t *testing.T) {
+	stub := &stubConnector{artifacts: application.ConnectionArtifacts{LocalPort: 16443, InternalIP: "10.0.0.10"}}
+	preflight := &stubPreflight{peerErr: &domain.OperationError{
+		Code:    domain.ErrCodePeerNotConnected,
+		Message: "NetBird target peer is not connected",
+		Hint:    "peer is Connecting",
+	}}
+	cfg := buildConfig(t)
+	target := buildTarget("sf-prd-us-00001.systemframe.vpn")
+
+	result, err := usecases.ConnectCluster(target, cfg, stub, preflight, false, true)
+
+	require.NoError(t, err)
+	assert.False(t, result.Success())
+	require.NotNil(t, result.Err())
+	assert.Equal(t, domain.ErrCodePeerNotConnected, result.Err().Code)
+	assert.Empty(t, stub.calls, "connector must not be called when peer check fails")
+	assert.Equal(t, 1, preflight.peerCalls)
+}
+
+func TestConnectCluster_PeerCheckSkipped_WhenSkipFlagTrue(t *testing.T) {
+	pid := 1111
+	stub := &stubConnector{artifacts: application.ConnectionArtifacts{LocalPort: 16443, InternalIP: "10.0.0.10", TunnelPID: &pid}}
+	preflight := &stubPreflight{peerErr: &domain.OperationError{
+		Code: domain.ErrCodePeerNotConnected, Message: "would fail",
+	}}
+	cfg := buildConfig(t)
+	target := buildTarget("sf-prd-us-00001.systemframe.vpn")
+
+	result, err := usecases.ConnectCluster(target, cfg, stub, preflight, true, true)
+
+	require.NoError(t, err)
+	assert.True(t, result.Success(), "skip flag must bypass peer check")
+}
+
+func TestConnectCluster_NilPreflight_ConnectsNormally(t *testing.T) {
+	pid := 2222
+	stub := &stubConnector{artifacts: application.ConnectionArtifacts{LocalPort: 16443, InternalIP: "10.0.0.10", TunnelPID: &pid}}
+	cfg := buildConfig(t)
+	target := buildTarget("sf-prd-us-00001.systemframe.vpn")
+
+	result, err := usecases.ConnectCluster(target, cfg, stub, nil, false, true)
+
+	require.NoError(t, err)
+	assert.True(t, result.Success())
+}
+
+func TestConnectCluster_PeerNotFound_AbortsWithPeerNotFoundCode(t *testing.T) {
+	stub := &stubConnector{}
+	preflight := &stubPreflight{peerErr: &domain.OperationError{
+		Code:    domain.ErrCodePeerNotFound,
+		Message: "NetBird target peer not found",
+		Hint:    "Verify the host is enrolled",
+	}}
+	cfg := buildConfig(t)
+	target := buildTarget("unknown-host.systemframe.vpn")
+
+	result, err := usecases.ConnectCluster(target, cfg, stub, preflight, false, true)
+
+	require.NoError(t, err)
+	assert.False(t, result.Success())
+	require.NotNil(t, result.Err())
+	assert.Equal(t, domain.ErrCodePeerNotFound, result.Err().Code)
+	assert.Empty(t, stub.calls)
 }
