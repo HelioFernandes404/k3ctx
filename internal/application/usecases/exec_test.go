@@ -2,6 +2,7 @@ package usecases_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,12 +14,15 @@ import (
 )
 
 type stubClusterExec struct {
+	mu      sync.Mutex
 	called  []string
 	results map[string]application.ExecResult
 }
 
 func (s *stubClusterExec) ExecOnContext(_ context.Context, contextName string, _ []string) application.ExecResult {
+	s.mu.Lock()
 	s.called = append(s.called, contextName)
+	s.mu.Unlock()
 	if r, ok := s.results[contextName]; ok {
 		return r
 	}
