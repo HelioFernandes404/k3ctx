@@ -34,7 +34,7 @@ func makeStatusJSON(daemonStatus string, peers []map[string]string) string {
 		Details []peerJSON `json:"details"`
 	}
 	type statusJSON struct {
-		Status string    `json:"status"`
+		Status string    `json:"daemonStatus"`
 		Peers  peersJSON `json:"peers"`
 	}
 	ps := make([]peerJSON, 0, len(peers))

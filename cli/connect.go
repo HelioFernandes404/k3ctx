@@ -230,9 +230,19 @@ func buildConnectQuery(args []string) domain.HostQuery {
 	if connectContext != "" {
 		q.ContextName = &connectContext
 	}
-	if len(args) > 0 {
+	switch len(args) {
+	case 1:
 		query := args[0]
 		q.Query = &query
+	case 2:
+		if q.Client == nil {
+			c := args[0]
+			q.Client = &c
+		}
+		if q.HostName == nil {
+			h := args[1]
+			q.HostName = &h
+		}
 	}
 	return q
 }

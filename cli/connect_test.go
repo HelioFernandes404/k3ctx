@@ -99,6 +99,45 @@ func TestRunConnect_DryRun_NoMatch_ReturnsError(t *testing.T) {
 	assert.Equal(t, "NO_MATCH", exitErr.ECode)
 }
 
+func TestBuildConnectQuery_TwoArgs_SetsClientAndHostName(t *testing.T) {
+	q := buildConnectQuery([]string{"systemframe", "sf-tst-sp-00003"})
+	require.NotNil(t, q.Client)
+	assert.Equal(t, "systemframe", *q.Client)
+	require.NotNil(t, q.HostName)
+	assert.Equal(t, "sf-tst-sp-00003", *q.HostName)
+	assert.Nil(t, q.Query)
+}
+
+func TestBuildConnectQuery_OneArg_SetsQuery(t *testing.T) {
+	q := buildConnectQuery([]string{"sf-tst-sp-00003"})
+	require.NotNil(t, q.Query)
+	assert.Equal(t, "sf-tst-sp-00003", *q.Query)
+	assert.Nil(t, q.Client)
+	assert.Nil(t, q.HostName)
+}
+
+func TestRunConnect_TwoArgs_ResolvesSpecificHostBySfID(t *testing.T) {
+	t1 := domain.NewClusterTarget("systemframe", "sf-prd-us-00002", "k3s", map[string]any{"addr": "sf-prd-us-00002.systemframe.vpn"}, nil)
+	t2 := domain.NewClusterTarget("systemframe", "sf-tst-sp-00003", "k3s", map[string]any{"addr": "sf-tst-sp-00003.systemframe.vpn"}, nil)
+	svcs.Catalog = &mockCatalog{targets: []domain.ClusterTarget{t1, t2}}
+	svcs.Connector = &mockConnector{err: nil}
+	connectDryRun = true
+	jsonOutput = true
+	t.Cleanup(func() { connectDryRun = false; jsonOutput = false; svcs.Connector = nil })
+
+	var buf bytes.Buffer
+	connectCmd.SetOut(&buf)
+	t.Cleanup(func() { connectCmd.SetOut(nil) })
+
+	err := runConnect(connectCmd, []string{"systemframe", "sf-tst-sp-00003"})
+	require.NoError(t, err)
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
+	data := got["data"].(map[string]any)
+	assert.Equal(t, "systemframe-sf-tst-sp-00003", data["context_name"])
+}
+
 func TestRunConnect_AllHosts_NoMatch(t *testing.T) {
 	svcs.Catalog = &mockCatalog{targets: []domain.ClusterTarget{
 		domain.NewClusterTarget("other", "host1", "k3s", map[string]any{"addr": "10.0.0.1"}, nil),

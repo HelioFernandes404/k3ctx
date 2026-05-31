@@ -18,7 +18,7 @@ type peersSection struct {
 }
 
 type statusOutput struct {
-	Status string       `json:"status"`
+	Status string       `json:"daemonStatus"`
 	Peers  peersSection `json:"peers"`
 }
 
