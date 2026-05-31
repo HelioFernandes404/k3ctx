@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/systemframe/k3ctx/internal/application/usecases"
+	"github.com/systemframe/k3ctx/internal/kubeconfig"
 )
 
 var statusCmd = &cobra.Command{
@@ -23,12 +24,20 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
+	currentCtx, _ := kubeconfig.GetCurrentContext()
+
 	if jsonOutput {
 		enc := json.NewEncoder(cmd.OutOrStdout())
 		enc.SetIndent("", "  ")
-		return enc.Encode(jsonEnvelope(cmd, items))
+		return enc.Encode(jsonEnvelope(cmd, map[string]any{
+			"current_context": currentCtx,
+			"tunnels":         items,
+		}))
 	}
 
+	if currentCtx != "" {
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Current context: %s\n", currentCtx)
+	}
 	if len(items) == 0 {
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No active tunnels.")
 		return nil

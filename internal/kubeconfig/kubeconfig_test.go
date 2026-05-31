@@ -215,6 +215,44 @@ users:
 	assert.FileExists(t, filepath.Join(kubeDir, "config.bak"))
 }
 
+// --- GetCurrentContext ---
+
+func TestGetCurrentContext_ReturnsCurrent(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	kubeDir := filepath.Join(tmp, ".kube")
+	require.NoError(t, os.Mkdir(kubeDir, 0o755))
+	writeYAML(t, filepath.Join(kubeDir, "config"), map[string]any{
+		"apiVersion":      "v1",
+		"current-context": "acme-prod",
+	})
+
+	ctx, err := kubeconfig.GetCurrentContext()
+	require.NoError(t, err)
+	assert.Equal(t, "acme-prod", ctx)
+}
+
+func TestGetCurrentContext_EmptyWhenFileMissing(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+
+	ctx, err := kubeconfig.GetCurrentContext()
+	require.NoError(t, err)
+	assert.Equal(t, "", ctx)
+}
+
+func TestGetCurrentContext_EmptyWhenFieldAbsent(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	kubeDir := filepath.Join(tmp, ".kube")
+	require.NoError(t, os.Mkdir(kubeDir, 0o755))
+	writeYAML(t, filepath.Join(kubeDir, "config"), map[string]any{"apiVersion": "v1"})
+
+	ctx, err := kubeconfig.GetCurrentContext()
+	require.NoError(t, err)
+	assert.Equal(t, "", ctx)
+}
+
 func loadYAML(t *testing.T, p string) map[string]any {
 	t.Helper()
 	data, err := os.ReadFile(p)

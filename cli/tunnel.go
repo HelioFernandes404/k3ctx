@@ -3,9 +3,6 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -80,52 +77,59 @@ func runTunnelList(cmd *cobra.Command, _ []string) error {
 	return nil
 }
 
-func runTunnelKill(_ *cobra.Command, args []string) error {
+func runTunnelKill(cmd *cobra.Command, args []string) error {
 	if !tunnelKillYes {
 		return newExitErr(1, "REQUIRES_CONFIRMATION",
 			"tunnel-kill requires --yes flag",
 			"Pass --yes to confirm termination of tunnel: "+args[0])
 	}
-	return usecases.KillTunnel(args[0], svcs.Tunnels)
+	if err := usecases.KillTunnel(args[0], svcs.Tunnels); err != nil {
+		return err
+	}
+	if jsonOutput {
+		enc := json.NewEncoder(cmd.OutOrStdout())
+		return enc.Encode(jsonEnvelope(cmd, map[string]any{
+			"context_name": args[0],
+			"killed":       true,
+		}))
+	}
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Killed: %s\n", args[0])
+	return nil
 }
 
 func runTunnelReconnect(cmd *cobra.Command, args []string) error {
 	contextName := args[0]
 	localPort, err := usecases.ReconnectTunnel(contextName, svcs.Reconnector)
 	if err != nil {
-		if jsonOutput {
-			enc := json.NewEncoder(cmd.OutOrStdout())
-			return enc.Encode(map[string]any{
-				"ok":           false,
-				"context_name": contextName,
-				"error":        err.Error(),
-			})
-		}
 		return err
 	}
 	if jsonOutput {
 		enc := json.NewEncoder(cmd.OutOrStdout())
-		return enc.Encode(map[string]any{
-			"ok":           true,
+		return enc.Encode(jsonEnvelope(cmd, map[string]any{
 			"context_name": contextName,
 			"local_port":   localPort,
-		})
+		}))
 	}
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s reconnected on localhost:%d\n", contextName, localPort)
 	return nil
 }
 
-func runTunnelKillAll(_ *cobra.Command, _ []string) error {
+func runTunnelKillAll(cmd *cobra.Command, _ []string) error {
 	if !tunnelKillAllYes {
 		return newExitErr(1, "REQUIRES_CONFIRMATION",
 			"tunnel-kill-all requires --yes flag",
 			"Pass --yes to confirm termination of all tunnels")
 	}
-	stateDir := filepath.Join(os.Getenv("HOME"), ".local", "state", "k3ctx-tunnels")
-	entries, _ := filepath.Glob(filepath.Join(stateDir, "*.pid"))
-	for _, pidFile := range entries {
-		ctx := strings.TrimSuffix(filepath.Base(pidFile), ".pid")
-		_ = usecases.KillTunnel(ctx, svcs.Tunnels)
+	killed, err := usecases.KillAllTunnels(svcs.Status, svcs.Tunnels)
+	if err != nil {
+		return err
+	}
+	if jsonOutput {
+		enc := json.NewEncoder(cmd.OutOrStdout())
+		return enc.Encode(jsonEnvelope(cmd, map[string]any{"killed": killed}))
+	}
+	for _, name := range killed {
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Killed: %s\n", name)
 	}
 	return nil
 }

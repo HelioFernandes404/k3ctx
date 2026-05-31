@@ -49,3 +49,13 @@ func (m *mockStatusReader) ListContextStatus() ([]map[string]any, error) {
 func (m *mockStatusReader) ValidateContextNetwork(_ string) (map[string]any, error) {
 	return map[string]any{}, nil
 }
+
+// mockReconnector implements application.TunnelReconnector.
+type mockReconnector struct {
+	port int
+	err  error
+}
+
+func (m *mockReconnector) ReconnectTunnel(_ string) (int, error) {
+	return m.port, m.err
+}

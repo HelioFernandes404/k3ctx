@@ -13,6 +13,24 @@ func defaultKubeconfigPath() string {
 	return filepath.Join(os.Getenv("HOME"), ".kube", "config")
 }
 
+// GetCurrentContext returns the active kubectl context name from ~/.kube/config.
+// Returns ("", nil) when the file is absent or the field is missing.
+func GetCurrentContext() (string, error) {
+	data, err := os.ReadFile(defaultKubeconfigPath())
+	if os.IsNotExist(err) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("read kubeconfig: %w", err)
+	}
+	var cfg map[string]any
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return "", fmt.Errorf("parse kubeconfig: %w", err)
+	}
+	ctx, _ := cfg["current-context"].(string)
+	return ctx, nil
+}
+
 // UpdateKubeconfigServer rewrites the first cluster's server URL.
 // When useLocalhost is true, uses 127.0.0.1:localPort instead of ip:port.
 func UpdateKubeconfigServer(yamlText, ip string, port int, useLocalhost bool, localPort int) (string, error) {

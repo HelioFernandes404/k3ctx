@@ -70,3 +70,35 @@ func TestReconnectTunnel_PassesExactContextName(t *testing.T) {
 	_, _ = usecases.ReconnectTunnel("beta-staging", rec)
 	assert.Equal(t, []string{"beta-staging"}, rec.reconnected)
 }
+
+func TestKillAllTunnels_KillsAllRunning(t *testing.T) {
+	reader := &stubStatusReader{statusItems: []map[string]any{
+		{"context_name": "acme-prod", "tunnel_running": true},
+		{"context_name": "beta-staging", "tunnel_running": true},
+		{"context_name": "gamma-dev", "tunnel_running": false},
+	}}
+	mgr := &stubTunnelManager{}
+	killed, err := usecases.KillAllTunnels(reader, mgr)
+	require.NoError(t, err)
+	assert.ElementsMatch(t, []string{"acme-prod", "beta-staging"}, killed)
+	assert.ElementsMatch(t, []string{"acme-prod", "beta-staging"}, mgr.killed)
+}
+
+func TestKillAllTunnels_ReturnsEmptyWhenNoneRunning(t *testing.T) {
+	reader := &stubStatusReader{statusItems: []map[string]any{
+		{"context_name": "acme-prod", "tunnel_running": false},
+	}}
+	mgr := &stubTunnelManager{}
+	killed, err := usecases.KillAllTunnels(reader, mgr)
+	require.NoError(t, err)
+	assert.Empty(t, killed)
+	assert.Empty(t, mgr.killed)
+}
+
+func TestKillAllTunnels_ReturnsEmptyWhenNoTunnels(t *testing.T) {
+	reader := &stubStatusReader{statusItems: []map[string]any{}}
+	mgr := &stubTunnelManager{}
+	killed, err := usecases.KillAllTunnels(reader, mgr)
+	require.NoError(t, err)
+	assert.Empty(t, killed)
+}

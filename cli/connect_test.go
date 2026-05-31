@@ -57,6 +57,48 @@ func TestRunConnect_CatalogError(t *testing.T) {
 
 // --- --all-hosts ---
 
+// --- --dry-run ---
+
+func TestRunConnect_DryRun_ReturnsResolutionWithoutConnecting(t *testing.T) {
+	svcs.Catalog = &mockCatalog{targets: []domain.ClusterTarget{
+		domain.NewClusterTarget("acme", "prod", "k3s", map[string]any{"addr": "10.0.0.1"}, nil),
+	}}
+	// If connector were called it would return an error — dry-run must skip it.
+	svcs.Connector = &mockConnector{err: errors.New("should not be called")}
+	connectDryRun = true
+	jsonOutput = true
+	t.Cleanup(func() { connectDryRun = false; jsonOutput = false; svcs.Connector = nil })
+
+	var buf bytes.Buffer
+	connectCmd.SetOut(&buf)
+	t.Cleanup(func() { connectCmd.SetOut(nil) })
+
+	err := runConnect(connectCmd, []string{"acme-prod"})
+	require.NoError(t, err)
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
+	assert.Equal(t, true, got["ok"])
+	data := got["data"].(map[string]any)
+	assert.Equal(t, true, data["dry_run"])
+	assert.Equal(t, "acme-prod", data["context_name"])
+	assert.Equal(t, "acme", data["client"])
+	assert.Equal(t, "prod", data["host"])
+}
+
+func TestRunConnect_DryRun_NoMatch_ReturnsError(t *testing.T) {
+	svcs.Catalog = &mockCatalog{targets: []domain.ClusterTarget{}}
+	connectDryRun = true
+	t.Cleanup(func() { connectDryRun = false })
+
+	err := runConnect(connectCmd, []string{"nonexistent"})
+
+	require.Error(t, err)
+	var exitErr *ExitErr
+	require.ErrorAs(t, err, &exitErr)
+	assert.Equal(t, "NO_MATCH", exitErr.ECode)
+}
+
 func TestRunConnect_AllHosts_NoMatch(t *testing.T) {
 	svcs.Catalog = &mockCatalog{targets: []domain.ClusterTarget{
 		domain.NewClusterTarget("other", "host1", "k3s", map[string]any{"addr": "10.0.0.1"}, nil),

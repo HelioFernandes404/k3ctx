@@ -19,12 +19,14 @@ var clientsCmd = &cobra.Command{
 var (
 	clientsLimit  int
 	clientsCursor string
+	clientsAll    bool
 )
 
 func init() {
 	rootCmd.AddCommand(clientsCmd)
 	clientsCmd.Flags().IntVar(&clientsLimit, "limit", 20, "Max results per page")
 	clientsCmd.Flags().StringVar(&clientsCursor, "cursor", "", "Pagination cursor")
+	clientsCmd.Flags().BoolVar(&clientsAll, "all", false, "Return all clients without pagination")
 }
 
 func runClients(cmd *cobra.Command, args []string) error {
@@ -32,6 +34,25 @@ func runClients(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		s := args[0]
 		q.Query = &s
+	}
+
+	if clientsAll {
+		page, err := usecases.ListClientSummaries(svcs.Catalog, 0, "")
+		if err != nil {
+			return err
+		}
+		items := make([]map[string]any, len(page.Items))
+		for i, c := range page.Items {
+			items[i] = map[string]any{"client": c.Client, "host_count": c.HostCount}
+		}
+		if jsonOutput {
+			enc := json.NewEncoder(cmd.OutOrStdout())
+			return enc.Encode(jsonEnvelope(cmd, map[string]any{"items": items}))
+		}
+		for _, item := range page.Items {
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%-30s  %d hosts\n", item.Client, item.HostCount)
+		}
+		return nil
 	}
 
 	page, err := usecases.ListClientSummaries(svcs.Catalog, clientsLimit, clientsCursor)

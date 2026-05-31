@@ -2,10 +2,10 @@
 name: k3ctx
 description: >
   Workflow guide for k3ctx, the CLI that discovers K3s cluster hosts from NetBird
-  peers, opens SSH tunnels, merges kubeconfig contexts, and enables kubectl/k9s
-  access. Use this skill when the user wants to connect to a cluster, manage
-  tunnels, switch kubectl contexts, use k9s, list available clusters, check
-  tunnel status, or debug kubectl access that might be missing a tunnel.
+  peers, opens SSH tunnels, and merges kubeconfig contexts. Use this skill when
+  the user wants to connect to a cluster, manage tunnels, switch kubectl contexts,
+  list available clusters, check tunnel status, or debug kubectl access that
+  might be missing a tunnel.
 ---
 
 ## Preflight check
@@ -45,19 +45,23 @@ context name:
 ```bash
 # 1. List clients (derived from NetBird FQDN domain label)
 k3ctx clients
+k3ctx clients --all          # return full list without pagination
 
 # 2. List hosts in a client — shows [Connected]/[Connecting]/[Idle] status
 k3ctx hosts <client>
+k3ctx hosts <client> --all   # return full list without pagination
 k3ctx hosts <client> --host <filter> --limit 10
 
-# 3. Connect (1–3 identifiers; fails deterministically if ambiguous)
+# 3. (Optional) Dry-run — resolve host without opening a tunnel
+k3ctx connect --dry-run <client> <host>
+
+# 4. Connect (1–3 identifiers; fails deterministically if ambiguous)
 k3ctx connect <client> <host>
 k3ctx connect --context <context-name>
-k3ctx connect --ip <netbird-ip>
+k3ctx connect --addr <netbird-fqdn>
 
-# 4. Validate / launch k9s
+# 5. Validate
 k3ctx status
-k3ctx k9s
 ```
 
 `connect` opens an SSH tunnel to the peer FQDN, fetches the kubeconfig, and
@@ -72,18 +76,35 @@ will work.
 | Goal | Command |
 |------|---------|
 | List clients | `k3ctx clients` |
+| List ALL clients | `k3ctx clients --all` |
 | Search hosts | `k3ctx hosts systemframe --host prd` |
+| List ALL hosts in a client | `k3ctx hosts systemframe --all` |
+| Dry-run connect (resolve only) | `k3ctx connect --dry-run systemframe prd-us-00001` |
 | Connect by context | `k3ctx connect --context systemframe-sf-prd-us-00001` |
 | Connect by host substring | `k3ctx connect systemframe prd-us-00001` |
+| Connect to all hosts of a client | `k3ctx connect --all-hosts systemframe` |
 | Check active tunnels | `k3ctx tunnel-list` |
-| Check context/tunnel state | `k3ctx status` or `k3ctx --json status` |
-| Launch k9s | `k3ctx k9s` |
-| Kill one tunnel | `k3ctx tunnel-kill <context>` |
-| Kill all tunnels | `k3ctx tunnel-kill-all` |
+| Check context/tunnel state | `k3ctx status` |
+| Re-establish a broken tunnel | `k3ctx tunnel-reconnect <context>` |
+| Kill one tunnel | `k3ctx tunnel-kill --yes <context>` |
+| Kill all tunnels | `k3ctx tunnel-kill-all --yes` |
+| Run kubectl on all live contexts | `k3ctx exec -- get pods -A` |
+| Print CLI schema (all commands/flags) | `k3ctx schema` |
 | Re-query NetBird peers | add `--refresh-inventory` to `clients` or `hosts` |
 | Bypass NetBird preflight | `k3ctx connect --skip-netbird-check <target>` |
 
-Structured output: pass the global `--json` flag, e.g. `k3ctx --json hosts systemframe`.
+**JSON output:** enabled automatically when stdout is not a TTY (e.g. when called by Claude Code). Force it manually with `--json`.
+
+**`status` JSON shape:**
+```json
+{"ok": true, "command": "status", "data": {"current_context": "acme-prod", "tunnels": [...]}}
+```
+Each tunnel item has: `context_name`, `tunnel_running` (bool), `liveness` (`"live"` / `"stale"` / `"dead"`).
+
+**`schema` command:** returns a full JSON manifest of all commands, flags, exit codes, and error codes. Call it once to orient before using other commands:
+```bash
+k3ctx schema | jq .data.commands
+```
 
 ---
 
@@ -187,7 +208,7 @@ with remediation steps — no interactive prompt.
 
 ## What NOT to do
 
-- Don't call `kubectl` or `k9s` directly without first verifying a tunnel is active (`status`).
+- Don't call `kubectl` directly without first verifying a tunnel is active (`k3ctx status`).
 - Don't run `connect` without at least one identifier — it fails deterministically.
 - Don't hardcode IPs — use FQDN-based discovery via `clients`/`hosts`.
 - Don't skip `--refresh-inventory` when NetBird peer state may have changed.

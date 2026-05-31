@@ -23,6 +23,7 @@ var (
 	hostsHostFilter string
 	hostsIDFilter   string
 	hostsAddrFilter string
+	hostsAll        bool
 )
 
 func init() {
@@ -32,6 +33,7 @@ func init() {
 	hostsCmd.Flags().StringVar(&hostsHostFilter, "host", "", "Filter by host name (substring)")
 	hostsCmd.Flags().StringVar(&hostsIDFilter, "id", "", "Filter by systemframe_id")
 	hostsCmd.Flags().StringVar(&hostsAddrFilter, "addr", "", "Filter by address (FQDN)")
+	hostsCmd.Flags().BoolVar(&hostsAll, "all", false, "Return all hosts without pagination")
 }
 
 func runHosts(cmd *cobra.Command, args []string) error {
@@ -51,6 +53,22 @@ func runHosts(cmd *cobra.Command, args []string) error {
 		q.Addr = &hostsAddrFilter
 	}
 
+	if hostsAll {
+		page, err := usecases.SearchHosts(svcs.Catalog, q, 0, "")
+		if err != nil {
+			return err
+		}
+		items := hostItemsToMaps(page.Items)
+		if jsonOutput {
+			enc := json.NewEncoder(cmd.OutOrStdout())
+			return enc.Encode(jsonEnvelope(cmd, map[string]any{"items": items}))
+		}
+		for _, item := range page.Items {
+			printHostLine(cmd, item)
+		}
+		return nil
+	}
+
 	page, err := usecases.SearchHosts(svcs.Catalog, q, hostsLimit, hostsCursor)
 	if err != nil {
 		return err
@@ -63,19 +81,7 @@ func runHosts(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, item := range page.Items {
-		addr := ""
-		if item.Addr != nil {
-			addr = *item.Addr
-		}
-		sfID := ""
-		if item.SystemframeID != nil {
-			sfID = *item.SystemframeID
-		}
-		status := ""
-		if item.Status != nil {
-			status = "[" + *item.Status + "] "
-		}
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s%-40s  %-45s  %s\n", status, item.ContextName, addr, sfID)
+		printHostLine(cmd, item)
 	}
 	if page.Page.HasMore {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "(more: --cursor %s)\n", *page.Page.NextCursor)
@@ -83,9 +89,25 @@ func runHosts(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func hostPageToMap(p domain.HostPage) map[string]any {
-	items := make([]map[string]any, len(p.Items))
-	for i, h := range p.Items {
+func printHostLine(cmd *cobra.Command, item domain.HostRecord) {
+	addr := ""
+	if item.Addr != nil {
+		addr = *item.Addr
+	}
+	sfID := ""
+	if item.SystemframeID != nil {
+		sfID = *item.SystemframeID
+	}
+	status := ""
+	if item.Status != nil {
+		status = "[" + *item.Status + "] "
+	}
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s%-40s  %-45s  %s\n", status, item.ContextName, addr, sfID)
+}
+
+func hostItemsToMaps(items []domain.HostRecord) []map[string]any {
+	result := make([]map[string]any, len(items))
+	for i, h := range items {
 		var addr, sfID, status any
 		if h.Addr != nil {
 			addr = *h.Addr
@@ -96,7 +118,7 @@ func hostPageToMap(p domain.HostPage) map[string]any {
 		if h.Status != nil {
 			status = *h.Status
 		}
-		items[i] = map[string]any{
+		result[i] = map[string]any{
 			"client":         h.Client,
 			"host_name":      h.HostName,
 			"context_name":   h.ContextName,
@@ -105,12 +127,16 @@ func hostPageToMap(p domain.HostPage) map[string]any {
 			"status":         status,
 		}
 	}
+	return result
+}
+
+func hostPageToMap(p domain.HostPage) map[string]any {
 	cursor := any(nil)
 	if p.Page.NextCursor != nil {
 		cursor = *p.Page.NextCursor
 	}
 	return map[string]any{
-		"items": items,
+		"items": hostItemsToMaps(p.Items),
 		"page": map[string]any{
 			"limit":       p.Page.Limit,
 			"returned":    p.Page.Returned,

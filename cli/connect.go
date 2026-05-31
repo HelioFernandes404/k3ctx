@@ -28,6 +28,7 @@ var (
 	connectContext          string
 	connectAllHosts         string
 	connectSkipNetbirdCheck bool
+	connectDryRun           bool
 )
 
 func init() {
@@ -39,6 +40,7 @@ func init() {
 	connectCmd.Flags().StringVar(&connectContext, "context", "", "Exact context name")
 	connectCmd.Flags().StringVar(&connectAllHosts, "all-hosts", "", "Connect to all hosts for this client")
 	connectCmd.Flags().BoolVar(&connectSkipNetbirdCheck, "skip-netbird-check", false, "Skip NetBird daemon and peer preflight check")
+	connectCmd.Flags().BoolVar(&connectDryRun, "dry-run", false, "Resolve host and show what would be connected without opening a tunnel")
 }
 
 func runConnect(cmd *cobra.Command, args []string) error {
@@ -98,6 +100,22 @@ func runConnect(cmd *cobra.Command, args []string) error {
 	if findErr != nil || target == nil {
 		return newExitErr(1, "TARGET_NOT_FOUND",
 			"Failed to load target for context: "+*resolution.ContextName, "")
+	}
+
+	if connectDryRun {
+		addr, _ := target.HostConfig()["addr"].(string)
+		if jsonOutput {
+			enc := json.NewEncoder(cmd.OutOrStdout())
+			return enc.Encode(jsonEnvelope(cmd, map[string]any{
+				"dry_run":      true,
+				"context_name": target.ContextName(),
+				"client":       target.Company(),
+				"host":         target.HostAlias(),
+				"addr":         addr,
+			}))
+		}
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Would connect: %s\n", target.ContextName())
+		return nil
 	}
 
 	result, err := usecases.ConnectCluster(*target, cfg, svcs.Connector, svcs.Preflight, connectSkipNetbirdCheck, false)
