@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>k3ctx v0.1.6 — Relatório de Teste</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3348;
+      --text: #e2e4ef;
+      --muted: #7b82a0;
+      --green: #3dd68c;
+      --green-dim: #1a3d2e;
+      --red: #f05c5c;
+      --red-dim: #3d1a1a;
+      --yellow: #f5a623;
+      --yellow-dim: #3d2d0a;
+      --blue: #5b8dee;
+      --blue-dim: #1a2a4a;
+      --purple: #a78bfa;
+      --purple-dim: #2a1a4a;
+      --mono: 'Fira Mono', 'Cascadia Code', 'Courier New', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      padding: 32px 16px 80px;
+    }
+
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+    }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      padding: 48px 24px 40px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    header::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 60% 40% at 50% 0%, #5b8dee18, transparent);
+      pointer-events: none;
+    }
+    header .badge {
+      display: inline-block;
+      padding: 4px 14px;
+      background: var(--blue-dim);
+      color: var(--blue);
+      border: 1px solid var(--blue);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -.02em;
+      margin-bottom: 8px;
+    }
+    header p {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    /* ── Section ── */
+    section {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .section-label {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--muted);
+    }
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .card.green  { border-left: 4px solid var(--green);  }
+    .card.red    { border-left: 4px solid var(--red);    }
+    .card.yellow { border-left: 4px solid var(--yellow); }
+    .card.blue   { border-left: 4px solid var(--blue);   }
+
+    .card-title {
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .dot.green  { background: var(--green); }
+    .dot.red    { background: var(--red); }
+    .dot.yellow { background: var(--yellow); }
+    .dot.blue   { background: var(--blue); }
+
+    .card-sub {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+
+    /* ── Code blocks ── */
+    .code {
+      background: #0d0f1a;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-family: var(--mono);
+      font-size: 12.5px;
+      line-height: 1.7;
+      overflow-x: auto;
+    }
+    .code .key   { color: #7ec8e3; }
+    .code .val   { color: var(--green); }
+    .code .bad   { color: var(--red); text-decoration: line-through; }
+    .code .good  { color: var(--green); }
+    .code .cmd   { color: var(--yellow); }
+    .code .err   { color: var(--red); }
+    .code .ok    { color: var(--green); }
+    .code .dim   { color: var(--muted); }
+    .code .hi    { background: #ffffff12; border-radius: 3px; padding: 0 3px; }
+
+    /* ── Two-column diff ── */
+    .diff {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .diff-col label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: 6px;
+    }
+    .diff-col.before label { color: var(--red); }
+    .diff-col.after  label { color: var(--green); }
+
+    /* ── Flow diagram ── */
+    .flow {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      overflow-x: auto;
+      padding: 8px 0;
+    }
+    .flow-node {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 12.5px;
+      text-align: center;
+      min-width: 120px;
+      flex-shrink: 0;
+    }
+    .flow-node .fn-label {
+      font-size: 10px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 4px;
+    }
+    .flow-node .fn-val {
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .flow-node.ok  { border-color: var(--green); }
+    .flow-node.bad { border-color: var(--red);   background: var(--red-dim); }
+    .flow-arrow {
+      padding: 0 6px;
+      color: var(--muted);
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .flow-arrow.bad { color: var(--red); }
+    .flow-arrow.ok  { color: var(--green); }
+
+    /* ── Network diagram ── */
+    .net-diagram {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .net-row {
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+    .net-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      min-width: 100px;
+    }
+    .net-icon {
+      width: 48px; height: 48px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      border: 1px solid var(--border);
+    }
+    .net-icon.local   { background: var(--blue-dim);   border-color: var(--blue); }
+    .net-icon.netbird { background: var(--purple-dim); border-color: var(--purple); }
+    .net-icon.host    { background: var(--surface2); }
+    .net-icon.ok      { background: var(--green-dim);  border-color: var(--green); }
+    .net-icon.bad     { background: var(--red-dim);    border-color: var(--red); }
+    .net-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      max-width: 90px;
+    }
+    .net-label strong { color: var(--text); font-size: 12px; display: block; }
+    .net-line {
+      flex: 1;
+      height: 2px;
+      position: relative;
+      margin: 0 4px;
+      margin-bottom: 16px;
+    }
+    .net-line .line-inner {
+      height: 2px;
+      width: 100%;
+    }
+    .net-line .line-label {
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      white-space: nowrap;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .net-line.ok .line-inner { background: var(--green); }
+    .net-line.ok .line-label { background: var(--green-dim); color: var(--green); }
+    .net-line.bad .line-inner { background: var(--red); }
+    .net-line.bad .line-label { background: var(--red-dim); color: var(--red); }
+    .net-line.dim .line-inner { background: var(--border); }
+    .net-line.dim .line-label { background: var(--surface2); color: var(--muted); }
+    .net-line.dashed .line-inner {
+      background: none;
+      border-top: 2px dashed var(--border);
+    }
+
+    /* ── Pill badges ── */
+    .pill {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .pill.green  { background: var(--green-dim);  color: var(--green); }
+    .pill.red    { background: var(--red-dim);    color: var(--red); }
+    .pill.yellow { background: var(--yellow-dim); color: var(--yellow); }
+    .pill.blue   { background: var(--blue-dim);   color: var(--blue); }
+
+    /* ── Summary bar ── */
+    .summary-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .summary-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px 16px;
+      text-align: center;
+    }
+    .summary-item .si-icon { font-size: 28px; margin-bottom: 8px; }
+    .summary-item .si-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .summary-item .si-sub   { font-size: 11px; color: var(--muted); }
+    .summary-item.green { border-top: 3px solid var(--green); }
+    .summary-item.red   { border-top: 3px solid var(--red);   }
+    .summary-item.yellow{ border-top: 3px solid var(--yellow);}
+
+    /* ── Step list ── */
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .step {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .step-num {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: var(--blue-dim);
+      border: 1px solid var(--blue);
+      color: var(--blue);
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .step-body { font-size: 13.5px; }
+    .step-body code {
+      font-family: var(--mono);
+      font-size: 12px;
+      background: #0d0f1a;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      color: var(--yellow);
+    }
+
+    /* ── Highlight box ── */
+    .hbox {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+    .hbox strong { color: var(--yellow); }
+
+    @media (max-width: 600px) {
+      .diff { grid-template-columns: 1fr; }
+      .summary-bar { grid-template-columns: 1fr; }
+      header h1 { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── HEADER ── -->
+  <header>
+    <div class="badge">k3ctx v0.1.6 · Teste de Usabilidade</div>
+    <h1>Relatório de Teste — 31 Mai 2026</h1>
+    <p>Clusters: <strong>prod-secundaria</strong> (sf-prd-us-00002) · <strong>thinkpad-dev-large</strong> (sf-tst-sp-00003)</p>
+  </header>
+
+  <!-- ── SUMMARY ── -->
+  <section>
+    <div class="section-label">Visão Geral</div>
+    <div class="summary-bar">
+      <div class="summary-item green">
+        <div class="si-icon">✅</div>
+        <div class="si-title">Bug Corrigido</div>
+        <div class="si-sub">NETBIRD_NOT_READY<br>campo JSON errado</div>
+      </div>
+      <div class="summary-item red">
+        <div class="si-icon">🐛</div>
+        <div class="si-title">Bug Novo Encontrado</div>
+        <div class="si-sub">AMBIGUOUS_MATCH<br>filtro posicional quebrado</div>
+      </div>
+      <div class="summary-item yellow">
+        <div class="si-icon">🌐</div>
+        <div class="si-title">Problema de Rede</div>
+        <div class="si-sub">SSH/ICMP bloqueado<br>fora do k3ctx</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── BUG 1 ── -->
+  <section>
+    <div class="section-label">Bug Corrigido — NETBIRD_NOT_READY</div>
+    <div class="card green">
+      <div class="card-title"><div class="dot green"></div> Campo JSON errado na leitura do status do NetBird</div>
+      <div class="card-sub">O k3ctx perguntava pro NetBird: "você está conectado?" mas lia a resposta no campo errado.</div>
+
+      <!-- Flow -->
+      <div style="margin-bottom:16px;">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Como funciona o fluxo de verificação</div>
+        <div class="flow">
+          <div class="flow-node ok">
+            <div class="fn-label">1. CLI executa</div>
+            <div class="fn-val">netbird status --json</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node ok">
+            <div class="fn-label">2. NetBird retorna</div>
+            <div class="fn-val">"daemonStatus": "Connected"</div>
+          </div>
+          <div class="flow-arrow bad">→</div>
+          <div class="flow-node bad">
+            <div class="fn-label">3. k3ctx lia campo</div>
+            <div class="fn-val">"status" (vazio!)</div>
+          </div>
+          <div class="flow-arrow bad">→</div>
+          <div class="flow-node bad">
+            <div class="fn-label">4. Resultado</div>
+            <div class="fn-val">NETBIRD_NOT_READY</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Diff -->
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">O que o JSON real do NetBird retorna</div>
+      <div class="code" style="margin-bottom:16px;">
+<span class="dim">{</span>
+  <span class="key">"daemonStatus"</span><span class="dim">:</span> <span class="val">"Connected"</span><span class="dim">,</span>   <span class="dim">← campo real</span>
+  <span class="key">"management"</span><span class="dim">:</span>   <span class="dim">{ "connected": true ... },</span>
+  <span class="key">"peers"</span><span class="dim">:</span>        <span class="dim">{ "total": 29, "connected": 19 ... }</span>
+<span class="dim">}</span>
+      </div>
+
+      <div class="diff">
+        <div class="diff-col before">
+          <label>Antes (quebrado)</label>
+          <div class="code">
+<span class="dim">// netbird/netbird.go</span>
+type statusOutput struct {
+  Status string
+    <span class="bad">`json:"status"`</span>
+  Peers  peersSection
+    <span class="dim">`json:"peers"`</span>
+}
+<span class="dim">// "status" não existe no JSON</span>
+<span class="dim">// → Status sempre vazio ""</span>
+<span class="dim">// → tratado como "Unknown"</span>
+          </div>
+        </div>
+        <div class="diff-col after">
+          <label>Depois (corrigido)</label>
+          <div class="code">
+<span class="dim">// netbird/netbird.go</span>
+type statusOutput struct {
+  Status string
+    <span class="good">`json:"daemonStatus"`</span>
+  Peers  peersSection
+    <span class="dim">`json:"peers"`</span>
+}
+<span class="dim">// lê o campo correto</span>
+<span class="dim">// → Status = "Connected"</span>
+<span class="dim">// → preflight passa ✓</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="hbox" style="margin-top:16px;">
+        <strong>Por que o hosts funcionava mas o connect falhava?</strong><br>
+        O comando <code style="color:var(--yellow);">k3ctx hosts</code> usa o NetBird apenas para listar peers (lê <code style="color:var(--yellow);">peers.details[]</code>). O comando <code style="color:var(--yellow);">k3ctx connect</code> faz uma verificação de preflight lendo <code style="color:var(--yellow);">daemonStatus</code> antes de qualquer coisa — e era aí que travava.
+      </div>
+    </div>
+  </section>
+
+  <!-- ── BUG 2 ── -->
+  <section>
+    <div class="section-label">Bug Encontrado — AMBIGUOUS_MATCH no filtro posicional</div>
+    <div class="card red">
+      <div class="card-title"><div class="dot red"></div> Argumento posicional de host não filtra corretamente</div>
+      <div class="card-sub">Passar um hostname específico retorna todos os peers conectados em vez de filtrar pelo nome.</div>
+
+      <!-- Command comparison -->
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Comportamento observado</div>
+
+      <div class="diff">
+        <div class="diff-col before">
+          <label>Comando (deveria funcionar)</label>
+          <div class="code">
+<span class="cmd">$ k3ctx connect \</span>
+<span class="cmd">    systemframe prd-us-00002</span>
+
+<span class="err">EXIT 3</span>
+<span class="err">AMBIGUOUS_MATCH</span>
+<span class="dim">Múltiplos hosts encontrados:</span>
+<span class="dim">  systemframe-sf-tst-us-00004</span>
+<span class="dim">  systemframe-sf-prd-us-00001</span>
+<span class="dim">  systemframe-sf-prd-us-00008</span>
+<span class="dim">  ... +7 mais</span>
+<span class="err">
+⚠ Nenhum desses é prd-us-00002!</span>
+          </div>
+        </div>
+        <div class="diff-col after">
+          <label>Workaround (funciona)</label>
+          <div class="code">
+<span class="cmd">$ k3ctx connect \</span>
+<span class="cmd">    --context \</span>
+<span class="cmd">    systemframe-sf-prd-us-00002</span>
+
+<span class="ok">EXIT 0</span>
+<span class="ok">{</span>
+  <span class="ok">"ok": true,</span>
+  <span class="dim">"addr": "sf-prd-us-00002</span>
+<span class="dim">             .systemframe.vpn",</span>
+  <span class="dim">"dry_run": true</span>
+<span class="ok">}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Visual of what's happening -->
+      <div style="margin-top:20px;">
+        <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">O que provavelmente está acontecendo</div>
+        <div class="flow" style="flex-wrap:wrap;gap:8px;">
+          <div class="flow-node ok" style="min-width:130px;">
+            <div class="fn-label">Input</div>
+            <div class="fn-val">prd-us-00002</div>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-node bad" style="min-width:160px;">
+            <div class="fn-label">Filtro interno (bug)</div>
+            <div class="fn-val">ignora o substring, lista tudo</div>
+          </div>
+          <div class="flow-arrow bad">→</div>
+          <div class="flow-node bad" style="min-width:140px;">
+            <div class="fn-label">Resultado</div>
+            <div class="fn-val">10 hosts sem relação</div>
+          </div>
+          <div class="flow-arrow bad">→</div>
+          <div class="flow-node bad">
+            <div class="fn-label">Erro</div>
+            <div class="fn-val">AMBIGUOUS_MATCH</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hbox">
+        <strong>Workaround enquanto o bug não é corrigido:</strong><br>
+        Use sempre <code style="color:var(--yellow);">--context systemframe-sf-&lt;id&gt;</code> em vez dos argumentos posicionais.<br>
+        <span style="color:var(--muted);">O <code style="color:var(--yellow);">--context</code> resolve direto pelo nome do context, sem passar pelo filtro de substring.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── INFRA ── -->
+  <section>
+    <div class="section-label">Problema de Infraestrutura — Hosts inacessíveis via SSH</div>
+    <div class="card yellow">
+      <div class="card-title"><div class="dot yellow"></div> NetBird diz "Connected" mas ICMP/SSH não chegam nos hosts</div>
+      <div class="card-sub">O k3ctx está correto — o problema é de rede/ACL fora do código.</div>
+
+      <!-- Network diagram -->
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:16px;">Diagrama de conectividade</div>
+
+      <div class="net-diagram">
+
+        <!-- Row: sua máquina → NetBird → hosts -->
+        <div style="display:grid;grid-template-columns:110px 1fr 110px 1fr 110px;align-items:center;gap:0;">
+          <div class="net-node">
+            <div class="net-icon local">💻</div>
+            <div class="net-label"><strong>omarchy</strong>100.64.7.47</div>
+          </div>
+
+          <div class="net-line ok" style="margin-bottom:20px;">
+            <div class="line-label">✓ WireGuard OK</div>
+            <div class="line-inner"></div>
+          </div>
+
+          <div class="net-node">
+            <div class="net-icon netbird">🌐</div>
+            <div class="net-label"><strong>NetBird</strong>relay / STUN</div>
+          </div>
+
+          <div class="net-line bad" style="margin-bottom:20px;">
+            <div class="line-label">✗ No route to host</div>
+            <div class="line-inner"></div>
+          </div>
+
+          <div class="net-node">
+            <div class="net-icon bad">🖥</div>
+            <div class="net-label"><strong>sf-prd-us-00002</strong>100.64.214.50</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:110px 1fr 110px 1fr 110px;align-items:center;gap:0;">
+          <div></div>
+          <div></div>
+          <div></div>
+          <div class="net-line bad" style="margin-bottom:20px;">
+            <div class="line-label">✗ No route to host</div>
+            <div class="line-inner"></div>
+          </div>
+          <div class="net-node">
+            <div class="net-icon bad">💻</div>
+            <div class="net-label"><strong>sf-tst-sp-00003</strong>100.64.197.186</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Evidence -->
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:20px 0 8px;">Evidências coletadas</div>
+      <div class="code">
+<span class="dim"># NetBird reporta "Connected" para ambos</span>
+<span class="dim">daemonStatus</span>: <span class="ok">"Connected"</span>
+<span class="dim">sf-prd-us-00002</span> → status: <span class="ok">Connected</span>, lastHandshake: <span class="ok">1 min atrás</span>
+<span class="dim">sf-tst-sp-00003</span> → status: <span class="ok">Connected</span>, lastHandshake: <span class="ok">1 min atrás</span>
+
+<span class="dim"># Mas ICMP não chega</span>
+<span class="cmd">$ ping 100.64.214.50</span>
+<span class="err">From 100.64.0.1: Destination Host Unreachable</span>   <span class="dim">← gateway NetBird rejeita</span>
+
+<span class="dim"># E SSH também não</span>
+<span class="cmd">$ ssh sf-prd-us-00002.systemframe.vpn</span>
+<span class="err">No route to host</span>
+      </div>
+
+      <!-- Possible causes -->
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:20px 0 8px;">Causas prováveis</div>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body"><strong>ACL do NetBird</strong> — a policy de acesso entre <code>omarchy</code> e esses dois peers pode não permitir tráfego. Verificar no painel NetBird → Access Control → Policies.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body"><strong>Firewall nos hosts remotos</strong> — <code>sf-prd-us-00002</code> é EC2 e pode ter Security Group bloqueando porta 22 ou ICMP da subnet <code>100.64.0.0/16</code>.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body"><strong>WireGuard handshake ≠ rota ativa</strong> — o NetBird pode registrar handshake mas a rota específica para esses IPs não estar propagada neste peer.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body"><strong>Peers offline ou sem daemon</strong> — os hosts podem estar ligados no NetBird mas com o serviço k3s ou SSH parado.</div>
+        </div>
+      </div>
+
+      <div class="hbox">
+        <strong>Como investigar:</strong><br>
+        No painel NetBird → Peers → verificar se <code style="color:var(--yellow);">sf-prd-us-00002</code> e <code style="color:var(--yellow);">sf-tst-sp-00003</code> têm ACL de acesso com <code style="color:var(--yellow);">omarchy</code>. Se EC2, verificar Security Groups na AWS permitindo CIDR <code style="color:var(--yellow);">100.64.0.0/16</code>.
+      </div>
+    </div>
+  </section>
+
+  <!-- ── COMMANDS ── -->
+  <section>
+    <div class="section-label">Comandos para Reconectar (quando rede estiver ok)</div>
+    <div class="card blue">
+      <div class="card-title"><div class="dot blue"></div> Sequência recomendada com v0.1.6</div>
+      <div class="card-sub">Usar <code style="color:var(--blue);">--context</code> enquanto o bug de argumento posicional não é corrigido.</div>
+      <div class="code">
+<span class="dim"># 1. Verificar status do NetBird</span>
+<span class="cmd">$ k3ctx hosts systemframe --host prd-us-00002 --json</span>
+<span class="dim">   → conferir se status = "Connected"</span>
+
+<span class="dim"># 2. Dry-run (sem abrir túnel)</span>
+<span class="cmd">$ k3ctx connect --dry-run --context systemframe-sf-prd-us-00002 --json</span>
+<span class="cmd">$ k3ctx connect --dry-run --context systemframe-sf-tst-sp-00003 --json</span>
+
+<span class="dim"># 3. Conectar</span>
+<span class="cmd">$ k3ctx connect --context systemframe-sf-prd-us-00002</span>
+<span class="cmd">$ k3ctx connect --context systemframe-sf-tst-sp-00003</span>
+
+<span class="dim"># 4. Validar</span>
+<span class="cmd">$ k3ctx status --json</span>
+<span class="cmd">$ kubectl get nodes   # em cada context</span>
+      </div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>
