@@ -19,7 +19,7 @@ func ProjectTargetToHostRecord(target domain.ClusterTarget) domain.HostRecord {
 	} else if v, ok := gv["systemframe_id"].(string); ok {
 		sfID = &v
 	}
-	if v, ok := hc["ansible_host"].(string); ok {
+	if v, ok := hc["addr"].(string); ok {
 		ip = &v
 	}
 	if v, ok := hc["netbird_status"].(string); ok {
@@ -30,7 +30,7 @@ func ProjectTargetToHostRecord(target domain.ClusterTarget) domain.HostRecord {
 		Client:        target.Company(),
 		HostName:      target.HostAlias(),
 		SystemframeID: sfID,
-		AddrIP:        ip,
+		Addr:          ip,
 		ContextName:   target.ContextName(),
 		Group:         target.Group(),
 		Status:        status,
@@ -47,8 +47,8 @@ func BuildHostRecords(targets []domain.ClusterTarget) []domain.HostRecord {
 }
 
 // LoadHostRecords loads targets from the catalog and projects them.
-func LoadHostRecords(inventoryPath string, catalog application.InventoryCatalog) ([]domain.HostRecord, error) {
-	targets, err := catalog.ListTargets(inventoryPath)
+func LoadHostRecords(catalog application.InventoryCatalog) ([]domain.HostRecord, error) {
+	targets, err := catalog.ListTargets()
 	if err != nil {
 		return nil, err
 	}
@@ -56,8 +56,8 @@ func LoadHostRecords(inventoryPath string, catalog application.InventoryCatalog)
 }
 
 // ListClientSummaries returns paginated client summaries sorted by client name.
-func ListClientSummaries(inventoryPath string, catalog application.InventoryCatalog, limit int, cursor string) (domain.ClientPage, error) {
-	records, err := LoadHostRecords(inventoryPath, catalog)
+func ListClientSummaries(catalog application.InventoryCatalog, limit int, cursor string) (domain.ClientPage, error) {
+	records, err := LoadHostRecords(catalog)
 	if err != nil {
 		return domain.ClientPage{}, err
 	}
@@ -119,8 +119,8 @@ func ListClientSummaries(inventoryPath string, catalog application.InventoryCata
 }
 
 // SearchHosts returns paginated host records filtered by query.
-func SearchHosts(inventoryPath string, catalog application.InventoryCatalog, query domain.HostQuery, limit int, cursor string) (domain.HostPage, error) {
-	records, err := LoadHostRecords(inventoryPath, catalog)
+func SearchHosts(catalog application.InventoryCatalog, query domain.HostQuery, limit int, cursor string) (domain.HostPage, error) {
+	records, err := LoadHostRecords(catalog)
 	if err != nil {
 		return domain.HostPage{}, err
 	}
@@ -171,8 +171,8 @@ func SearchHostRecords(records []domain.HostRecord, query domain.HostQuery, limi
 }
 
 // ResolveHost resolves a query to a unique context or returns an ambiguous/no-match result.
-func ResolveHost(inventoryPath string, catalog application.InventoryCatalog, query domain.HostQuery, limit int) (domain.HostResolutionResult, error) {
-	records, err := LoadHostRecords(inventoryPath, catalog)
+func ResolveHost(catalog application.InventoryCatalog, query domain.HostQuery, limit int) (domain.HostResolutionResult, error) {
+	records, err := LoadHostRecords(catalog)
 	if err != nil {
 		return domain.HostResolutionResult{}, err
 	}
@@ -205,7 +205,7 @@ func ResolveHostRecords(records []domain.HostRecord, query domain.HostQuery, lim
 			ContextName: &cn,
 		}
 	default:
-		hint := "Multiple hosts matched. Refine with --ip, --id, or a more specific host name."
+		hint := "Multiple hosts matched. Refine with --addr, --id, or a more specific host name."
 		return domain.HostResolutionResult{
 			Status:  domain.ResolutionAmbiguous,
 			Query:   query,
@@ -236,8 +236,8 @@ func filterRecords(records []domain.HostRecord, q domain.HostQuery) []domain.Hos
 				continue
 			}
 		}
-		if q.AddrIP != nil {
-			if r.AddrIP == nil || *r.AddrIP != *q.AddrIP {
+		if q.Addr != nil {
+			if r.Addr == nil || *r.Addr != *q.Addr {
 				continue
 			}
 		}
@@ -249,7 +249,7 @@ func filterRecords(records []domain.HostRecord, q domain.HostQuery) []domain.Hos
 			match := strings.Contains(r.HostName, needle) ||
 				strings.Contains(r.ContextName, needle) ||
 				(r.SystemframeID != nil && strings.Contains(*r.SystemframeID, needle)) ||
-				(r.AddrIP != nil && strings.Contains(*r.AddrIP, needle))
+				(r.Addr != nil && strings.Contains(*r.Addr, needle))
 			if !match {
 				continue
 			}

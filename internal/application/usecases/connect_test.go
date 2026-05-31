@@ -54,7 +54,6 @@ func (s *stubConnector) Connect(target domain.ClusterTarget, _ domain.EffectiveC
 func buildConfig(t *testing.T) domain.EffectiveConfig {
 	t.Helper()
 	return domain.EffectiveConfig{
-		InventoryPath:       t.TempDir() + "/inventory",
 		SSHConfigPath:       "~/.ssh/config",
 		SSHKeyPath:          "~/.ssh/id_ed25519",
 		RemoteK3sConfigPath: "/etc/rancher/k3s/k3s.yaml",
@@ -64,9 +63,9 @@ func buildConfig(t *testing.T) domain.EffectiveConfig {
 	}
 }
 
-func buildTarget(ansibleHost string) domain.ClusterTarget {
+func buildTarget(addr string) domain.ClusterTarget {
 	return domain.NewClusterTarget("acme", "prod", "k3s_cluster",
-		map[string]any{"ansible_host": ansibleHost}, nil)
+		map[string]any{"addr": addr}, nil)
 }
 
 // --- Tests ---
@@ -114,7 +113,7 @@ func TestConnectMultiple_PreservesTargetOrder(t *testing.T) {
 	cfg := buildConfig(t)
 	first := buildTarget("203.0.113.10")
 	second := domain.NewClusterTarget("beta", "staging", "k3s_cluster",
-		map[string]any{"ansible_host": "203.0.113.11"}, nil)
+		map[string]any{"addr": "203.0.113.11"}, nil)
 
 	results, err := usecases.ConnectMultiple([]domain.ClusterTarget{first, second}, cfg, stub, nil, false, true)
 

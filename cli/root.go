@@ -21,12 +21,12 @@ import (
 var Version = "dev"
 
 var (
-	svcs          bootstrap.ServiceContainer
-	jsonOutput    bool
-	cmdStart      time.Time
-	telWriter     *telemetry.Writer
+	svcs           bootstrap.ServiceContainer
+	jsonOutput     bool
+	cmdStart       time.Time
+	telWriter      *telemetry.Writer
 	calledCobraCmd *cobra.Command
-	calledArgs    []string
+	calledArgs     []string
 )
 
 // ExitErr carries a structured exit code through Cobra's error return path.

@@ -12,8 +12,8 @@ import (
 
 func strP(s string) *string { return &s }
 
-func buildDiscoveryTarget(company, hostAlias, addrIP string, sfID *string) domain.ClusterTarget {
-	hc := map[string]any{"ansible_host": addrIP}
+func buildDiscoveryTarget(company, hostAlias, addr string, sfID *string) domain.ClusterTarget {
+	hc := map[string]any{"addr": addr}
 	if sfID != nil {
 		hc["systemframe_id"] = *sfID
 	}
@@ -25,7 +25,7 @@ func TestLoadHostRecords_ProjectsPublicFieldsFromClusterTargets(t *testing.T) {
 		buildDiscoveryTarget("acme", "prod", "10.0.0.10", strP("sf-1042")),
 	}}
 
-	records, err := usecases.LoadHostRecords(t.TempDir(), catalog)
+	records, err := usecases.LoadHostRecords(catalog)
 	require.NoError(t, err)
 	require.Len(t, records, 1)
 
@@ -33,7 +33,7 @@ func TestLoadHostRecords_ProjectsPublicFieldsFromClusterTargets(t *testing.T) {
 	assert.Equal(t, "acme", r.Client)
 	assert.Equal(t, "prod", r.HostName)
 	assert.Equal(t, "sf-1042", *r.SystemframeID)
-	assert.Equal(t, "10.0.0.10", *r.AddrIP)
+	assert.Equal(t, "10.0.0.10", *r.Addr)
 	assert.Equal(t, "acme-prod", r.ContextName)
 	assert.Equal(t, "k3s_cluster", r.Group)
 }
@@ -48,12 +48,12 @@ func TestBuildHostRecords_ProjectsPublicFieldsFromTargets(t *testing.T) {
 
 func TestLoadHostRecords_FallsBackToGroupVarsForSystemframeID(t *testing.T) {
 	target := domain.NewClusterTarget("acme", "prod", "k3s_cluster",
-		map[string]any{"ansible_host": "10.0.0.10"},
+		map[string]any{"addr": "10.0.0.10"},
 		map[string]any{"systemframe_id": "sf-group-7"},
 	)
 	catalog := &stubCatalog{targets: []domain.ClusterTarget{target}}
 
-	records, err := usecases.LoadHostRecords(t.TempDir(), catalog)
+	records, err := usecases.LoadHostRecords(catalog)
 	require.NoError(t, err)
 	assert.Equal(t, "sf-group-7", *records[0].SystemframeID)
 }
@@ -65,7 +65,7 @@ func TestListClientSummaries_ReturnsSortedCountsAndCursor(t *testing.T) {
 		buildDiscoveryTarget("acme", "api-02", "10.0.0.3", nil),
 	}}
 
-	page, err := usecases.ListClientSummaries(t.TempDir(), catalog, 1, "")
+	page, err := usecases.ListClientSummaries(catalog, 1, "")
 	require.NoError(t, err)
 
 	assert.Len(t, page.Items, 1)
@@ -88,7 +88,7 @@ func TestSearchHosts_FiltersByClientAndContextCursor(t *testing.T) {
 	}}
 
 	q := domain.HostQuery{Client: strP("acme"), HostName: strP("api")}
-	first, err := usecases.SearchHosts(t.TempDir(), catalog, q, 1, "")
+	first, err := usecases.SearchHosts(catalog, q, 1, "")
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"acme-api-01"}, contextNames(first.Items))
@@ -97,20 +97,20 @@ func TestSearchHosts_FiltersByClientAndContextCursor(t *testing.T) {
 	require.NotNil(t, first.Page.NextCursor)
 	assert.Equal(t, "acme-api-01", *first.Page.NextCursor)
 
-	second, err := usecases.SearchHosts(t.TempDir(), catalog, q, 1, *first.Page.NextCursor)
+	second, err := usecases.SearchHosts(catalog, q, 1, *first.Page.NextCursor)
 	require.NoError(t, err)
 	assert.Equal(t, []string{"acme-api-02"}, contextNames(second.Items))
 	assert.False(t, second.Page.HasMore)
 }
 
-func TestSearchHosts_SupportsIDIPAndFreeTextFilters(t *testing.T) {
+func TestSearchHosts_SupportsIDAddrAndFreeTextFilters(t *testing.T) {
 	catalog := &stubCatalog{targets: []domain.ClusterTarget{
 		buildDiscoveryTarget("acme", "api-prod", "10.0.0.10", strP("sf-1042")),
 		buildDiscoveryTarget("acme", "api-dev", "10.0.0.11", strP("sf-2001")),
 	}}
 
-	q := domain.HostQuery{Client: strP("acme"), Query: strP("1042"), AddrIP: strP("10.0.0.10")}
-	page, err := usecases.SearchHosts(t.TempDir(), catalog, q, 20, "")
+	q := domain.HostQuery{Client: strP("acme"), Query: strP("1042"), Addr: strP("10.0.0.10")}
+	page, err := usecases.SearchHosts(catalog, q, 20, "")
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"acme-api-prod"}, contextNames(page.Items))
@@ -123,7 +123,7 @@ func TestResolveHost_ReturnsUniqueForSingleMatch(t *testing.T) {
 		buildDiscoveryTarget("acme", "db-prod", "10.0.0.2", strP("sf-2001")),
 	}}
 
-	result, err := usecases.ResolveHost(t.TempDir(), catalog, domain.HostQuery{Client: strP("acme"), HostName: strP("api")}, 20)
+	result, err := usecases.ResolveHost(catalog, domain.HostQuery{Client: strP("acme"), HostName: strP("api")}, 20)
 	require.NoError(t, err)
 
 	assert.Equal(t, domain.ResolutionUnique, result.Status)
@@ -139,7 +139,7 @@ func TestResolveHost_ReturnsAmbiguousWithHint(t *testing.T) {
 		buildDiscoveryTarget("acme", "api-03", "10.0.0.3", strP("sf-3")),
 	}}
 
-	result, err := usecases.ResolveHost(t.TempDir(), catalog, domain.HostQuery{Client: strP("acme"), HostName: strP("api")}, 2)
+	result, err := usecases.ResolveHost(catalog, domain.HostQuery{Client: strP("acme"), HostName: strP("api")}, 2)
 	require.NoError(t, err)
 
 	assert.Equal(t, domain.ResolutionAmbiguous, result.Status)
@@ -156,8 +156,8 @@ func TestResolveHost_ReturnsNoMatchWhenFiltersDoNotOverlap(t *testing.T) {
 		buildDiscoveryTarget("acme", "db-prod", "10.0.0.20", nil),
 	}}
 
-	result, err := usecases.ResolveHost(t.TempDir(), catalog, domain.HostQuery{
-		Client: strP("acme"), HostName: strP("api"), AddrIP: strP("10.0.0.20"),
+	result, err := usecases.ResolveHost(catalog, domain.HostQuery{
+		Client: strP("acme"), HostName: strP("api"), Addr: strP("10.0.0.20"),
 	}, 20)
 	require.NoError(t, err)
 

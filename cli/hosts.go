@@ -3,12 +3,10 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
 	"github.com/systemframe/k3ctx/internal/application/usecases"
-	"github.com/systemframe/k3ctx/internal/config"
 	"github.com/systemframe/k3ctx/internal/domain"
 )
 
@@ -20,35 +18,24 @@ var hostsCmd = &cobra.Command{
 }
 
 var (
-	hostsLimit            int
-	hostsCursor           string
-	hostsRefreshInventory bool
-	hostsHostFilter       string
-	hostsIDFilter         string
-	hostsIPFilter         string
+	hostsLimit      int
+	hostsCursor     string
+	hostsHostFilter string
+	hostsIDFilter   string
+	hostsAddrFilter string
 )
 
 func init() {
 	rootCmd.AddCommand(hostsCmd)
 	hostsCmd.Flags().IntVar(&hostsLimit, "limit", 20, "Max results per page")
 	hostsCmd.Flags().StringVar(&hostsCursor, "cursor", "", "Pagination cursor")
-	hostsCmd.Flags().BoolVar(&hostsRefreshInventory, "refresh-inventory", false, "Refresh inventory before listing")
 	hostsCmd.Flags().StringVar(&hostsHostFilter, "host", "", "Filter by host name (substring)")
 	hostsCmd.Flags().StringVar(&hostsIDFilter, "id", "", "Filter by systemframe_id")
-	hostsCmd.Flags().StringVar(&hostsIPFilter, "ip", "", "Filter by IP address")
+	hostsCmd.Flags().StringVar(&hostsAddrFilter, "addr", "", "Filter by address (FQDN)")
 }
 
 func runHosts(cmd *cobra.Command, args []string) error {
 	client := args[0]
-	projectDir, _ := os.Getwd()
-	cfg, err := config.LoadEffectiveConfig(projectDir, os.Getenv("CONFIG_FILE"))
-	if err != nil {
-		return fmt.Errorf("config error: %w", err)
-	}
-
-	if hostsRefreshInventory {
-		usecases.RefreshInventoryIfPossible(cfg.InventoryPath, svcs.Refresher)
-	}
 
 	q := domain.HostQuery{Client: &client}
 	if len(args) > 1 {
@@ -60,11 +47,11 @@ func runHosts(cmd *cobra.Command, args []string) error {
 	if hostsIDFilter != "" {
 		q.SystemframeID = &hostsIDFilter
 	}
-	if hostsIPFilter != "" {
-		q.AddrIP = &hostsIPFilter
+	if hostsAddrFilter != "" {
+		q.Addr = &hostsAddrFilter
 	}
 
-	page, err := usecases.SearchHosts(cfg.InventoryPath, svcs.Catalog, q, hostsLimit, hostsCursor)
+	page, err := usecases.SearchHosts(svcs.Catalog, q, hostsLimit, hostsCursor)
 	if err != nil {
 		return err
 	}
@@ -76,9 +63,9 @@ func runHosts(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, item := range page.Items {
-		ip := ""
-		if item.AddrIP != nil {
-			ip = *item.AddrIP
+		addr := ""
+		if item.Addr != nil {
+			addr = *item.Addr
 		}
 		sfID := ""
 		if item.SystemframeID != nil {
@@ -88,7 +75,7 @@ func runHosts(cmd *cobra.Command, args []string) error {
 		if item.Status != nil {
 			status = "[" + *item.Status + "] "
 		}
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s%-40s  %-45s  %s\n", status, item.ContextName, ip, sfID)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s%-40s  %-45s  %s\n", status, item.ContextName, addr, sfID)
 	}
 	if page.Page.HasMore {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "(more: --cursor %s)\n", *page.Page.NextCursor)
@@ -99,9 +86,9 @@ func runHosts(cmd *cobra.Command, args []string) error {
 func hostPageToMap(p domain.HostPage) map[string]any {
 	items := make([]map[string]any, len(p.Items))
 	for i, h := range p.Items {
-		var ip, sfID, status any
-		if h.AddrIP != nil {
-			ip = *h.AddrIP
+		var addr, sfID, status any
+		if h.Addr != nil {
+			addr = *h.Addr
 		}
 		if h.SystemframeID != nil {
 			sfID = *h.SystemframeID
@@ -113,7 +100,7 @@ func hostPageToMap(p domain.HostPage) map[string]any {
 			"client":         h.Client,
 			"host_name":      h.HostName,
 			"context_name":   h.ContextName,
-			"addr_ip":        ip,
+			"addr":           addr,
 			"systemframe_id": sfID,
 			"status":         status,
 		}

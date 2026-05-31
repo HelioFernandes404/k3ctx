@@ -8,7 +8,7 @@ import (
 const (
 	vpnFlag       = "k3s_use_socks5_proxy"
 	vpnFlagLegacy = "argocd_use_socks5_proxy"
-	ansibleHost   = "ansible_host"
+	hostAddr      = "addr"
 )
 
 // IsPrivateNetwork returns true if ip is an RFC 1918 private address.
@@ -38,13 +38,13 @@ func CheckVPNRequirement(invData map[string]any, groupName, _ string) bool {
 }
 
 // CheckNetworkRequirement returns (networkType, networkRange) for a host_info map.
-// host_info must have a "config" key containing "ansible_host".
+// host_info must have a "config" key containing "addr".
 func CheckNetworkRequirement(_ string, hostInfo map[string]any) (string, string) {
 	config, _ := hostInfo["config"].(map[string]any)
 	if config == nil {
 		return "", ""
 	}
-	ah, _ := config[ansibleHost].(string)
+	ah, _ := config[hostAddr].(string)
 	if ah == "" {
 		return "", ""
 	}

@@ -24,10 +24,9 @@ var (
 	connectClient           string
 	connectHost             string
 	connectID               string
-	connectIP               string
+	connectAddr             string
 	connectContext          string
 	connectAllHosts         string
-	connectRefreshInventory bool
 	connectSkipNetbirdCheck bool
 )
 
@@ -36,16 +35,15 @@ func init() {
 	connectCmd.Flags().StringVar(&connectClient, "client", "", "Client filter")
 	connectCmd.Flags().StringVar(&connectHost, "host", "", "Host name filter")
 	connectCmd.Flags().StringVar(&connectID, "id", "", "systemframe_id filter")
-	connectCmd.Flags().StringVar(&connectIP, "ip", "", "IP address filter")
+	connectCmd.Flags().StringVar(&connectAddr, "addr", "", "Address (FQDN) filter")
 	connectCmd.Flags().StringVar(&connectContext, "context", "", "Exact context name")
 	connectCmd.Flags().StringVar(&connectAllHosts, "all-hosts", "", "Connect to all hosts for this client")
-	connectCmd.Flags().BoolVar(&connectRefreshInventory, "refresh-inventory", false, "Refresh inventory")
 	connectCmd.Flags().BoolVar(&connectSkipNetbirdCheck, "skip-netbird-check", false, "Skip NetBird daemon and peer preflight check")
 }
 
 func runConnect(cmd *cobra.Command, args []string) error {
 	if connectAllHosts != "" {
-		if len(args) > 0 || connectHost != "" || connectID != "" || connectIP != "" || connectContext != "" || connectClient != "" {
+		if len(args) > 0 || connectHost != "" || connectID != "" || connectAddr != "" || connectContext != "" || connectClient != "" {
 			return newExitErr(1, "USAGE_ERROR",
 				"--all-hosts cannot be combined with other host filters or positional arguments",
 				"Use --all-hosts <client> alone to connect to all hosts for a client")
@@ -59,10 +57,6 @@ func runConnect(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("config error: %w", err)
 	}
 
-	if connectRefreshInventory {
-		usecases.RefreshInventoryIfPossible(cfg.InventoryPath, svcs.Refresher)
-	}
-
 	if svcs.Preflight != nil {
 		if preflightErr := svcs.Preflight.CheckDaemonReady(connectSkipNetbirdCheck); preflightErr != nil {
 			var opErr *domain.OperationError
@@ -74,7 +68,7 @@ func runConnect(cmd *cobra.Command, args []string) error {
 	}
 
 	q := buildConnectQuery(args)
-	resolution, err := usecases.ResolveHost(cfg.InventoryPath, svcs.Catalog, q, 10)
+	resolution, err := usecases.ResolveHost(svcs.Catalog, q, 10)
 	if err != nil {
 		return err
 	}
@@ -100,7 +94,7 @@ func runConnect(cmd *cobra.Command, args []string) error {
 		return newExitErr(3, "AMBIGUOUS_MATCH", sb.String(), hint)
 	}
 
-	target, findErr := usecases.FindTargetByContextName(*resolution.ContextName, cfg.InventoryPath, svcs.Catalog)
+	target, findErr := usecases.FindTargetByContextName(*resolution.ContextName, svcs.Catalog)
 	if findErr != nil || target == nil {
 		return newExitErr(1, "TARGET_NOT_FOUND",
 			"Failed to load target for context: "+*resolution.ContextName, "")
@@ -151,10 +145,6 @@ func runConnectAllHosts(cmd *cobra.Command) error {
 		return fmt.Errorf("config error: %w", err)
 	}
 
-	if connectRefreshInventory {
-		usecases.RefreshInventoryIfPossible(cfg.InventoryPath, svcs.Refresher)
-	}
-
 	if svcs.Preflight != nil {
 		if preflightErr := svcs.Preflight.CheckDaemonReady(connectSkipNetbirdCheck); preflightErr != nil {
 			var opErr *domain.OperationError
@@ -165,7 +155,7 @@ func runConnectAllHosts(cmd *cobra.Command) error {
 		}
 	}
 
-	targets, err := usecases.FindTargetsByClient(connectAllHosts, cfg.InventoryPath, svcs.Catalog)
+	targets, err := usecases.FindTargetsByClient(connectAllHosts, svcs.Catalog)
 	if err != nil {
 		return err
 	}
@@ -216,8 +206,8 @@ func buildConnectQuery(args []string) domain.HostQuery {
 	if connectID != "" {
 		q.SystemframeID = &connectID
 	}
-	if connectIP != "" {
-		q.AddrIP = &connectIP
+	if connectAddr != "" {
+		q.Addr = &connectAddr
 	}
 	if connectContext != "" {
 		q.ContextName = &connectContext

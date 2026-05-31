@@ -23,7 +23,7 @@ type mockCatalog struct {
 	err     error
 }
 
-func (m *mockCatalog) ListTargets(_ string) ([]domain.ClusterTarget, error) {
+func (m *mockCatalog) ListTargets() ([]domain.ClusterTarget, error) {
 	return m.targets, m.err
 }
 

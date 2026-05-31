@@ -10,7 +10,6 @@ import (
 
 func TestEffectiveConfig_ExposesExpectedFields(t *testing.T) {
 	cfg := domain.EffectiveConfig{
-		InventoryPath:       "/tmp/inventory",
 		SSHConfigPath:       "~/.ssh/config",
 		SSHKeyPath:          "~/.ssh/id_ed25519",
 		RemoteK3sConfigPath: "/etc/rancher/k3s/k3s.yaml",
@@ -19,7 +18,6 @@ func TestEffectiveConfig_ExposesExpectedFields(t *testing.T) {
 		PortRangeSize:       10000,
 	}
 
-	assert.Equal(t, "/tmp/inventory", cfg.InventoryPath)
 	assert.Equal(t, "~/.ssh/config", cfg.SSHConfigPath)
 	assert.Equal(t, "~/.ssh/id_ed25519", cfg.SSHKeyPath)
 	assert.Equal(t, "/etc/rancher/k3s/k3s.yaml", cfg.RemoteK3sConfigPath)
@@ -44,8 +42,8 @@ func TestClusterTarget_ExposesContextName(t *testing.T) {
 
 func TestClusterTarget_HostConfigIsProtectedFromMutation(t *testing.T) {
 	hostConfig := map[string]any{
-		"ansible_host": "10.0.0.10",
-		"network":      map[string]any{"dns": "10.96.0.10"},
+		"addr":    "10.0.0.10",
+		"network": map[string]any{"dns": "10.96.0.10"},
 	}
 	groupVars := map[string]any{
 		"proxy": map[string]any{"enabled": true},
@@ -53,12 +51,12 @@ func TestClusterTarget_HostConfigIsProtectedFromMutation(t *testing.T) {
 	target := domain.NewClusterTarget("acme", "prod", "k3s_cluster", hostConfig, groupVars)
 
 	// mutate originals
-	hostConfig["ansible_host"] = "10.0.0.20"
+	hostConfig["addr"] = "10.0.0.20"
 	hostConfig["network"].(map[string]any)["dns"] = "10.96.0.20"
 	groupVars["proxy"].(map[string]any)["enabled"] = false
 
 	got := target.HostConfig()
-	assert.Equal(t, "10.0.0.10", got["ansible_host"])
+	assert.Equal(t, "10.0.0.10", got["addr"])
 	assert.Equal(t, "10.96.0.10", got["network"].(map[string]any)["dns"])
 	assert.Equal(t, true, target.GroupVars()["proxy"].(map[string]any)["enabled"])
 }

@@ -30,7 +30,6 @@ var envMapping = map[string]string{
 	"k3s_api_port":           "K3S_API_PORT",
 	"port_range_start":       "PORT_RANGE_START",
 	"port_range_size":        "PORT_RANGE_SIZE",
-	"inventory_path":         "INVENTORY_PATH",
 	"netbird_bin_path":       "NETBIRD_BIN_PATH",
 	"netbird_host_filter":    "NETBIRD_HOST_FILTER",
 }
@@ -78,54 +77,6 @@ func GetConfigValue(cfg map[string]any, key string, defaultVal any) any {
 	return defaultVal
 }
 
-// resolveInventoryPathOptional returns the configured inventory path when
-// explicitly set via config or env; returns empty string otherwise.
-// Empty string signals that the NetBird catalog should be used instead.
-func resolveInventoryPathOptional(cfg map[string]any, projectDir string) string {
-	if raw, ok := cfg["inventory_path"].(string); ok && raw != "" {
-		expanded := expandHome(raw)
-		if stat, err := os.Stat(expanded); err == nil && stat.IsDir() {
-			return expanded
-		}
-	}
-	return ""
-}
-
-// ResolveInventoryPath finds the best inventory directory.
-func ResolveInventoryPath(cfg map[string]any, projectDir string) string {
-	var configured string
-	if raw, ok := cfg["inventory_path"].(string); ok && raw != "" {
-		configured = expandHome(raw)
-		if stat, err := os.Stat(configured); err == nil && stat.IsDir() {
-			return configured
-		}
-	}
-
-	local := filepath.Join(projectDir, "inventory")
-	if stat, err := os.Stat(local); err == nil && stat.IsDir() {
-		return local
-	}
-
-	// Walk ancestors for ansible/inventory
-	dir := projectDir
-	for {
-		candidate := filepath.Join(dir, "ansible", "inventory")
-		if stat, err := os.Stat(candidate); err == nil && stat.IsDir() {
-			return candidate
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			break
-		}
-		dir = parent
-	}
-
-	if configured != "" {
-		return configured
-	}
-	return local
-}
-
 // LoadEffectiveConfig resolves and returns the canonical EffectiveConfig.
 // If configFilePath is empty, it searches default candidate paths.
 func LoadEffectiveConfig(projectDir, configFilePath string) (domain.EffectiveConfig, error) {
@@ -146,7 +97,6 @@ func LoadEffectiveConfig(projectDir, configFilePath string) (domain.EffectiveCon
 	}
 
 	return domain.EffectiveConfig{
-		InventoryPath:       resolveInventoryPathOptional(cfg, projectDir),
 		SSHConfigPath:       expandHome(defaultSSHConfigPath),
 		SSHKeyPath:          expandHome(strVal(GetConfigValue(cfg, "ssh_key_path", defaultSSHKeyPath))),
 		RemoteK3sConfigPath: strVal(GetConfigValue(cfg, "remote_k3s_config_path", defaultRemoteK3sConfigPath)),

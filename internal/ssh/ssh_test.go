@@ -75,7 +75,7 @@ Host *
 
 func TestResolveConnectionTarget_InventoryHostOverridesSshConfig(t *testing.T) {
 	sshCfg := map[string]string{"hostname": "ssh-hostname", "user": "ubuntu"}
-	hostCfg := map[string]any{"ansible_host": "10.0.0.1"}
+	hostCfg := map[string]any{"addr": "10.0.0.1"}
 	hostname, username, keyfile, port, proxycmd, err := ResolveConnectionTarget("alias", sshCfg, "", hostCfg)
 	require.NoError(t, err)
 	assert.Equal(t, "10.0.0.1", hostname)

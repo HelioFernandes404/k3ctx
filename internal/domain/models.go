@@ -4,7 +4,6 @@ import "fmt"
 
 // EffectiveConfig holds resolved configuration for a session.
 type EffectiveConfig struct {
-	InventoryPath       string // optional; empty activates NetBird catalog
 	SSHConfigPath       string
 	SSHKeyPath          string
 	RemoteK3sConfigPath string

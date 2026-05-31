@@ -34,7 +34,7 @@ func ConnectCluster(
 	allowManualNetwork bool,
 ) (domain.ConnectResult, error) {
 	if preflight != nil {
-		fqdn, _ := target.HostConfig()["ansible_host"].(string)
+		fqdn, _ := target.HostConfig()["addr"].(string)
 		if err := preflight.CheckPeerReady(fqdn, skipNetbird); err != nil {
 			var opErr *domain.OperationError
 			if errors.As(err, &opErr) {

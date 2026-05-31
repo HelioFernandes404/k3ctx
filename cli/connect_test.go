@@ -29,8 +29,8 @@ func TestRunConnect_NoMatch(t *testing.T) {
 
 func TestRunConnect_AmbiguousMatch(t *testing.T) {
 	// Two targets with the same query match → AMBIGUOUS_MATCH
-	t1 := domain.NewClusterTarget("acme", "prod1", "k3s", map[string]any{"ansible_host": "10.0.0.1"}, nil)
-	t2 := domain.NewClusterTarget("acme", "prod2", "k3s", map[string]any{"ansible_host": "10.0.0.2"}, nil)
+	t1 := domain.NewClusterTarget("acme", "prod1", "k3s", map[string]any{"addr": "10.0.0.1"}, nil)
+	t2 := domain.NewClusterTarget("acme", "prod2", "k3s", map[string]any{"addr": "10.0.0.2"}, nil)
 	svcs.Catalog = &mockCatalog{targets: []domain.ClusterTarget{t1, t2}}
 
 	// The query "acme" matches both targets (substring match on client/host)
@@ -59,7 +59,7 @@ func TestRunConnect_CatalogError(t *testing.T) {
 
 func TestRunConnect_AllHosts_NoMatch(t *testing.T) {
 	svcs.Catalog = &mockCatalog{targets: []domain.ClusterTarget{
-		domain.NewClusterTarget("other", "host1", "k3s", map[string]any{"ansible_host": "10.0.0.1"}, nil),
+		domain.NewClusterTarget("other", "host1", "k3s", map[string]any{"addr": "10.0.0.1"}, nil),
 	}}
 	connectAllHosts = "acme"
 	t.Cleanup(func() { connectAllHosts = "" })
@@ -86,8 +86,8 @@ func TestRunConnect_AllHosts_MutualExclusionWithArgs(t *testing.T) {
 }
 
 func TestRunConnect_AllHosts_MultiResultJSON(t *testing.T) {
-	t1 := domain.NewClusterTarget("acme", "prod1", "k3s", map[string]any{"ansible_host": "10.0.0.1"}, nil)
-	t2 := domain.NewClusterTarget("acme", "prod2", "k3s", map[string]any{"ansible_host": "10.0.0.2"}, nil)
+	t1 := domain.NewClusterTarget("acme", "prod1", "k3s", map[string]any{"addr": "10.0.0.1"}, nil)
+	t2 := domain.NewClusterTarget("acme", "prod2", "k3s", map[string]any{"addr": "10.0.0.2"}, nil)
 	svcs.Catalog = &mockCatalog{targets: []domain.ClusterTarget{t1, t2}}
 	svcs.Connector = &mockConnector{artifacts: application.ConnectionArtifacts{
 		LocalPort:  16500,

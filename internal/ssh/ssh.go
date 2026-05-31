@@ -95,7 +95,7 @@ func matchesHost(alias string, patterns []string) bool {
 }
 
 // ResolveConnectionTarget resolves the final SSH connection parameters.
-// ansible_host in hostConfig overrides the SSH config hostname.
+// addr in hostConfig overrides the SSH config hostname.
 func ResolveConnectionTarget(
 	hostAlias string,
 	sshConfig map[string]string,
@@ -107,7 +107,7 @@ func ResolveConnectionTarget(
 		hostname = h
 	}
 	if hostConfig != nil {
-		if inv, ok := hostConfig["ansible_host"]; ok && inv != nil {
+		if inv, ok := hostConfig["addr"]; ok && inv != nil {
 			hostname = fmt.Sprintf("%v", inv)
 		}
 	}

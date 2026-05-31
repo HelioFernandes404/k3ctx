@@ -5,7 +5,7 @@ type HostRecord struct {
 	Client        string
 	HostName      string
 	SystemframeID *string
-	AddrIP        *string
+	Addr          *string
 	ContextName   string
 	Group         string
 	Status        *string // peer connectivity status (e.g. "Connected", "Connecting", "Idle")
@@ -31,7 +31,7 @@ type HostQuery struct {
 	Client        *string
 	HostName      *string
 	SystemframeID *string
-	AddrIP        *string
+	Addr          *string
 	ContextName   *string
 	Query         *string
 	Exact         bool

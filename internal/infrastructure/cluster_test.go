@@ -15,12 +15,11 @@ import (
 
 func makeTarget() domain.ClusterTarget {
 	return domain.NewClusterTarget("acme", "prod", "k3s_cluster",
-		map[string]any{"ansible_host": "203.0.113.10"}, nil)
+		map[string]any{"addr": "203.0.113.10"}, nil)
 }
 
 func makeEffectiveConfig(t *testing.T) domain.EffectiveConfig {
 	return domain.EffectiveConfig{
-		InventoryPath:       t.TempDir(),
 		SSHConfigPath:       "~/.ssh/config",
 		SSHKeyPath:          "~/.ssh/id_ed25519",
 		RemoteK3sConfigPath: "/etc/rancher/k3s/k3s.yaml",
@@ -179,7 +178,7 @@ func TestLocalClusterConnector_SkipsAPICheckWhenDisabled(t *testing.T) {
 func TestLocalClusterConnector_UsesAutoDiscoveryArgocdConfig(t *testing.T) {
 	argocd := &stubArgocdConnector{}
 	target := domain.NewClusterTarget("acme", "prod", "k3s_cluster", map[string]any{
-		"ansible_host":       "203.0.113.10",
+		"addr":               "203.0.113.10",
 		"argocd_enabled":     false,
 		"argocd_node_port":   30080,
 		"argocd_namespace":   "inventory-ns",

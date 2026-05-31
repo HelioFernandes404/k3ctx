@@ -5,7 +5,11 @@ Discover cluster targets from the NetBird peer network. Executes `netbird status
 ## Requirements
 
 ### Requirement: Discover peers via NetBird CLI
-The system SHALL discover cluster targets by executing `netbird status --json` and parsing the peer list.
+The system SHALL discover cluster targets by executing `netbird up` followed by `netbird status --json` and parsing the peer list.
+
+#### Scenario: netbird up called before status query
+- **WHEN** `ListTargets` is called on the NetBird catalog
+- **THEN** the system executes `netbird up` to ensure the daemon is connected before executing `netbird status --json`
 
 #### Scenario: Peers are loaded as cluster targets
 - **WHEN** `netbird status --json` returns a list of peers with FQDNs
@@ -36,7 +40,7 @@ The system SHALL derive `ClusterTarget` identity from the peer FQDN using a fixe
 
 #### Scenario: FQDN set as SSH address
 - **WHEN** a peer is mapped to a `ClusterTarget`
-- **THEN** the host config `ansible_host` field is set to the peer's full FQDN
+- **THEN** the host config `addr` field is set to the peer's full FQDN
 
 ### Requirement: Derive group from NetBird peer groups
 The system SHALL use NetBird peer group membership to populate the `ClusterTarget` group field.

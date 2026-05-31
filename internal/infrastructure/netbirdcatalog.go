@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"fmt"
+	"os/exec"
 	"regexp"
 	"strings"
 
@@ -12,14 +13,14 @@ import (
 const defaultNetBirdGroup = "k3s_cluster"
 
 // NetBirdInventoryCatalog discovers cluster targets from the NetBird peer list.
-// StatusFn is injectable for testing; when nil, RunStatus(BinPath) is used.
+// StatusFn is injectable for testing; when nil, the catalog calls netbird up then RunStatus(BinPath).
 type NetBirdInventoryCatalog struct {
 	BinPath    string
 	HostFilter string
 	StatusFn   func() ([]netbird.Peer, error)
 }
 
-func (c NetBirdInventoryCatalog) ListTargets(_ string) ([]domain.ClusterTarget, error) {
+func (c NetBirdInventoryCatalog) ListTargets() ([]domain.ClusterTarget, error) {
 	peers, err := c.fetchPeers()
 	if err != nil {
 		return nil, err
@@ -47,7 +48,7 @@ func (c NetBirdInventoryCatalog) ListTargets(_ string) ([]domain.ClusterTarget, 
 		}
 
 		hostConfig := map[string]any{
-			"ansible_host":   p.FQDN,
+			"addr":           p.FQDN,
 			"netbird_status": p.Status,
 			"netbird_ip":     p.IP,
 		}
@@ -60,7 +61,13 @@ func (c NetBirdInventoryCatalog) fetchPeers() ([]netbird.Peer, error) {
 	if c.StatusFn != nil {
 		return c.StatusFn()
 	}
-	data, err := netbird.RunStatus(c.BinPath)
+	binPath := c.BinPath
+	if binPath == "" {
+		binPath = "netbird"
+	}
+	// Ensure the daemon is connected before querying peers.
+	_ = exec.Command(binPath, "up").Run()
+	data, err := netbird.RunStatus(binPath)
 	if err != nil {
 		return nil, err
 	}

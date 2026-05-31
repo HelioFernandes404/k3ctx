@@ -3,12 +3,10 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
 	"github.com/systemframe/k3ctx/internal/application/usecases"
-	"github.com/systemframe/k3ctx/internal/config"
 	"github.com/systemframe/k3ctx/internal/domain"
 )
 
@@ -19,36 +17,24 @@ var clientsCmd = &cobra.Command{
 }
 
 var (
-	clientsLimit            int
-	clientsCursor           string
-	clientsRefreshInventory bool
+	clientsLimit  int
+	clientsCursor string
 )
 
 func init() {
 	rootCmd.AddCommand(clientsCmd)
 	clientsCmd.Flags().IntVar(&clientsLimit, "limit", 20, "Max results per page")
 	clientsCmd.Flags().StringVar(&clientsCursor, "cursor", "", "Pagination cursor")
-	clientsCmd.Flags().BoolVar(&clientsRefreshInventory, "refresh-inventory", false, "Refresh inventory before listing")
 }
 
 func runClients(cmd *cobra.Command, args []string) error {
-	projectDir, _ := os.Getwd()
-	cfg, err := config.LoadEffectiveConfig(projectDir, os.Getenv("CONFIG_FILE"))
-	if err != nil {
-		return fmt.Errorf("config error: %w", err)
-	}
-
-	if clientsRefreshInventory {
-		usecases.RefreshInventoryIfPossible(cfg.InventoryPath, svcs.Refresher)
-	}
-
 	q := domain.HostQuery{}
 	if len(args) > 0 {
 		s := args[0]
 		q.Query = &s
 	}
 
-	page, err := usecases.ListClientSummaries(cfg.InventoryPath, svcs.Catalog, clientsLimit, clientsCursor)
+	page, err := usecases.ListClientSummaries(svcs.Catalog, clientsLimit, clientsCursor)
 	if err != nil {
 		return err
 	}

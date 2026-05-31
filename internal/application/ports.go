@@ -60,14 +60,9 @@ type ClusterConnector interface {
 	Connect(target domain.ClusterTarget, config domain.EffectiveConfig, req domain.NetworkRequirement) (ConnectionArtifacts, error)
 }
 
-// InventoryCatalog lists cluster targets from an inventory path.
+// InventoryCatalog lists cluster targets from the configured source.
 type InventoryCatalog interface {
-	ListTargets(inventoryPath string) ([]domain.ClusterTarget, error)
-}
-
-// InventoryRefresher pulls the latest inventory from its source.
-type InventoryRefresher interface {
-	Refresh(inventoryPath string) (bool, string)
+	ListTargets() ([]domain.ClusterTarget, error)
 }
 
 // ContextSwitcher sets the active kubectl context.

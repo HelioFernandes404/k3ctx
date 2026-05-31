@@ -92,7 +92,7 @@ func TestCheckVPNRequirement_InvalidInventory(t *testing.T) {
 
 func TestCheckNetworkRequirement_DetectsSshuttleForPrivateIP(t *testing.T) {
 	hostInfo := map[string]any{
-		"config": map[string]any{"ansible_host": "192.168.90.100"},
+		"config": map[string]any{"addr": "192.168.90.100"},
 	}
 	netType, netRange := domain.CheckNetworkRequirement("testhost", hostInfo)
 	assert.Equal(t, "sshuttle", netType)
@@ -101,7 +101,7 @@ func TestCheckNetworkRequirement_DetectsSshuttleForPrivateIP(t *testing.T) {
 
 func TestCheckNetworkRequirement_ReturnsNilForPublicIP(t *testing.T) {
 	hostInfo := map[string]any{
-		"config": map[string]any{"ansible_host": "8.8.8.8"},
+		"config": map[string]any{"addr": "8.8.8.8"},
 	}
 	netType, netRange := domain.CheckNetworkRequirement("testhost", hostInfo)
 	assert.Empty(t, netType)
@@ -131,7 +131,7 @@ func TestCheckNetworkRequirement_CalculatesCorrectNetworkRange(t *testing.T) {
 		{"192.168.1.255", "192.168.1.0/24"},
 	}
 	for _, tc := range cases {
-		hostInfo := map[string]any{"config": map[string]any{"ansible_host": tc.ip}}
+		hostInfo := map[string]any{"config": map[string]any{"addr": tc.ip}}
 		_, netRange := domain.CheckNetworkRequirement("testhost", hostInfo)
 		assert.Equal(t, tc.expected, netRange, "ip=%s", tc.ip)
 	}

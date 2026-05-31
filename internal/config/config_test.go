@@ -55,14 +55,6 @@ func TestLoadConfig_EnvVarOverridesFileValue(t *testing.T) {
 	assert.Equal(t, "/file/path", cfg["remote_k3s_config_path"])
 }
 
-func TestLoadConfig_InventoryPathOverriddenByEnvVar(t *testing.T) {
-	p := writeYAML(t, t.TempDir(), map[string]any{"inventory_path": "/file/inventory"})
-	t.Setenv("INVENTORY_PATH", "/env/inventory/path")
-	cfg, err := config.LoadConfig(p)
-	require.NoError(t, err)
-	assert.Equal(t, "/env/inventory/path", cfg["inventory_path"])
-}
-
 func TestLoadConfig_NumericStringsInYAMLNormalized(t *testing.T) {
 	p := writeYAML(t, t.TempDir(), map[string]any{
 		"k3s_api_port":     "7443",
@@ -106,36 +98,10 @@ func TestGetConfigValue_ReturnsValueOrDefault(t *testing.T) {
 	assert.Nil(t, config.GetConfigValue(cfg, "missing", nil))
 }
 
-func TestResolveInventoryPath_UsesExistingConfiguredPath(t *testing.T) {
-	tmp := t.TempDir()
-	inv := filepath.Join(tmp, "inventory")
-	require.NoError(t, os.Mkdir(inv, 0o755))
-
-	resolved := config.ResolveInventoryPath(map[string]any{"inventory_path": inv}, tmp)
-	assert.Equal(t, inv, resolved)
-}
-
-func TestResolveInventoryPath_FallsBackToAncestorAnsibleInventory(t *testing.T) {
-	root := t.TempDir()
-	projectDir := filepath.Join(root, ".custom-tools", "k3ctx")
-	require.NoError(t, os.MkdirAll(projectDir, 0o755))
-	ancestorInv := filepath.Join(root, "ansible", "inventory")
-	require.NoError(t, os.MkdirAll(ancestorInv, 0o755))
-
-	resolved := config.ResolveInventoryPath(
-		map[string]any{"inventory_path": filepath.Join(root, "missing", "inventory")},
-		projectDir,
-	)
-	assert.Equal(t, ancestorInv, resolved)
-}
-
 func TestLoadEffectiveConfig_BuildsCanonicalConfig(t *testing.T) {
 	tmp := t.TempDir()
-	inv := filepath.Join(tmp, "inventory")
-	require.NoError(t, os.Mkdir(inv, 0o755))
 	cfgFile := filepath.Join(tmp, "config.yaml")
 	require.NoError(t, os.WriteFile(cfgFile, mustYAML(map[string]any{
-		"inventory_path":         inv,
 		"remote_k3s_config_path": "/file/path/k3s.yaml",
 		"ssh_key_path":           "~/.ssh/from-file",
 		"k3s_api_port":           7443,
@@ -148,7 +114,6 @@ func TestLoadEffectiveConfig_BuildsCanonicalConfig(t *testing.T) {
 
 	cfg, err := config.LoadEffectiveConfig(tmp, cfgFile)
 	require.NoError(t, err)
-	assert.Equal(t, inv, cfg.InventoryPath)
 	assert.Equal(t, "/file/path/k3s.yaml", cfg.RemoteK3sConfigPath)
 	assert.Contains(t, cfg.SSHKeyPath, ".ssh/from-env")
 	assert.Contains(t, cfg.SSHConfigPath, ".ssh/config")
