@@ -4,6 +4,7 @@ import (
 	"crypto/md5" //nolint:gosec
 	"encoding/binary"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -143,4 +144,28 @@ func SaveTunnelPID(contextName string, pid *int, stateDir string) {
 	}
 	pidFile := GetTunnelPIDFile(contextName, stateDir)
 	_ = os.WriteFile(pidFile, []byte(strconv.Itoa(*pid)), 0o644)
+}
+
+// IsPortLive reports whether localhost:<localPort> accepts a TCP connection within timeout.
+func IsPortLive(localPort int, timeout time.Duration) bool {
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", localPort), timeout)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
+}
+
+// TunnelLiveness returns the liveness state of a managed tunnel:
+//   - "live"  — process running and local port responds
+//   - "stale" — process running but local port is unresponsive
+//   - "dead"  — no running process (PID file absent or process gone)
+func TunnelLiveness(contextName, stateDir string, localPort int) string {
+	if !IsTunnelRunning(contextName, stateDir) {
+		return "dead"
+	}
+	if IsPortLive(localPort, 2*time.Second) {
+		return "live"
+	}
+	return "stale"
 }

@@ -15,7 +15,9 @@ type ServiceContainer struct {
 	Switcher        application.ContextSwitcher
 	Status          application.StatusReader
 	Tunnels         application.TunnelManager
+	Reconnector     application.TunnelReconnector
 	Connector       application.ClusterConnector
+	Exec            application.ClusterExec
 	Argocd          application.ArgocdConnector
 	Alertmanager    application.AlertmanagerConnector
 	VictoriaMetrics application.VictoriaMetricsConnector
@@ -49,12 +51,17 @@ func Build(cfg domain.EffectiveConfig) ServiceContainer {
 	}
 
 	return ServiceContainer{
-		Catalog:         catalog,
-		Refresher:       refresher,
-		Switcher:        infrastructure.KubectlContextSwitcher{},
-		Status:          infrastructure.LocalStatusReader{},
+		Catalog:   catalog,
+		Refresher: refresher,
+		Switcher:  infrastructure.KubectlContextSwitcher{},
+		Status: infrastructure.LocalStatusReader{
+			PortRangeStart: cfg.PortRangeStart,
+			PortRangeSize:  cfg.PortRangeSize,
+		},
 		Tunnels:         infrastructure.LocalTunnelManager{},
+		Reconnector:     infrastructure.LocalTunnelManager{},
 		Connector:       connector,
+		Exec:            infrastructure.LocalClusterExec{},
 		Argocd:          argocd,
 		Alertmanager:    alertmanager,
 		VictoriaMetrics: victoriaMetrics,

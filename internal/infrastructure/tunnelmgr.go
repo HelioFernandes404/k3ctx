@@ -1,6 +1,7 @@
 package infrastructure
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -22,4 +23,29 @@ func (m LocalTunnelManager) stateDir() string {
 func (m LocalTunnelManager) KillTunnel(contextName string) error {
 	tunnel.KillTunnel(contextName, m.stateDir())
 	return nil
+}
+
+func (m LocalTunnelManager) ReconnectTunnel(contextName string) (int, error) {
+	stateDir := m.stateDir()
+	params, err := tunnel.LoadConnParams(contextName, stateDir)
+	if err != nil {
+		return 0, err
+	}
+	tunnel.KillTunnel(contextName, stateDir)
+	opts := tunnel.CreateTunnelOptions{
+		Username: params.Username,
+		Port:     params.SSHPort,
+	}
+	if params.KeyFile != "" {
+		opts.KeyFilename = params.KeyFile
+	}
+	if params.ProxyCmd != "" {
+		opts.ProxyCmd = params.ProxyCmd
+	}
+	pid, err := tunnel.CreateTunnel(params.SSHHost, params.InternalIP, params.LocalPort, params.RemotePort, opts)
+	if err != nil {
+		return 0, fmt.Errorf("reconnect tunnel: %w", err)
+	}
+	tunnel.SaveTunnelPID(contextName, pid, stateDir)
+	return params.LocalPort, nil
 }

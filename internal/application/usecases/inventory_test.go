@@ -155,3 +155,35 @@ func TestRefreshInventoryIfPossible_PropagatesFailure(t *testing.T) {
 	assert.Equal(t, false, (*result)[0])
 	assert.Equal(t, "git pull failed", (*result)[1])
 }
+
+// --- FindTargetsByClient ---
+
+func TestFindTargetsByClient_ReturnsEmptyWhenNoMatch(t *testing.T) {
+	catalog := &stubCatalog{targets: []domain.ClusterTarget{
+		buildTestTarget("acme", "host1", "10.0.0.1"),
+	}}
+	targets, err := usecases.FindTargetsByClient("other", "", catalog)
+	require.NoError(t, err)
+	assert.Empty(t, targets)
+}
+
+func TestFindTargetsByClient_ReturnsOnlyMatchingClient(t *testing.T) {
+	catalog := &stubCatalog{targets: []domain.ClusterTarget{
+		buildTestTarget("acme", "host1", "10.0.0.1"),
+		buildTestTarget("acme", "host2", "10.0.0.2"),
+		buildTestTarget("beta", "host3", "10.0.0.3"),
+	}}
+	targets, err := usecases.FindTargetsByClient("acme", "", catalog)
+	require.NoError(t, err)
+	require.Len(t, targets, 2)
+	for _, tgt := range targets {
+		assert.Equal(t, "acme", tgt.Company())
+	}
+}
+
+func TestFindTargetsByClient_EmptyCatalogReturnsEmpty(t *testing.T) {
+	catalog := &stubCatalog{}
+	targets, err := usecases.FindTargetsByClient("acme", "", catalog)
+	require.NoError(t, err)
+	assert.Empty(t, targets)
+}

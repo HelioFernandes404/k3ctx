@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,6 +31,13 @@ var tunnelKillAllCmd = &cobra.Command{
 	RunE:  runTunnelKillAll,
 }
 
+var tunnelReconnectCmd = &cobra.Command{
+	Use:   "tunnel-reconnect CONTEXT",
+	Short: "Re-establish a broken SSH tunnel",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runTunnelReconnect,
+}
+
 var (
 	tunnelKillYes    bool
 	tunnelKillAllYes bool
@@ -39,6 +47,7 @@ func init() {
 	rootCmd.AddCommand(tunnelCmd)
 	rootCmd.AddCommand(tunnelKillCmd)
 	rootCmd.AddCommand(tunnelKillAllCmd)
+	rootCmd.AddCommand(tunnelReconnectCmd)
 
 	tunnelKillCmd.Flags().BoolVar(&tunnelKillYes, "yes", false, "Confirm tunnel termination")
 	tunnelKillAllCmd.Flags().BoolVar(&tunnelKillAllYes, "yes", false, "Confirm termination of all tunnels")
@@ -78,6 +87,32 @@ func runTunnelKill(_ *cobra.Command, args []string) error {
 			"Pass --yes to confirm termination of tunnel: "+args[0])
 	}
 	return usecases.KillTunnel(args[0], svcs.Tunnels)
+}
+
+func runTunnelReconnect(cmd *cobra.Command, args []string) error {
+	contextName := args[0]
+	localPort, err := usecases.ReconnectTunnel(contextName, svcs.Reconnector)
+	if err != nil {
+		if jsonOutput {
+			enc := json.NewEncoder(cmd.OutOrStdout())
+			return enc.Encode(map[string]any{
+				"ok":           false,
+				"context_name": contextName,
+				"error":        err.Error(),
+			})
+		}
+		return err
+	}
+	if jsonOutput {
+		enc := json.NewEncoder(cmd.OutOrStdout())
+		return enc.Encode(map[string]any{
+			"ok":           true,
+			"context_name": contextName,
+			"local_port":   localPort,
+		})
+	}
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s reconnected on localhost:%d\n", contextName, localPort)
+	return nil
 }
 
 func runTunnelKillAll(_ *cobra.Command, _ []string) error {

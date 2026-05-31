@@ -1,10 +1,12 @@
 package tunnel_test
 
 import (
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -137,3 +139,70 @@ func TestSaveTunnelPID_DoesNothingWhenPIDNil(t *testing.T) {
 }
 
 func intPtr(v int) *int { return &v }
+
+// --- IsPortLive ---
+
+func TestIsPortLive_ReturnsFalseWhenNoListener(t *testing.T) {
+	assert.False(t, tunnel.IsPortLive(19999, 200*time.Millisecond))
+}
+
+func TestIsPortLive_ReturnsTrueWhenListening(t *testing.T) {
+	ln, err := net.Listen("tcp", "localhost:0")
+	require.NoError(t, err)
+	defer ln.Close()
+	port := ln.Addr().(*net.TCPAddr).Port
+	assert.True(t, tunnel.IsPortLive(port, time.Second))
+}
+
+// --- TunnelLiveness ---
+
+func TestTunnelLiveness_DeadWhenNoPIDFile(t *testing.T) {
+	assert.Equal(t, "dead", tunnel.TunnelLiveness("nonexistent", t.TempDir(), 19998))
+}
+
+func TestTunnelLiveness_StaleWhenPIDAliveButPortClosed(t *testing.T) {
+	stateDir := t.TempDir()
+	pidFile := tunnel.GetTunnelPIDFile("ctx", stateDir)
+	require.NoError(t, os.WriteFile(pidFile, []byte(strconv.Itoa(os.Getpid())), 0o644))
+	assert.Equal(t, "stale", tunnel.TunnelLiveness("ctx", stateDir, 19997))
+}
+
+// --- SaveConnParams / LoadConnParams ---
+
+func TestSaveLoadConnParams_Roundtrip(t *testing.T) {
+	stateDir := t.TempDir()
+	want := tunnel.ConnParams{
+		SSHHost:    "sf-ams-nl-00001.netbird.cloud",
+		InternalIP: "10.28.0.1",
+		LocalPort:  16500,
+		RemotePort: 6443,
+		Username:   "ubuntu",
+		KeyFile:    "/home/user/.ssh/id_ed25519",
+		SSHPort:    22,
+		ProxyCmd:   "",
+	}
+	require.NoError(t, tunnel.SaveConnParams("ctx", stateDir, want))
+	got, err := tunnel.LoadConnParams("ctx", stateDir)
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
+}
+
+func TestLoadConnParams_ErrorWhenMissing(t *testing.T) {
+	_, err := tunnel.LoadConnParams("nonexistent", t.TempDir())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no connection state for context nonexistent")
+}
+
+// --- TunnelLiveness (continued) ---
+
+func TestTunnelLiveness_LiveWhenPIDAliveAndPortResponds(t *testing.T) {
+	ln, err := net.Listen("tcp", "localhost:0")
+	require.NoError(t, err)
+	defer ln.Close()
+	port := ln.Addr().(*net.TCPAddr).Port
+
+	stateDir := t.TempDir()
+	pidFile := tunnel.GetTunnelPIDFile("ctx", stateDir)
+	require.NoError(t, os.WriteFile(pidFile, []byte(strconv.Itoa(os.Getpid())), 0o644))
+	assert.Equal(t, "live", tunnel.TunnelLiveness("ctx", stateDir, port))
+}

@@ -1,4 +1,4 @@
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Report context and tunnel status
 The system SHALL report active managed tunnel status from local PID state combined with a TCP liveness probe on the tunnel's local port.
@@ -23,6 +23,8 @@ The system SHALL report active managed tunnel status from local PID state combin
 - **WHEN** the user runs `k3ctx status --json`
 - **THEN** the system outputs status entries as JSON, each entry including `tunnel_running` (bool, preserved for backward compatibility) and `liveness` (string: `live`, `stale`, or `dead`)
 
+## ADDED Requirements
+
 ### Requirement: Persist SSH connection parameters at connect time
 The system SHALL write a connection sidecar file `<context>.conn.json` to the tunnel state directory upon a successful cluster connection.
 
@@ -33,31 +35,3 @@ The system SHALL write a connection sidecar file `<context>.conn.json` to the tu
 #### Scenario: Sidecar file absent does not break status
 - **WHEN** the user runs `k3ctx status` and a context has a PID file but no `.conn.json`
 - **THEN** the system reports liveness normally (PID + TCP probe) without error
-
-### Requirement: List active managed tunnels
-The system SHALL provide a command that lists context names for active managed SSH tunnels.
-
-#### Scenario: Tunnel list shows running contexts
-- **WHEN** the user runs `k3ctx tunnel-list`
-- **THEN** the system prints context names whose managed tunnels are running
-
-### Requirement: Kill one managed tunnel
-The system SHALL provide a command that terminates a managed tunnel by context name.
-
-#### Scenario: Tunnel kill delegates to manager
-- **WHEN** the user runs `k3ctx tunnel-kill CONTEXT`
-- **THEN** the system attempts to terminate the managed tunnel for `CONTEXT`
-
-### Requirement: Kill all managed tunnels
-The system SHALL provide a command that terminates all managed tunnels represented by local PID files.
-
-#### Scenario: Tunnel kill all iterates PID files
-- **WHEN** the user runs `k3ctx tunnel-kill-all`
-- **THEN** the system scans the managed tunnel state directory for PID files and attempts to kill each corresponding context tunnel
-
-### Requirement: Use default tunnel state directory
-The system SHALL use the local state tunnel directory for managed tunnel PID files unless a test adapter overrides it.
-
-#### Scenario: Default state directory is used
-- **WHEN** runtime code needs the managed tunnel state directory
-- **THEN** the system uses `$HOME/.local/state/k3ctx-tunnels`

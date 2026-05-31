@@ -26,6 +26,7 @@ var (
 	connectID               string
 	connectIP               string
 	connectContext          string
+	connectAllHosts         string
 	connectRefreshInventory bool
 	connectSkipNetbirdCheck bool
 )
@@ -37,11 +38,21 @@ func init() {
 	connectCmd.Flags().StringVar(&connectID, "id", "", "systemframe_id filter")
 	connectCmd.Flags().StringVar(&connectIP, "ip", "", "IP address filter")
 	connectCmd.Flags().StringVar(&connectContext, "context", "", "Exact context name")
+	connectCmd.Flags().StringVar(&connectAllHosts, "all-hosts", "", "Connect to all hosts for this client")
 	connectCmd.Flags().BoolVar(&connectRefreshInventory, "refresh-inventory", false, "Refresh inventory")
 	connectCmd.Flags().BoolVar(&connectSkipNetbirdCheck, "skip-netbird-check", false, "Skip NetBird daemon and peer preflight check")
 }
 
 func runConnect(cmd *cobra.Command, args []string) error {
+	if connectAllHosts != "" {
+		if len(args) > 0 || connectHost != "" || connectID != "" || connectIP != "" || connectContext != "" || connectClient != "" {
+			return newExitErr(1, "USAGE_ERROR",
+				"--all-hosts cannot be combined with other host filters or positional arguments",
+				"Use --all-hosts <client> alone to connect to all hosts for a client")
+		}
+		return runConnectAllHosts(cmd)
+	}
+
 	projectDir, _ := os.Getwd()
 	cfg, err := config.LoadEffectiveConfig(projectDir, os.Getenv("CONFIG_FILE"))
 	if err != nil {
@@ -129,6 +140,67 @@ func runConnect(cmd *cobra.Command, args []string) error {
 	}
 	if result.VictoriaMetricsLocalPort() != nil {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "VictoriaMetrics:   http://127.0.0.1:%d\n", *result.VictoriaMetricsLocalPort())
+	}
+	return nil
+}
+
+func runConnectAllHosts(cmd *cobra.Command) error {
+	projectDir, _ := os.Getwd()
+	cfg, err := config.LoadEffectiveConfig(projectDir, os.Getenv("CONFIG_FILE"))
+	if err != nil {
+		return fmt.Errorf("config error: %w", err)
+	}
+
+	if connectRefreshInventory {
+		usecases.RefreshInventoryIfPossible(cfg.InventoryPath, svcs.Refresher)
+	}
+
+	if svcs.Preflight != nil {
+		if preflightErr := svcs.Preflight.CheckDaemonReady(connectSkipNetbirdCheck); preflightErr != nil {
+			var opErr *domain.OperationError
+			if errors.As(preflightErr, &opErr) {
+				return newExitErr(2, opErr.Code, opErr.Message, opErr.Hint)
+			}
+			return newExitErr(2, "NETBIRD_NOT_READY", preflightErr.Error(), "")
+		}
+	}
+
+	targets, err := usecases.FindTargetsByClient(connectAllHosts, cfg.InventoryPath, svcs.Catalog)
+	if err != nil {
+		return err
+	}
+	if len(targets) == 0 {
+		return newExitErr(4, "NO_MATCH", "No hosts found for client: "+connectAllHosts, "")
+	}
+
+	results, err := usecases.ConnectMultiple(targets, cfg, svcs.Connector, svcs.Preflight, connectSkipNetbirdCheck, false)
+	if err != nil {
+		return err
+	}
+
+	if jsonOutput {
+		dicts := make([]map[string]any, len(results))
+		for i, r := range results {
+			dicts[i] = r.ToPublicDict()
+		}
+		enc := json.NewEncoder(cmd.OutOrStdout())
+		return enc.Encode(jsonEnvelope(cmd, dicts))
+	}
+
+	for _, r := range results {
+		if r.Success() {
+			port := ""
+			if r.LocalPort() != nil {
+				port = fmt.Sprintf(" (local port %d)", *r.LocalPort())
+			}
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Connected: %s%s\n", r.ContextName(), port)
+		} else {
+			msg := ""
+			if r.Err() != nil {
+				msg = r.Err().Message
+			}
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Failed: %s: %s\n", r.ContextName(), msg)
+		}
 	}
 	return nil
 }

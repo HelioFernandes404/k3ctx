@@ -264,6 +264,24 @@ func defaultEnsureTunnel(contextName, hostname, internalIP, username string, key
 		return nil, false, fmt.Errorf("create tunnel: %w", err)
 	}
 	tunnel.SaveTunnelPID(contextName, pid, stateDir)
+	keyFileStr := ""
+	if keyfile != nil {
+		keyFileStr = *keyfile
+	}
+	proxyCmdStr := ""
+	if proxycmd != nil {
+		proxyCmdStr = *proxycmd
+	}
+	_ = tunnel.SaveConnParams(contextName, stateDir, tunnel.ConnParams{
+		SSHHost:    hostname,
+		InternalIP: internalIP,
+		LocalPort:  localPort,
+		RemotePort: k3sPort,
+		Username:   username,
+		KeyFile:    keyFileStr,
+		SSHPort:    sshPort,
+		ProxyCmd:   proxyCmdStr,
+	})
 	return pid, false, nil
 }
 

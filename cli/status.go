@@ -34,11 +34,16 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 	for _, item := range items {
-		running := ""
-		if v, ok := item["tunnel_running"].(bool); ok && v {
-			running = " [tunnel running]"
+		marker := ""
+		switch item["liveness"] {
+		case "live":
+			marker = " [live]"
+		case "stale":
+			marker = " [stale]"
+		case "dead":
+			marker = " [dead]"
 		}
-		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n", item["context_name"], running)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s%s\n", item["context_name"], marker)
 	}
 	return nil
 }

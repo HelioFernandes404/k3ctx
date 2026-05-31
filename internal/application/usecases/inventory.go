@@ -12,6 +12,21 @@ func ListClusterTargets(inventoryPath string, catalog application.InventoryCatal
 	return catalog.ListTargets(inventoryPath)
 }
 
+// FindTargetsByClient returns all targets whose Company matches client.
+func FindTargetsByClient(client, inventoryPath string, catalog application.InventoryCatalog) ([]domain.ClusterTarget, error) {
+	all, err := ListClusterTargets(inventoryPath, catalog)
+	if err != nil {
+		return nil, err
+	}
+	var out []domain.ClusterTarget
+	for _, t := range all {
+		if t.Company() == client {
+			out = append(out, t)
+		}
+	}
+	return out, nil
+}
+
 // FindTargetByContextName returns the first target matching contextName, or nil.
 func FindTargetByContextName(contextName, inventoryPath string, catalog application.InventoryCatalog) (*domain.ClusterTarget, error) {
 	targets, err := ListClusterTargets(inventoryPath, catalog)

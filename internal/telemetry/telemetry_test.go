@@ -113,6 +113,98 @@ func TestRecord_RotatesAtSizeLimit(t *testing.T) {
 	assert.Greater(t, len(names), 1, "expected rotation, got files: %v", names)
 }
 
+// --- ReadLastN ---
+
+func writeLines(t *testing.T, path string, lines []string) {
+	t.Helper()
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644))
+}
+
+func jsonLine(cmd string, ok bool, durationMs int) string {
+	ev := map[string]any{"cmd": cmd, "ok": ok, "duration_ms": float64(durationMs), "ts": "2026-01-01T00:00:00Z"}
+	b, _ := json.Marshal(ev)
+	return string(b)
+}
+
+func TestReadLastN_EmptyDirReturnsEmpty(t *testing.T) {
+	events, err := telemetry.ReadLastN(t.TempDir(), 10)
+	require.NoError(t, err)
+	assert.Empty(t, events)
+}
+
+func TestReadLastN_ReturnsLastNFromActiveFile(t *testing.T) {
+	dir := t.TempDir()
+	lines := []string{
+		jsonLine("connect", true, 100),
+		jsonLine("status", true, 50),
+		jsonLine("hosts", true, 30),
+	}
+	writeLines(t, filepath.Join(dir, "telemetry.jsonl"), lines)
+
+	events, err := telemetry.ReadLastN(dir, 2)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	// newest-first: hosts, then status
+	assert.Equal(t, "hosts", events[0]["cmd"])
+	assert.Equal(t, "status", events[1]["cmd"])
+}
+
+func TestReadLastN_OverflowsToRotatedFile(t *testing.T) {
+	dir := t.TempDir()
+	writeLines(t, filepath.Join(dir, "telemetry.jsonl"), []string{jsonLine("status", true, 50)})
+	writeLines(t, filepath.Join(dir, "telemetry.jsonl.1"), []string{jsonLine("connect", true, 100)})
+
+	events, err := telemetry.ReadLastN(dir, 2)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	assert.Equal(t, "status", events[0]["cmd"])
+	assert.Equal(t, "connect", events[1]["cmd"])
+}
+
+func TestReadLastN_SkipsCorruptedLines(t *testing.T) {
+	dir := t.TempDir()
+	content := jsonLine("connect", true, 100) + "\nnot-valid-json\n" + jsonLine("status", true, 50) + "\n"
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "telemetry.jsonl"), []byte(content), 0o644))
+
+	events, err := telemetry.ReadLastN(dir, 10)
+	require.NoError(t, err)
+	assert.Len(t, events, 2)
+}
+
+// --- Aggregate ---
+
+func TestAggregate_EmptyDirReturnsEmpty(t *testing.T) {
+	stats, err := telemetry.Aggregate(t.TempDir())
+	require.NoError(t, err)
+	assert.Empty(t, stats)
+}
+
+func TestAggregate_ComputesPerCommandStats(t *testing.T) {
+	dir := t.TempDir()
+	lines := []string{
+		jsonLine("connect", true, 200),
+		jsonLine("connect", false, 50),
+		jsonLine("status", true, 30),
+	}
+	writeLines(t, filepath.Join(dir, "telemetry.jsonl"), lines)
+
+	stats, err := telemetry.Aggregate(dir)
+	require.NoError(t, err)
+	require.Len(t, stats, 2)
+
+	// sorted by count desc: connect(2), status(1)
+	assert.Equal(t, "connect", stats[0].Cmd)
+	assert.Equal(t, 2, stats[0].Count)
+	assert.Equal(t, 1, stats[0].OKCount)
+	assert.Equal(t, 1, stats[0].ErrorCount)
+	assert.InDelta(t, 0.5, stats[0].ErrorRate, 0.001)
+	assert.InDelta(t, 125.0, stats[0].AvgDuration, 0.001)
+
+	assert.Equal(t, "status", stats[1].Cmd)
+	assert.Equal(t, 0.0, stats[1].ErrorRate)
+}
+
 func TestRecord_RespectsMaxFiles(t *testing.T) {
 	dir := t.TempDir()
 

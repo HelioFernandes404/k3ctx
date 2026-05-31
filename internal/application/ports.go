@@ -1,8 +1,24 @@
 package application
 
 import (
+	"context"
+
 	"github.com/systemframe/k3ctx/internal/domain"
 )
+
+// ExecResult holds the outcome of running a kubectl command against one context.
+type ExecResult struct {
+	Context  string
+	OK       bool
+	Stdout   string
+	Stderr   string
+	ExitCode int
+}
+
+// ClusterExec runs an arbitrary kubectl command against a named context.
+type ClusterExec interface {
+	ExecOnContext(ctx context.Context, contextName string, args []string) ExecResult
+}
 
 // ConnectionArtifacts holds the outputs of a successful cluster connection.
 type ConnectionArtifacts struct {
@@ -68,6 +84,13 @@ type StatusReader interface {
 // TunnelManager manages tunnel lifecycle.
 type TunnelManager interface {
 	KillTunnel(contextName string) error
+}
+
+// TunnelReconnector re-establishes a broken managed tunnel using persisted SSH parameters.
+type TunnelReconnector interface {
+	// ReconnectTunnel kills any existing tunnel for contextName, opens a new one
+	// using stored ConnParams, and returns the local port on success.
+	ReconnectTunnel(contextName string) (int, error)
 }
 
 // ArgocdConnector sets up the ArgoCD tunnel and login.

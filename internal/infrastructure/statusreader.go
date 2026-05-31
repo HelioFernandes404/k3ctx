@@ -12,6 +12,8 @@ import (
 type LocalStatusReader struct {
 	StateDir       string
 	KubeconfigPath string
+	PortRangeStart int
+	PortRangeSize  int
 }
 
 func (r LocalStatusReader) stateDir() string {
@@ -21,6 +23,20 @@ func (r LocalStatusReader) stateDir() string {
 	return filepath.Join(os.Getenv("HOME"), ".local", "state", "k3ctx-tunnels")
 }
 
+func (r LocalStatusReader) portRangeStart() int {
+	if r.PortRangeStart != 0 {
+		return r.PortRangeStart
+	}
+	return 16443
+}
+
+func (r LocalStatusReader) portRangeSize() int {
+	if r.PortRangeSize != 0 {
+		return r.PortRangeSize
+	}
+	return 10000
+}
+
 func (r LocalStatusReader) ListContextStatus() ([]map[string]any, error) {
 	stateDir := r.stateDir()
 	entries, _ := filepath.Glob(filepath.Join(stateDir, "*.pid"))
@@ -28,10 +44,12 @@ func (r LocalStatusReader) ListContextStatus() ([]map[string]any, error) {
 	for _, pidFile := range entries {
 		base := filepath.Base(pidFile)
 		contextName := base[:len(base)-4] // strip .pid
-		running := tunnel.IsTunnelRunning(contextName, stateDir)
+		localPort := tunnel.GetUniquePort(contextName, r.portRangeStart(), r.portRangeSize())
+		liveness := tunnel.TunnelLiveness(contextName, stateDir, localPort)
 		items = append(items, map[string]any{
 			"context_name":   contextName,
-			"tunnel_running": running,
+			"tunnel_running": liveness != "dead",
+			"liveness":       liveness,
 		})
 	}
 	return items, nil
