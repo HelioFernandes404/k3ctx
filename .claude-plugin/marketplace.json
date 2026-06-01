@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "k3ctx",
+  "description": "CLI that discovers K3s cluster hosts from NetBird peers, opens SSH tunnels, and merges kubeconfig contexts.",
+  "owner": {
+    "name": "Helio Fernandes",
+    "url": "https://github.com/HelioFernandes404"
+  },
+  "plugins": [
+    {
+      "name": "k3ctx",
+      "description": "Workflow guide for k3ctx: connect to K3s clusters via NetBird peer discovery, manage SSH tunnels, and switch kubeconfig contexts.",
+      "source": "./",
+      "category": "devops"
+    }
+  ]
+}

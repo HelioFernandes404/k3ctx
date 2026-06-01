@@ -1,0 +1,8 @@
+{
+  "name": "k3ctx",
+  "description": "Workflow guide for k3ctx: connect to K3s clusters via NetBird peer discovery, manage SSH tunnels, and switch kubeconfig contexts.",
+  "author": {
+    "name": "Helio Fernandes",
+    "url": "https://github.com/HelioFernandes404"
+  }
+}
