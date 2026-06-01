@@ -120,6 +120,18 @@ func TestLoadEffectiveConfig_BuildsCanonicalConfig(t *testing.T) {
 	assert.Equal(t, 8443, cfg.K3sAPIPort)
 	assert.Equal(t, 20000, cfg.PortRangeStart)
 	assert.Equal(t, 5000, cfg.PortRangeSize)
+	assert.Equal(t, "helio", cfg.SSHUser)
+}
+
+func TestLoadEffectiveConfig_SSHUserEnvOverridesDefault(t *testing.T) {
+	tmp := t.TempDir()
+	cfgFile := filepath.Join(tmp, "config.yaml")
+	require.NoError(t, os.WriteFile(cfgFile, []byte("{}"), 0o644))
+	t.Setenv("SSH_USER", "deploy")
+
+	cfg, err := config.LoadEffectiveConfig(tmp, cfgFile)
+	require.NoError(t, err)
+	assert.Equal(t, "deploy", cfg.SSHUser)
 }
 
 func TestLoadEffectiveConfig_InvalidNumericEnvUsesDefault(t *testing.T) {

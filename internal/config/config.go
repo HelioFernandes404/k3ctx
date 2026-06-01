@@ -15,6 +15,7 @@ const (
 	defaultRemoteK3sConfigPath = "/etc/rancher/k3s/k3s.yaml"
 	defaultSSHKeyPath          = "~/.ssh/id_ed25519"
 	defaultSSHConfigPath       = "~/.ssh/config"
+	defaultSSHUser             = "helio"
 	defaultK3sAPIPort          = 6443
 	defaultPortRangeStart      = 16443
 	defaultPortRangeSize       = 10000
@@ -27,6 +28,7 @@ var numericKeys = []string{"k3s_api_port", "port_range_start", "port_range_size"
 var envMapping = map[string]string{
 	"remote_k3s_config_path": "REMOTE_K3S_CONFIG_PATH",
 	"ssh_key_path":           "SSH_KEY_PATH",
+	"ssh_user":               "SSH_USER",
 	"k3s_api_port":           "K3S_API_PORT",
 	"port_range_start":       "PORT_RANGE_START",
 	"port_range_size":        "PORT_RANGE_SIZE",
@@ -99,6 +101,7 @@ func LoadEffectiveConfig(projectDir, configFilePath string) (domain.EffectiveCon
 	return domain.EffectiveConfig{
 		SSHConfigPath:       expandHome(defaultSSHConfigPath),
 		SSHKeyPath:          expandHome(strVal(GetConfigValue(cfg, "ssh_key_path", defaultSSHKeyPath))),
+		SSHUser:             strVal(GetConfigValue(cfg, "ssh_user", defaultSSHUser)),
 		RemoteK3sConfigPath: strVal(GetConfigValue(cfg, "remote_k3s_config_path", defaultRemoteK3sConfigPath)),
 		K3sAPIPort:          canonicalInt(cfg, "k3s_api_port", defaultK3sAPIPort),
 		PortRangeStart:      canonicalInt(cfg, "port_range_start", defaultPortRangeStart),

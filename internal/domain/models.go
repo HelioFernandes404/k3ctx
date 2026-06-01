@@ -6,6 +6,7 @@ import "fmt"
 type EffectiveConfig struct {
 	SSHConfigPath       string
 	SSHKeyPath          string
+	SSHUser             string
 	RemoteK3sConfigPath string
 	K3sAPIPort          int
 	PortRangeStart      int

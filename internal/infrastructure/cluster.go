@@ -220,7 +220,7 @@ func (c *LocalClusterConnector) verifyOrRecreateTunnel(
 func defaultSSHConnect(target domain.ClusterTarget, cfg domain.EffectiveConfig) (string, string, *string, int, *string, func(string) (string, error), error) {
 	sshCfg := sshpkg.LoadSSHConfig(target.HostAlias(), cfg.SSHConfigPath)
 	hostname, username, keyfile, sshPort, proxycmd, err := sshpkg.ResolveConnectionTarget(
-		target.HostAlias(), sshCfg, cfg.SSHKeyPath, target.HostConfig(),
+		target.HostAlias(), sshCfg, cfg.SSHKeyPath, target.HostConfig(), cfg.SSHUser,
 	)
 	if err != nil {
 		return "", "", nil, 0, nil, nil, err

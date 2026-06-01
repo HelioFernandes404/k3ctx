@@ -76,7 +76,7 @@ Host *
 func TestResolveConnectionTarget_InventoryHostOverridesSshConfig(t *testing.T) {
 	sshCfg := map[string]string{"hostname": "ssh-hostname", "user": "ubuntu"}
 	hostCfg := map[string]any{"addr": "10.0.0.1"}
-	hostname, username, keyfile, port, proxycmd, err := ResolveConnectionTarget("alias", sshCfg, "", hostCfg)
+	hostname, username, keyfile, port, proxycmd, err := ResolveConnectionTarget("alias", sshCfg, "", hostCfg, "helio")
 	require.NoError(t, err)
 	assert.Equal(t, "10.0.0.1", hostname)
 	assert.Equal(t, "ubuntu", username)
@@ -87,7 +87,7 @@ func TestResolveConnectionTarget_InventoryHostOverridesSshConfig(t *testing.T) {
 
 func TestResolveConnectionTarget_UsesSshConfigHostname(t *testing.T) {
 	sshCfg := map[string]string{"hostname": "resolved.host", "user": "ec2-user", "port": "2222"}
-	hostname, username, _, port, _, err := ResolveConnectionTarget("alias", sshCfg, "", nil)
+	hostname, username, _, port, _, err := ResolveConnectionTarget("alias", sshCfg, "", nil, "helio")
 	require.NoError(t, err)
 	assert.Equal(t, "resolved.host", hostname)
 	assert.Equal(t, "ec2-user", username)
@@ -95,13 +95,13 @@ func TestResolveConnectionTarget_UsesSshConfigHostname(t *testing.T) {
 }
 
 func TestResolveConnectionTarget_FallsBackToAlias(t *testing.T) {
-	hostname, _, _, _, _, err := ResolveConnectionTarget("my-alias", map[string]string{}, "", nil)
+	hostname, _, _, _, _, err := ResolveConnectionTarget("my-alias", map[string]string{}, "", nil, "helio")
 	require.NoError(t, err)
 	assert.Equal(t, "my-alias", hostname)
 }
 
 func TestResolveConnectionTarget_UsesProvidedKeyPath(t *testing.T) {
-	_, _, keyfile, _, _, err := ResolveConnectionTarget("alias", map[string]string{}, "/tmp/my.key", nil)
+	_, _, keyfile, _, _, err := ResolveConnectionTarget("alias", map[string]string{}, "/tmp/my.key", nil, "helio")
 	require.NoError(t, err)
 	require.NotNil(t, keyfile)
 	assert.Equal(t, "/tmp/my.key", *keyfile)
@@ -109,7 +109,7 @@ func TestResolveConnectionTarget_UsesProvidedKeyPath(t *testing.T) {
 
 func TestResolveConnectionTarget_PrefersConfigKeyOverFallback(t *testing.T) {
 	sshCfg := map[string]string{"identityfile": "/home/user/.ssh/cfg_key"}
-	_, _, keyfile, _, _, err := ResolveConnectionTarget("alias", sshCfg, "/tmp/fallback.key", nil)
+	_, _, keyfile, _, _, err := ResolveConnectionTarget("alias", sshCfg, "/tmp/fallback.key", nil, "helio")
 	require.NoError(t, err)
 	require.NotNil(t, keyfile)
 	assert.Contains(t, *keyfile, "cfg_key")
@@ -117,7 +117,7 @@ func TestResolveConnectionTarget_PrefersConfigKeyOverFallback(t *testing.T) {
 
 func TestResolveConnectionTarget_SetsProxycmd(t *testing.T) {
 	sshCfg := map[string]string{"proxycommand": "ssh -W %h:%p bastion"}
-	_, _, _, _, proxycmd, err := ResolveConnectionTarget("alias", sshCfg, "", nil)
+	_, _, _, _, proxycmd, err := ResolveConnectionTarget("alias", sshCfg, "", nil, "helio")
 	require.NoError(t, err)
 	require.NotNil(t, proxycmd)
 	assert.Equal(t, "ssh -W %h:%p bastion", *proxycmd)
@@ -125,21 +125,27 @@ func TestResolveConnectionTarget_SetsProxycmd(t *testing.T) {
 
 func TestResolveConnectionTarget_IgnoresNoneProxycmd(t *testing.T) {
 	sshCfg := map[string]string{"proxycommand": "none"}
-	_, _, _, _, proxycmd, err := ResolveConnectionTarget("alias", sshCfg, "", nil)
+	_, _, _, _, proxycmd, err := ResolveConnectionTarget("alias", sshCfg, "", nil, "helio")
 	require.NoError(t, err)
 	assert.Nil(t, proxycmd)
 }
 
 func TestResolveConnectionTarget_DefaultsPort22(t *testing.T) {
-	_, _, _, port, _, err := ResolveConnectionTarget("alias", map[string]string{}, "", nil)
+	_, _, _, port, _, err := ResolveConnectionTarget("alias", map[string]string{}, "", nil, "helio")
 	require.NoError(t, err)
 	assert.Equal(t, 22, port)
 }
 
-func TestResolveConnectionTarget_DefaultsUsernameUbuntu(t *testing.T) {
-	_, username, _, _, _, err := ResolveConnectionTarget("alias", map[string]string{}, "", nil)
+func TestResolveConnectionTarget_DefaultsUsernameFromParam(t *testing.T) {
+	_, username, _, _, _, err := ResolveConnectionTarget("alias", map[string]string{}, "", nil, "helio")
 	require.NoError(t, err)
-	assert.Equal(t, "ubuntu", username)
+	assert.Equal(t, "helio", username)
+}
+
+func TestResolveConnectionTarget_ErrorsOnEmptyUsername(t *testing.T) {
+	_, _, _, _, _, err := ResolveConnectionTarget("alias", map[string]string{}, "", nil, "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ssh user is empty")
 }
 
 // --- GetInternalIP ---

@@ -96,11 +96,13 @@ func matchesHost(alias string, patterns []string) bool {
 
 // ResolveConnectionTarget resolves the final SSH connection parameters.
 // addr in hostConfig overrides the SSH config hostname.
+// defaultUser is used when neither the SSH config nor hostConfig specifies a user.
 func ResolveConnectionTarget(
 	hostAlias string,
 	sshConfig map[string]string,
 	sshKeyPath string,
 	hostConfig map[string]any,
+	defaultUser string,
 ) (hostname, username string, keyfile *string, port int, proxycmd *string, err error) {
 	hostname = hostAlias
 	if h := sshConfig["hostname"]; h != "" {
@@ -112,9 +114,12 @@ func ResolveConnectionTarget(
 		}
 	}
 
-	username = "ubuntu"
+	username = defaultUser
 	if u := sshConfig["user"]; u != "" {
 		username = u
+	}
+	if username == "" {
+		return "", "", nil, 0, nil, fmt.Errorf("ssh user is empty: set ssh_user in config or SSH_USER env var")
 	}
 
 	port = 22

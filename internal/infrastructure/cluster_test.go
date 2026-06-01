@@ -22,6 +22,7 @@ func makeEffectiveConfig(t *testing.T) domain.EffectiveConfig {
 	return domain.EffectiveConfig{
 		SSHConfigPath:       "~/.ssh/config",
 		SSHKeyPath:          "~/.ssh/id_ed25519",
+		SSHUser:             "helio",
 		RemoteK3sConfigPath: "/etc/rancher/k3s/k3s.yaml",
 		K3sAPIPort:          6443,
 		PortRangeStart:      16443,
