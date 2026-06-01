@@ -32,7 +32,7 @@ echo ""
 
 # 1. k3ctx binary
 if command -v k3ctx &>/dev/null; then
-  version=$(k3ctx version 2>/dev/null | head -1 || echo "unknown")
+  version=$(k3ctx --version 2>/dev/null | head -1 || echo "unknown")
   check "k3ctx binary" "$PASS" "$version"
 else
   check "k3ctx binary" "$FAIL" "not found on PATH — run: make install"

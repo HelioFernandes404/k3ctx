@@ -135,10 +135,33 @@ peers are listed regardless of connectivity; status is informational.
 | Alias | Context name | NetBird FQDN |
 |-------|-------------|--------------|
 | `prod-primaria` | `systemframe-sf-prd-us-00001` | `sf-prd-us-00001.systemframe.vpn` |
-| `thinkpad-medium` / test | `systemframe-sf-tst-sp-00001` | `sf-tst-sp-00001.systemframe.vpn` |
+| `prod-secundaria` | `systemframe-sf-prd-us-00002` | `sf-prd-us-00002.systemframe.vpn` |
+| `thinkpad-medium` / `thinkpad` / test | `systemframe-sf-tst-sp-00001` | `sf-tst-sp-00001.systemframe.vpn` |
+| `thinkpad-dev-large` / `thinkpad-large` | `systemframe-sf-tst-sp-00003` | `sf-tst-sp-00003.systemframe.vpn` |
+| `logs machine` / `hostinger-vps-prod` / ELK | `systemframe-sf-prd-sp-00031` | `sf-prd-sp-00031.systemframe.vpn` |
 
 When user says "prod-primaria" → target `systemframe-sf-prd-us-00001`.
+When user says "prod-secundaria" → target `systemframe-sf-prd-us-00002`.
 When user says "thinkpad" or "test machine" → target `systemframe-sf-tst-sp-00001`.
+When user says "thinkpad-large", "thinkpad-dev-large" or "large tester" → target `systemframe-sf-tst-sp-00003`.
+When user says "logs machine", "ELK", "hostinger" or "MCP do ELK" → target `systemframe-sf-prd-sp-00031`.
+
+**For unlisted or ambiguous aliases**, resolve with:
+
+```bash
+bash agentskills/k3ctx/scripts/resolve-alias.sh "<term>"
+```
+
+Output JSON — use `matches[0].context_name` for `k3ctx connect --context`. Exit 1 when no match.
+
+```bash
+# Examples
+bash agentskills/k3ctx/scripts/resolve-alias.sh prod-secundaria
+bash agentskills/k3ctx/scripts/resolve-alias.sh thinkpad-large
+bash agentskills/k3ctx/scripts/resolve-alias.sh elk
+```
+
+Manifests live in `agentskills/k3ctx/hosts/*.md`. Add a new file there to register a new host.
 
 ---
 
