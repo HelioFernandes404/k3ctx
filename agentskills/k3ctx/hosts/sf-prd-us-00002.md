@@ -13,4 +13,9 @@ tags:
   - ec2
   - k3s
   - alertmanager
+default_namespaces:
+  - kube-system
+  - argocd
+  - monitoring
+  - default
 ---

@@ -101,6 +101,21 @@ will work.
 ```
 Each tunnel item has: `context_name`, `tunnel_running` (bool), `liveness` (`"live"` / `"stale"` / `"dead"`).
 
+**`status` does NOT include `local_port`.** Read local ports from state files instead:
+
+```bash
+# Main context port (k3s API forwarded locally)
+jq '.local_port' ~/.local/state/k3ctx-tunnels/<context>.conn.json
+# Example:
+jq '.local_port' ~/.local/state/k3ctx-tunnels/systemframe-sf-tst-sp-00003.conn.json
+
+# ArgoCD tunnel port — extract from SSH process cmdline
+pid=$(cat ~/.local/state/k3ctx-tunnels/<context>-argocd.pid)
+tr '\0' ' ' < /proc/$pid/cmdline | grep -oP '(?<=-L )\d+'
+```
+
+ArgoCD local ports are dynamic (chosen at `connect` time) — do not hardcode them.
+
 **`schema` command:** returns a full JSON manifest of all commands, flags, exit codes, and error codes. Call it once to orient before using other commands:
 ```bash
 k3ctx schema | jq .data.commands

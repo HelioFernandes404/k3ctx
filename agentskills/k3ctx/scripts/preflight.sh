@@ -96,6 +96,15 @@ else
   check "active tunnels" "$SKIP" "state dir absent"
 fi
 
+# 8. Available hosts — informational, show context names the agent can connect to
+echo ""
+echo "=== available hosts (systemframe) ==="
+if command -v k3ctx &>/dev/null; then
+  k3ctx hosts systemframe --all 2>/dev/null || echo "(unable to list hosts — run k3ctx hosts systemframe to debug)"
+else
+  echo "(k3ctx binary not found — skipping)"
+fi
+
 echo ""
 echo "=== summary: $ok passed, $fail failed ==="
 

@@ -19,4 +19,9 @@ tags:
   - filebeat
   - logs
   - vps
+default_namespaces:
+  - kube-system
+  - elastic-system
+  - monitoring
+  - default
 ---

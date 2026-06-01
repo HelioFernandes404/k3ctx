@@ -12,4 +12,9 @@ tags:
   - production
   - ec2
   - k3s
+default_namespaces:
+  - kube-system
+  - argocd
+  - monitoring
+  - default
 ---
