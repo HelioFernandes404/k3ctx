@@ -15,10 +15,8 @@ import (
 	"github.com/systemframe/k3ctx/internal/config"
 	"github.com/systemframe/k3ctx/internal/paths"
 	"github.com/systemframe/k3ctx/internal/telemetry"
+	buildversion "github.com/systemframe/k3ctx/internal/version"
 )
-
-// Version is set at build time via -ldflags "-X cli.Version=x.y.z".
-var Version = "dev"
 
 var (
 	svcs           bootstrap.ServiceContainer
@@ -120,7 +118,7 @@ var rootCmd = &cobra.Command{
 			Flags:      flags,
 			DurationMs: time.Since(cmdStart).Milliseconds(),
 			Ok:         true,
-			Version:    Version,
+			Version:    buildversion.Version,
 		})
 		return nil
 	},
@@ -162,11 +160,13 @@ func recordErrorTelemetry(err error) {
 		DurationMs: time.Since(cmdStart).Milliseconds(),
 		Ok:         false,
 		Error:      err.Error(),
-		Version:    Version,
+		Version:    buildversion.Version,
 	})
 }
 
 func init() {
+	rootCmd.Version = buildversion.Version
+	rootCmd.SetVersionTemplate(versionJSON())
 	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "Output as JSON")
 	rootCmd.SilenceErrors = true
 	rootCmd.SilenceUsage = true

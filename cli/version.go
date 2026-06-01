@@ -1,19 +1,16 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 
-	"github.com/spf13/cobra"
+	buildversion "github.com/systemframe/k3ctx/internal/version"
 )
 
-var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Print the k3ctx version",
-	Args:  cobra.NoArgs,
-	RunE: func(cmd *cobra.Command, _ []string) error {
-		fmt.Fprintf(cmd.OutOrStdout(), "k3ctx %s\n", Version)
-		return nil
-	},
+func versionJSON() string {
+	b, err := json.Marshal(buildversion.Current())
+	if err != nil {
+		return fmt.Sprintf("{\"version\":%q,\"commit\":%q,\"date\":%q}\n", buildversion.Version, buildversion.Commit, buildversion.Date)
+	}
+	return string(b) + "\n"
 }
-
-func init() { rootCmd.AddCommand(versionCmd) }

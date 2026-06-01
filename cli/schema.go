@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	buildversion "github.com/systemframe/k3ctx/internal/version"
 )
 
 var schemaCmd = &cobra.Command{
@@ -20,7 +21,7 @@ func runSchema(cmd *cobra.Command, _ []string) error {
 	enc := json.NewEncoder(cmd.OutOrStdout())
 	enc.SetIndent("", "  ")
 	return enc.Encode(jsonEnvelope(cmd, map[string]any{
-		"version": Version,
+		"version": buildversion.Version,
 		"behavior": map[string]any{
 			"json_auto": "JSON output is enabled automatically when stdout is not a TTY",
 			"envelope":  "success: {ok,command,data}  error: {ok,error:{code,message,hint,retryable}}",
