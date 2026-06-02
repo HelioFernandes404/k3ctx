@@ -112,9 +112,33 @@ jq '.local_port' ~/.local/state/k3ctx-tunnels/systemframe-sf-tst-sp-00003.conn.j
 # ArgoCD tunnel port — extract from SSH process cmdline
 pid=$(cat ~/.local/state/k3ctx-tunnels/<context>-argocd.pid)
 tr '\0' ' ' < /proc/$pid/cmdline | grep -oP '(?<=-L )\d+'
+
+# Alertmanager tunnel port — extract from kubectl port-forward cmdline
+pid=$(cat ~/.local/state/k3ctx-tunnels/<context>-alertmanager.pid)
+tr '\0' ' ' < /proc/$pid/cmdline | grep -oP '\d+(?=:9093)'
+# Example:
+pid=$(cat ~/.local/state/k3ctx-tunnels/systemframe-sf-tst-sp-00003-alertmanager.pid)
+tr '\0' ' ' < /proc/$pid/cmdline | grep -oP '\d+(?=:9093)'
 ```
 
-ArgoCD local ports are dynamic (chosen at `connect` time) — do not hardcode them.
+All secondary tunnel ports (ArgoCD, Alertmanager) are dynamic — do not hardcode them.
+
+**Alertmanager via `amtool`:** always use the port opened by k3ctx — never manually open a separate port-forward.
+
+```bash
+# Get port from connect output (preferred — capture at connect time)
+port=$(k3ctx connect --context <context> --json | jq '.data.alertmanager_local_port')
+
+# Get port for an already-running tunnel
+port=$(pid=$(cat ~/.local/state/k3ctx-tunnels/<context>-alertmanager.pid); tr '\0' ' ' < /proc/$pid/cmdline | grep -oP '\d+(?=:9093)')
+
+# Use amtool (systemframe sub-path is /alertmanager)
+amtool --alertmanager.url=http://localhost:${port}/alertmanager cluster
+amtool --alertmanager.url=http://localhost:${port}/alertmanager alert
+amtool --alertmanager.url=http://localhost:${port}/alertmanager silence query
+```
+
+The Alertmanager service in systemframe clusters is ClusterIP — k3ctx opens a `kubectl port-forward` automatically during `connect`. No manual port-forward needed.
 
 **`schema` command:** returns a full JSON manifest of all commands, flags, exit codes, and error codes. Call it once to orient before using other commands:
 ```bash
