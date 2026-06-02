@@ -73,10 +73,38 @@ func TestDiscoverAlertmanagerService_PrefersPort9093(t *testing.T) {
 	assert.Equal(t, 30093, result.NodePort)
 }
 
-func TestDiscoverAlertmanagerService_SkipsClusterIPOnly(t *testing.T) {
+func TestDiscoverAlertmanagerService_SelectsClusterIPAsFallback(t *testing.T) {
 	out := servicesJSON(serviceJSON(
 		"monitoring", "alertmanager", `{}`, "ClusterIP",
 		`{"name":"http","port":9093}`,
+	))
+
+	result := discoverAlertmanagerService("acme-prod", func(_ []string) (string, error) { return out, nil })
+
+	require.NotNil(t, result)
+	assert.Equal(t, "monitoring", result.Namespace)
+	assert.Equal(t, "alertmanager", result.ServiceName)
+	assert.Equal(t, 9093, result.NodePort)
+	assert.True(t, result.UseKubectl)
+}
+
+func TestDiscoverAlertmanagerService_PrefersNodePortOverClusterIP(t *testing.T) {
+	out := servicesJSON(fmt.Sprintf("%s,%s",
+		serviceJSON("monitoring", "alertmanager", `{}`, "ClusterIP", `{"name":"http","port":9093}`),
+		serviceJSON("monitoring", "alertmanager", `{}`, "NodePort", nodePortJSON("http", 9093, 30093)),
+	))
+
+	result := discoverAlertmanagerService("acme-prod", func(_ []string) (string, error) { return out, nil })
+
+	require.NotNil(t, result)
+	assert.Equal(t, 30093, result.NodePort)
+	assert.False(t, result.UseKubectl)
+}
+
+func TestDiscoverAlertmanagerService_SkipsClusterIPWithNoMatchingPort(t *testing.T) {
+	out := servicesJSON(serviceJSON(
+		"monitoring", "alertmanager", `{}`, "ClusterIP",
+		`{"name":"metrics","port":8080}`,
 	))
 
 	result := discoverAlertmanagerService("acme-prod", func(_ []string) (string, error) { return out, nil })
@@ -168,6 +196,70 @@ func TestLocalAlertmanagerConnector_ReusesExistingTunnel(t *testing.T) {
 	require.NoError(t, err)
 	assert.False(t, createCalled)
 	assert.NotNil(t, result.LocalPort)
+}
+
+func TestLocalAlertmanagerConnector_OpensKubectlPortForwardForClusterIP(t *testing.T) {
+	var kubectlCalled bool
+	var tunnelCalled bool
+
+	conn := NewLocalAlertmanagerConnector()
+	conn.isTunnelRunning = func(_, _ string) bool { return false }
+	conn.createKubectlPortForward = func(ctx, ns, svc string, _ int, remote int) (*int, error) {
+		kubectlCalled = true
+		assert.Equal(t, "acme-prod", ctx)
+		assert.Equal(t, "monitoring", ns)
+		assert.Equal(t, "alertmanager", svc)
+		assert.Equal(t, 9093, remote)
+		pid := 77777
+		return &pid, nil
+	}
+	conn.createTunnel = func(_, _ string, _, _ int, _ tunnel.CreateTunnelOptions) (*int, error) {
+		tunnelCalled = true
+		return nil, nil
+	}
+	conn.saveTunnelPID = func(_ string, _ *int, _ string) {}
+	conn.discoverService = func(_ string) *discoveredAlertmanagerService {
+		port := 9093
+		return &discoveredAlertmanagerService{
+			Namespace:   "monitoring",
+			ServiceName: "alertmanager",
+			NodePort:    port,
+			UseKubectl:  true,
+		}
+	}
+
+	h, u, kf, p, pc, ip := alertmanagerSSHArgs()
+	result, err := conn.Setup("acme-prod", domain.AutoDiscoverAlertmanagerConfig(), h, u, kf, p, pc, ip)
+
+	require.NoError(t, err)
+	assert.True(t, kubectlCalled, "createKubectlPortForward should be called for ClusterIP")
+	assert.False(t, tunnelCalled, "createTunnel should NOT be called for ClusterIP")
+	assert.NotNil(t, result.LocalPort)
+}
+
+func TestLocalAlertmanagerConnector_KubectlErrorReturnsMessageNotError(t *testing.T) {
+	conn := NewLocalAlertmanagerConnector()
+	conn.isTunnelRunning = func(_, _ string) bool { return false }
+	conn.createKubectlPortForward = func(_, _, _ string, _, _ int) (*int, error) {
+		return nil, fmt.Errorf("kubectl: connection refused")
+	}
+	conn.saveTunnelPID = func(_ string, _ *int, _ string) {}
+	conn.discoverService = func(_ string) *discoveredAlertmanagerService {
+		port := 9093
+		return &discoveredAlertmanagerService{
+			Namespace:   "monitoring",
+			ServiceName: "alertmanager",
+			NodePort:    port,
+			UseKubectl:  true,
+		}
+	}
+
+	h, u, kf, p, pc, ip := alertmanagerSSHArgs()
+	result, err := conn.Setup("acme-prod", domain.AutoDiscoverAlertmanagerConfig(), h, u, kf, p, pc, ip)
+
+	require.NoError(t, err)
+	assert.Nil(t, result.LocalPort)
+	assert.Contains(t, result.Message, "alertmanager tunnel failed")
 }
 
 func TestLocalAlertmanagerConnector_TunnelErrorReturnsMessageNotError(t *testing.T) {

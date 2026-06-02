@@ -137,6 +137,37 @@ func CreateTunnel(sshHost, internalIP string, localPort, remotePort int, opts Cr
 	return &pid, nil
 }
 
+// CreateKubectlPortForward opens a background kubectl port-forward and returns the process PID.
+// Returns nil PID when pgrep cannot locate the process (not an error).
+func CreateKubectlPortForward(contextName, namespace, serviceName string, localPort, remotePort int) (*int, error) {
+	cmd := exec.Command(
+		"kubectl", "port-forward",
+		"-n", namespace,
+		"--context", contextName,
+		"svc/"+serviceName,
+		fmt.Sprintf("%d:%d", localPort, remotePort),
+	)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("kubectl port-forward process failed: %w", err)
+	}
+	_ = cmd.Process.Release()
+
+	time.Sleep(500 * time.Millisecond)
+
+	pattern := fmt.Sprintf("kubectl.*port-forward.*%d:%d", localPort, remotePort)
+	pgrepOut, err := exec.Command("pgrep", "-f", pattern).Output()
+	if err != nil || len(strings.TrimSpace(string(pgrepOut))) == 0 {
+		return nil, nil
+	}
+	pid, err := strconv.Atoi(strings.Fields(string(pgrepOut))[0])
+	if err != nil {
+		return nil, nil
+	}
+	return &pid, nil
+}
+
 // SaveTunnelPID writes the PID to the tunnel PID file. No-op when pid is nil.
 func SaveTunnelPID(contextName string, pid *int, stateDir string) {
 	if pid == nil {
