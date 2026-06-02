@@ -1,17 +1,16 @@
 package usecases
 
 import (
-	"github.com/systemframe/k3ctx/internal/application"
 	"github.com/systemframe/k3ctx/internal/domain"
 )
 
 // ListClusterTargets returns all targets from the inventory catalog.
-func ListClusterTargets(catalog application.InventoryCatalog) ([]domain.ClusterTarget, error) {
+func ListClusterTargets(catalog domain.InventoryCatalog) ([]domain.ClusterTarget, error) {
 	return catalog.ListTargets()
 }
 
 // FindTargetsByClient returns all targets whose Company matches client.
-func FindTargetsByClient(client string, catalog application.InventoryCatalog) ([]domain.ClusterTarget, error) {
+func FindTargetsByClient(client string, catalog domain.InventoryCatalog) ([]domain.ClusterTarget, error) {
 	all, err := ListClusterTargets(catalog)
 	if err != nil {
 		return nil, err
@@ -26,7 +25,7 @@ func FindTargetsByClient(client string, catalog application.InventoryCatalog) ([
 }
 
 // FindTargetByContextName returns the first target matching contextName, or nil.
-func FindTargetByContextName(contextName string, catalog application.InventoryCatalog) (*domain.ClusterTarget, error) {
+func FindTargetByContextName(contextName string, catalog domain.InventoryCatalog) (*domain.ClusterTarget, error) {
 	targets, err := ListClusterTargets(catalog)
 	if err != nil {
 		return nil, err
@@ -55,7 +54,7 @@ func DeduplicateContextNames(names []string) []string {
 
 // SelectTargetsByContextName resolves context names to ClusterTargets.
 // Returns (selected, missing) — missing contains names not found in catalog.
-func SelectTargetsByContextName(contextNames []string, catalog application.InventoryCatalog) ([]domain.ClusterTarget, []string, error) {
+func SelectTargetsByContextName(contextNames []string, catalog domain.InventoryCatalog) ([]domain.ClusterTarget, []string, error) {
 	available, err := ListClusterTargets(catalog)
 	if err != nil {
 		return nil, nil, err

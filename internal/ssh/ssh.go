@@ -2,6 +2,7 @@ package ssh
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -23,11 +24,11 @@ func LoadSSHConfig(alias, configPath string) map[string]string {
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return map[string]string{}
 	}
-	f, err := os.Open(configPath)
+	f, err := os.Open(configPath) //nolint:gosec // configPath comes from validated config
 	if err != nil {
 		return map[string]string{}
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return parseSSHConfigFile(alias, f)
 }
 
@@ -167,16 +168,16 @@ func GetInternalIP(runCmd func(string) (string, error)) (string, error) {
 			return ip, nil
 		}
 	}
-	return "", fmt.Errorf("Could not detect internal IPv4 on remote host using tried commands")
+	return "", fmt.Errorf("could not detect internal IPv4 on remote host using tried commands")
 }
 
 // LocalFileHash returns the SHA256 hex digest of a local file, or "" if unreadable.
 func LocalFileHash(filePath string) string {
-	f, err := os.Open(filePath)
+	f, err := os.Open(filePath) //nolint:gosec // caller-controlled file path
 	if err != nil {
 		return ""
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return ""
@@ -209,7 +210,7 @@ func MakeRemoteRunner(hostname, username string, keyfile *string, port int, prox
 	return func(cmd string) (string, error) {
 		args := buildSSHArgs(hostname, username, keyfile, port, proxycmd)
 		args = append(args, cmd)
-		out, err := exec.Command("ssh", args...).Output()
+		out, err := exec.CommandContext(context.Background(), "ssh", args...).Output() //nolint:gosec // ssh args built from validated config
 		return strings.TrimSpace(string(out)), err
 	}
 }
@@ -257,7 +258,7 @@ func FetchRemoteFileCached(
 
 	localHash := LocalFileHash(cachePath)
 	if localHash != "" && localHash == remoteHash {
-		content, err := os.ReadFile(cachePath)
+		content, err := os.ReadFile(cachePath) //nolint:gosec // cachePath controlled by caller
 		if err == nil {
 			return string(content), true, nil
 		}
@@ -268,7 +269,7 @@ func FetchRemoteFileCached(
 		return "", false, err
 	}
 
-	_ = os.MkdirAll(filepath.Dir(cachePath), 0o755)
+	_ = os.MkdirAll(filepath.Dir(cachePath), 0o700)
 	_ = os.WriteFile(cachePath, []byte(content), 0o600)
 	return content, false, nil
 }

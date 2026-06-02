@@ -95,7 +95,7 @@ var rootCmd = &cobra.Command{
 		if telWriter == nil {
 			return nil
 		}
-		defer telWriter.Close()
+		defer func() { _ = telWriter.Close() }()
 
 		flags := []string{}
 		cmd.Flags().Visit(func(f *pflag.Flag) {
@@ -132,7 +132,7 @@ func recordErrorTelemetry(err error) {
 	if telWriter == nil {
 		return
 	}
-	defer telWriter.Close()
+	defer func() { _ = telWriter.Close() }()
 
 	cmdName := ""
 	var flags []string

@@ -42,7 +42,7 @@ type Writer struct {
 
 // NewWriter opens (or creates) the telemetry file in dir.
 func NewWriter(dir string, maxBytes int64, maxFiles int) (*Writer, error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, fmt.Errorf("telemetry: mkdir %s: %w", dir, err)
 	}
 	w := &Writer{dir: dir, maxBytes: maxBytes, maxFiles: maxFiles}
@@ -57,7 +57,7 @@ func (w *Writer) path() string {
 }
 
 func (w *Writer) open() error {
-	f, err := os.OpenFile(w.path(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(w.path(), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 	if err != nil {
 		return fmt.Errorf("telemetry: open: %w", err)
 	}

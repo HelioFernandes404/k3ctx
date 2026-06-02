@@ -16,6 +16,34 @@ linters:
     - bodyclose
     - noctx
     - gocritic
+    - depguard
+  settings:
+    depguard:
+      rules:
+        domain:
+          list-mode: strict
+          files:
+            - "**/internal/domain/**"
+          allow:
+            - $gostd
+            - github.com/systemframe/k3ctx/internal/domain
+            - github.com/stretchr/testify
+        application:
+          files:
+            - "**/internal/application/**"
+          deny:
+            - pkg: github.com/systemframe/k3ctx/internal/infrastructure
+              desc: application must not depend on infrastructure (hexagonal dependency rule)
+            - pkg: github.com/systemframe/k3ctx/internal/bootstrap
+              desc: application must not depend on bootstrap
+            - pkg: github.com/systemframe/k3ctx/cli
+              desc: application must not depend on cli
+        cli:
+          files:
+            - "**/cli/**"
+          deny:
+            - pkg: github.com/systemframe/k3ctx/internal/infrastructure
+              desc: cli must not import infrastructure directly — go through bootstrap and ports
 
 formatters:
   enable:

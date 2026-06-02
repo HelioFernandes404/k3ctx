@@ -47,9 +47,14 @@ func NewClusterTarget(company, hostAlias, group string, hostConfig, groupVars ma
 	}
 }
 
-func (t ClusterTarget) Company() string   { return t.company }
+// Company returns the customer/organization name this target belongs to.
+func (t ClusterTarget) Company() string { return t.company }
+
+// HostAlias returns the short host alias (e.g. "sf-prd-us-00001").
 func (t ClusterTarget) HostAlias() string { return t.hostAlias }
-func (t ClusterTarget) Group() string     { return t.group }
+
+// Group returns the inventory group the host was discovered in.
+func (t ClusterTarget) Group() string { return t.group }
 
 // ContextName returns the canonical kubectl context name.
 func (t ClusterTarget) ContextName() string { return t.company + "-" + t.hostAlias }
@@ -140,19 +145,44 @@ func NewConnectResult(p ConnectResultParams) (ConnectResult, error) {
 	}, nil
 }
 
-func (r ConnectResult) Success() bool                          { return r.success }
-func (r ConnectResult) ContextName() string                    { return r.contextName }
-func (r ConnectResult) LocalPort() *int                        { return r.localPort }
-func (r ConnectResult) InternalIP() *string                    { return r.internalIP }
-func (r ConnectResult) TunnelPID() *int                        { return r.tunnelPID }
-func (r ConnectResult) UsedCache() bool                        { return r.usedCache }
+// Success reports whether the connection completed without a domain error.
+func (r ConnectResult) Success() bool { return r.success }
+
+// ContextName returns the resolved kubectl context name.
+func (r ConnectResult) ContextName() string { return r.contextName }
+
+// LocalPort returns the local SSH tunnel port, when one was opened.
+func (r ConnectResult) LocalPort() *int { return r.localPort }
+
+// InternalIP returns the cluster-internal IP the tunnel forwards to.
+func (r ConnectResult) InternalIP() *string { return r.internalIP }
+
+// TunnelPID returns the PID of the managed SSH tunnel process.
+func (r ConnectResult) TunnelPID() *int { return r.tunnelPID }
+
+// UsedCache reports whether the remote kubeconfig was served from the local cache.
+func (r ConnectResult) UsedCache() bool { return r.usedCache }
+
+// NetworkRequirement returns the network access path detected for this target.
 func (r ConnectResult) NetworkRequirement() NetworkRequirement { return r.networkRequirement }
-func (r ConnectResult) Err() *OperationError                   { return r.err }
-func (r ConnectResult) ArgocdLocalPort() *int                  { return r.argocdLocalPort }
-func (r ConnectResult) ArgocdLoginSuccess() bool               { return r.argocdLoginSuccess }
-func (r ConnectResult) ArgocdLoginMessage() string             { return r.argocdLoginMessage }
-func (r ConnectResult) AlertmanagerLocalPort() *int            { return r.alertmanagerLocalPort }
-func (r ConnectResult) VictoriaMetricsLocalPort() *int         { return r.victoriaMetricsLocalPort }
+
+// Err returns the OperationError when the connection failed, or nil.
+func (r ConnectResult) Err() *OperationError { return r.err }
+
+// ArgocdLocalPort returns the local port for the managed ArgoCD tunnel, if discovered.
+func (r ConnectResult) ArgocdLocalPort() *int { return r.argocdLocalPort }
+
+// ArgocdLoginSuccess reports whether `argocd login` ran successfully during connect.
+func (r ConnectResult) ArgocdLoginSuccess() bool { return r.argocdLoginSuccess }
+
+// ArgocdLoginMessage returns the textual result of the ArgoCD login attempt.
+func (r ConnectResult) ArgocdLoginMessage() string { return r.argocdLoginMessage }
+
+// AlertmanagerLocalPort returns the local port for the managed Alertmanager tunnel.
+func (r ConnectResult) AlertmanagerLocalPort() *int { return r.alertmanagerLocalPort }
+
+// VictoriaMetricsLocalPort returns the local port for the managed VictoriaMetrics tunnel.
+func (r ConnectResult) VictoriaMetricsLocalPort() *int { return r.victoriaMetricsLocalPort }
 
 // ToPublicDict returns a JSON-safe representation.
 func (r ConnectResult) ToPublicDict() map[string]any {

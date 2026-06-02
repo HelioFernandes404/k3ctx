@@ -3,7 +3,6 @@ package usecases
 import (
 	"errors"
 
-	"github.com/systemframe/k3ctx/internal/application"
 	"github.com/systemframe/k3ctx/internal/domain"
 )
 
@@ -28,8 +27,8 @@ func BuildNetworkRequirement(target domain.ClusterTarget) domain.NetworkRequirem
 func ConnectCluster(
 	target domain.ClusterTarget,
 	config domain.EffectiveConfig,
-	connector application.ClusterConnector,
-	preflight application.NetBirdPreflightChecker,
+	connector domain.ClusterConnector,
+	preflight domain.NetBirdPreflightChecker,
 	skipNetbird bool,
 	allowManualNetwork bool,
 ) (domain.ConnectResult, error) {
@@ -102,8 +101,8 @@ func ConnectCluster(
 func ConnectMultiple(
 	targets []domain.ClusterTarget,
 	config domain.EffectiveConfig,
-	connector application.ClusterConnector,
-	preflight application.NetBirdPreflightChecker,
+	connector domain.ClusterConnector,
+	preflight domain.NetBirdPreflightChecker,
 	skipNetbird bool,
 	allowManualNetwork bool,
 ) ([]domain.ConnectResult, error) {

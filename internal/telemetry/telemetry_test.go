@@ -19,7 +19,7 @@ func TestRecord_WritesJSONLEvent(t *testing.T) {
 
 	w, err := telemetry.NewWriter(dir, 10*1024*1024, 3)
 	require.NoError(t, err)
-	defer w.Close()
+	defer func() { _ = w.Close() }()
 
 	before := time.Now().UTC().Truncate(time.Second)
 	err = w.Record(telemetry.Event{
@@ -33,7 +33,7 @@ func TestRecord_WritesJSONLEvent(t *testing.T) {
 	require.NoError(t, err)
 	after := time.Now().UTC().Add(time.Second)
 
-	data, err := os.ReadFile(filepath.Join(dir, "telemetry.jsonl"))
+	data, err := os.ReadFile(filepath.Join(dir, "telemetry.jsonl")) //nolint:gosec // test reads its own tempdir
 	require.NoError(t, err)
 
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
@@ -61,7 +61,7 @@ func TestRecord_WritesErrorField(t *testing.T) {
 
 	w, err := telemetry.NewWriter(dir, 10*1024*1024, 3)
 	require.NoError(t, err)
-	defer w.Close()
+	defer func() { _ = w.Close() }()
 
 	err = w.Record(telemetry.Event{
 		Cmd:        "connect",
@@ -74,7 +74,7 @@ func TestRecord_WritesErrorField(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	data, err := os.ReadFile(filepath.Join(dir, "telemetry.jsonl"))
+	data, err := os.ReadFile(filepath.Join(dir, "telemetry.jsonl")) //nolint:gosec // test reads its own tempdir
 	require.NoError(t, err)
 
 	var evt map[string]any
@@ -89,7 +89,7 @@ func TestRecord_RotatesAtSizeLimit(t *testing.T) {
 
 	w, err := telemetry.NewWriter(dir, 100, 3) // 100 bytes max
 	require.NoError(t, err)
-	defer w.Close()
+	defer func() { _ = w.Close() }()
 
 	for i := 0; i < 10; i++ {
 		err = w.Record(telemetry.Event{
@@ -104,7 +104,7 @@ func TestRecord_RotatesAtSizeLimit(t *testing.T) {
 	entries, err := os.ReadDir(dir)
 	require.NoError(t, err)
 
-	var names []string
+	names := make([]string, 0, len(entries))
 	for _, e := range entries {
 		names = append(names, e.Name())
 	}
@@ -117,8 +117,8 @@ func TestRecord_RotatesAtSizeLimit(t *testing.T) {
 
 func writeLines(t *testing.T, path string, lines []string) {
 	t.Helper()
-	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
-	require.NoError(t, os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o644))
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
+	require.NoError(t, os.WriteFile(path, []byte(strings.Join(lines, "\n")+"\n"), 0o600))
 }
 
 func jsonLine(cmd string, ok bool, durationMs int) string {
@@ -165,7 +165,7 @@ func TestReadLastN_OverflowsToRotatedFile(t *testing.T) {
 func TestReadLastN_SkipsCorruptedLines(t *testing.T) {
 	dir := t.TempDir()
 	content := jsonLine("connect", true, 100) + "\nnot-valid-json\n" + jsonLine("status", true, 50) + "\n"
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "telemetry.jsonl"), []byte(content), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "telemetry.jsonl"), []byte(content), 0o600))
 
 	events, err := telemetry.ReadLastN(dir, 10)
 	require.NoError(t, err)
@@ -210,7 +210,7 @@ func TestRecord_RespectsMaxFiles(t *testing.T) {
 
 	w, err := telemetry.NewWriter(dir, 50, 3) // 50 bytes max, 3 files
 	require.NoError(t, err)
-	defer w.Close()
+	defer func() { _ = w.Close() }()
 
 	for i := 0; i < 50; i++ {
 		_ = w.Record(telemetry.Event{

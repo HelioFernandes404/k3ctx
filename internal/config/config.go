@@ -41,7 +41,7 @@ var envMapping = map[string]string{
 func LoadConfig(configPath string) (map[string]any, error) {
 	cfg := map[string]any{}
 
-	data, err := os.ReadFile(configPath)
+	data, err := os.ReadFile(configPath) //nolint:gosec // configPath is the resolved k3ctx config location
 	if err == nil {
 		var raw map[string]any
 		if yerr := yaml.Unmarshal(data, &raw); yerr == nil && raw != nil {

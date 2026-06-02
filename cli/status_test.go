@@ -19,7 +19,7 @@ func TestRunStatus_JSON_IncludesCurrentContext(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
 	kubeDir := filepath.Join(tmp, ".kube")
-	require.NoError(t, os.Mkdir(kubeDir, 0o755))
+	require.NoError(t, os.Mkdir(kubeDir, 0o700))
 	cfg := map[string]any{"apiVersion": "v1", "current-context": "acme-prod"}
 	data, _ := yaml.Marshal(cfg)
 	require.NoError(t, os.WriteFile(filepath.Join(kubeDir, "config"), data, 0o600))

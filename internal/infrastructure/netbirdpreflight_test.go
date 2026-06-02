@@ -20,7 +20,7 @@ func makeFakeBin(t *testing.T, exitCode int, stdout string) string {
 	dir := t.TempDir()
 	bin := filepath.Join(dir, "netbird")
 	script := fmt.Sprintf("#!/bin/sh\nprintf '%%s' '%s'\nexit %d\n", stdout, exitCode)
-	require.NoError(t, os.WriteFile(bin, []byte(script), 0o755))
+	require.NoError(t, os.WriteFile(bin, []byte(script), 0o755)) //nolint:gosec // executable test stub must be 0755
 	return bin
 }
 

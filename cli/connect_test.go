@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/systemframe/k3ctx/internal/application"
 	"github.com/systemframe/k3ctx/internal/domain"
 )
 
@@ -167,7 +166,7 @@ func TestRunConnect_AllHosts_MultiResultJSON(t *testing.T) {
 	t1 := domain.NewClusterTarget("acme", "prod1", "k3s", map[string]any{"addr": "10.0.0.1"}, nil)
 	t2 := domain.NewClusterTarget("acme", "prod2", "k3s", map[string]any{"addr": "10.0.0.2"}, nil)
 	svcs.Catalog = &mockCatalog{targets: []domain.ClusterTarget{t1, t2}}
-	svcs.Connector = &mockConnector{artifacts: application.ConnectionArtifacts{
+	svcs.Connector = &mockConnector{artifacts: domain.ConnectionArtifacts{
 		LocalPort:  16500,
 		InternalIP: "10.0.0.1",
 	}}

@@ -24,7 +24,7 @@ func runInit(cmd *cobra.Command, _ []string) error {
 		paths.KubeconfigCacheDir(),
 	}
 	for _, d := range dirs {
-		if err := os.MkdirAll(d, 0o755); err != nil {
+		if err := os.MkdirAll(d, 0o700); err != nil {
 			return fmt.Errorf("failed to create %s: %w", d, err)
 		}
 	}

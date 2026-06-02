@@ -1,6 +1,7 @@
 package infrastructure
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -20,6 +21,7 @@ type NetBirdInventoryCatalog struct {
 	StatusFn   func() ([]netbird.Peer, error)
 }
 
+// ListTargets returns the cluster targets discovered from the NetBird peer list.
 func (c NetBirdInventoryCatalog) ListTargets() ([]domain.ClusterTarget, error) {
 	peers, err := c.fetchPeers()
 	if err != nil {
@@ -66,7 +68,7 @@ func (c NetBirdInventoryCatalog) fetchPeers() ([]netbird.Peer, error) {
 		binPath = "netbird"
 	}
 	// Ensure the daemon is connected before querying peers.
-	_ = exec.Command(binPath, "up").Run()
+	_ = exec.CommandContext(context.Background(), binPath, "up").Run() //nolint:gosec // binPath is the netbird binary configured by the operator
 	data, err := netbird.RunStatus(binPath)
 	if err != nil {
 		return nil, err

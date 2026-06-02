@@ -39,7 +39,7 @@ func TestLoadHostRecords_ProjectsPublicFieldsFromClusterTargets(t *testing.T) {
 }
 
 func TestBuildHostRecords_ProjectsPublicFieldsFromTargets(t *testing.T) {
-	records := usecases.BuildHostRecords([]domain.ClusterTarget{
+	records := domain.BuildHostRecords([]domain.ClusterTarget{
 		buildDiscoveryTarget("acme", "prod", "10.0.0.10", strP("sf-1042")),
 	})
 	require.Len(t, records, 1)
@@ -169,12 +169,12 @@ func TestResolveHost_ReturnsNoMatchWhenFiltersDoNotOverlap(t *testing.T) {
 }
 
 func TestResolveHostRecords_ReturnsUniqueWithoutCatalogRoundtrip(t *testing.T) {
-	records := usecases.BuildHostRecords([]domain.ClusterTarget{
+	records := domain.BuildHostRecords([]domain.ClusterTarget{
 		buildDiscoveryTarget("acme", "api-prod", "10.0.0.1", strP("sf-1042")),
 		buildDiscoveryTarget("acme", "db-prod", "10.0.0.2", strP("sf-2001")),
 	})
 
-	result := usecases.ResolveHostRecords(records, domain.HostQuery{Client: strP("acme"), HostName: strP("api")}, 20)
+	result := domain.ResolveHostRecords(records, domain.HostQuery{Client: strP("acme"), HostName: strP("api")}, 20)
 
 	assert.Equal(t, domain.ResolutionUnique, result.Status)
 	assert.Equal(t, "acme-api-prod", *result.ContextName)

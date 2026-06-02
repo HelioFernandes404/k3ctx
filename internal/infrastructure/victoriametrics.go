@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/systemframe/k3ctx/internal/application"
 	"github.com/systemframe/k3ctx/internal/domain"
 	"github.com/systemframe/k3ctx/internal/tunnel"
 )
@@ -18,7 +17,7 @@ const (
 	victoriaMetricsPortRangeSize  = 10000
 )
 
-// LocalVictoriaMetricsConnector implements application.VictoriaMetricsConnector using SSH tunnels.
+// LocalVictoriaMetricsConnector implements domain.VictoriaMetricsConnector using SSH tunnels.
 type LocalVictoriaMetricsConnector struct {
 	StateDir string
 
@@ -53,7 +52,7 @@ func (c *LocalVictoriaMetricsConnector) stateDir() string {
 	return filepath.Join(os.Getenv("HOME"), ".local", "state", "k3ctx-tunnels")
 }
 
-// Setup implements application.VictoriaMetricsConnector.
+// Setup implements domain.VictoriaMetricsConnector.
 func (c *LocalVictoriaMetricsConnector) Setup(
 	contextName string,
 	cfg domain.VictoriaMetricsConfig,
@@ -62,9 +61,9 @@ func (c *LocalVictoriaMetricsConnector) Setup(
 	port int,
 	proxycmd *string,
 	internalIP string,
-) (application.VictoriaMetricsResult, error) {
+) (domain.VictoriaMetricsResult, error) {
 	if !cfg.Enabled {
-		return application.VictoriaMetricsResult{
+		return domain.VictoriaMetricsResult{
 			Skipped: true,
 			Message: "VictoriaMetrics not configured for this cluster",
 		}, nil
@@ -76,7 +75,7 @@ func (c *LocalVictoriaMetricsConnector) Setup(
 		}
 	}
 	if cfg.NodePort == nil {
-		return application.VictoriaMetricsResult{
+		return domain.VictoriaMetricsResult{
 			Skipped: true,
 			Message: "VictoriaMetrics not discovered for this cluster",
 		}, nil
@@ -96,14 +95,14 @@ func (c *LocalVictoriaMetricsConnector) Setup(
 		}
 		pid, err := c.createTunnel(hostname, internalIP, localPort, *cfg.NodePort, opts)
 		if err != nil {
-			return application.VictoriaMetricsResult{
+			return domain.VictoriaMetricsResult{
 				Message: fmt.Sprintf("victoriametrics tunnel failed: %v", err),
 			}, nil
 		}
 		c.saveTunnelPID(vmContext, pid, stateDir)
 	}
 
-	return application.VictoriaMetricsResult{
+	return domain.VictoriaMetricsResult{
 		LocalPort: &localPort,
 	}, nil
 }

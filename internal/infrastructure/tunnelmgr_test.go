@@ -13,7 +13,7 @@ import (
 func TestLocalTunnelManager_KillTunnel_RemovesPIDFile(t *testing.T) {
 	stateDir := t.TempDir()
 	pidFile := filepath.Join(stateDir, "acme-prod.pid")
-	require.NoError(t, os.WriteFile(pidFile, []byte("99999"), 0o644))
+	require.NoError(t, os.WriteFile(pidFile, []byte("99999"), 0o600))
 
 	mgr := infrastructure.LocalTunnelManager{StateDir: stateDir}
 	err := mgr.KillTunnel("acme-prod")

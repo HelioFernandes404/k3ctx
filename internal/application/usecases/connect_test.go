@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/systemframe/k3ctx/internal/application"
 	"github.com/systemframe/k3ctx/internal/application/usecases"
 	"github.com/systemframe/k3ctx/internal/domain"
 )
@@ -38,15 +37,15 @@ func (s *stubPreflight) CheckPeerReady(_ string, skipCheck bool) error {
 // --- Stub connector ---
 
 type stubConnector struct {
-	artifacts application.ConnectionArtifacts
+	artifacts domain.ConnectionArtifacts
 	err       error
 	calls     []domain.ClusterTarget
 }
 
-func (s *stubConnector) Connect(target domain.ClusterTarget, _ domain.EffectiveConfig, _ domain.NetworkRequirement) (application.ConnectionArtifacts, error) {
+func (s *stubConnector) Connect(target domain.ClusterTarget, _ domain.EffectiveConfig, _ domain.NetworkRequirement) (domain.ConnectionArtifacts, error) {
 	s.calls = append(s.calls, target)
 	if s.err != nil {
-		return application.ConnectionArtifacts{}, s.err
+		return domain.ConnectionArtifacts{}, s.err
 	}
 	return s.artifacts, nil
 }
@@ -72,7 +71,7 @@ func buildTarget(addr string) domain.ClusterTarget {
 
 func TestConnectCluster_DelegatesToConnectorAndReturnsStructuredResult(t *testing.T) {
 	pid := 4242
-	stub := &stubConnector{artifacts: application.ConnectionArtifacts{
+	stub := &stubConnector{artifacts: domain.ConnectionArtifacts{
 		LocalPort:  16443,
 		InternalIP: "10.0.0.10",
 		TunnelPID:  &pid,
@@ -95,7 +94,7 @@ func TestConnectCluster_DelegatesToConnectorAndReturnsStructuredResult(t *testin
 }
 
 func TestConnectCluster_BlocksWhenManualNetworkSetupRequired(t *testing.T) {
-	stub := &stubConnector{artifacts: application.ConnectionArtifacts{LocalPort: 16443, InternalIP: "10.0.0.10"}}
+	stub := &stubConnector{artifacts: domain.ConnectionArtifacts{LocalPort: 16443, InternalIP: "10.0.0.10"}}
 	cfg := buildConfig(t)
 	target := buildTarget("10.0.0.10") // private IP → sshuttle requirement
 
@@ -109,7 +108,7 @@ func TestConnectCluster_BlocksWhenManualNetworkSetupRequired(t *testing.T) {
 }
 
 func TestConnectMultiple_PreservesTargetOrder(t *testing.T) {
-	stub := &stubConnector{artifacts: application.ConnectionArtifacts{LocalPort: 16443, InternalIP: "10.0.0.10"}}
+	stub := &stubConnector{artifacts: domain.ConnectionArtifacts{LocalPort: 16443, InternalIP: "10.0.0.10"}}
 	cfg := buildConfig(t)
 	first := buildTarget("203.0.113.10")
 	second := domain.NewClusterTarget("beta", "staging", "k3s_cluster",
@@ -173,7 +172,7 @@ func TestConnectCluster_SetsHintFromOperationErrorDetail(t *testing.T) {
 }
 
 func TestConnectCluster_PeerCheckFailure_AbortsBeforeConnector(t *testing.T) {
-	stub := &stubConnector{artifacts: application.ConnectionArtifacts{LocalPort: 16443, InternalIP: "10.0.0.10"}}
+	stub := &stubConnector{artifacts: domain.ConnectionArtifacts{LocalPort: 16443, InternalIP: "10.0.0.10"}}
 	preflight := &stubPreflight{peerErr: &domain.OperationError{
 		Code:    domain.ErrCodePeerNotConnected,
 		Message: "NetBird target peer is not connected",
@@ -194,7 +193,7 @@ func TestConnectCluster_PeerCheckFailure_AbortsBeforeConnector(t *testing.T) {
 
 func TestConnectCluster_PeerCheckSkipped_WhenSkipFlagTrue(t *testing.T) {
 	pid := 1111
-	stub := &stubConnector{artifacts: application.ConnectionArtifacts{LocalPort: 16443, InternalIP: "10.0.0.10", TunnelPID: &pid}}
+	stub := &stubConnector{artifacts: domain.ConnectionArtifacts{LocalPort: 16443, InternalIP: "10.0.0.10", TunnelPID: &pid}}
 	preflight := &stubPreflight{peerErr: &domain.OperationError{
 		Code: domain.ErrCodePeerNotConnected, Message: "would fail",
 	}}
@@ -209,7 +208,7 @@ func TestConnectCluster_PeerCheckSkipped_WhenSkipFlagTrue(t *testing.T) {
 
 func TestConnectCluster_NilPreflight_ConnectsNormally(t *testing.T) {
 	pid := 2222
-	stub := &stubConnector{artifacts: application.ConnectionArtifacts{LocalPort: 16443, InternalIP: "10.0.0.10", TunnelPID: &pid}}
+	stub := &stubConnector{artifacts: domain.ConnectionArtifacts{LocalPort: 16443, InternalIP: "10.0.0.10", TunnelPID: &pid}}
 	cfg := buildConfig(t)
 	target := buildTarget("sf-prd-us-00001.systemframe.vpn")
 

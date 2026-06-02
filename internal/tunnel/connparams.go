@@ -20,7 +20,7 @@ type ConnParams struct {
 }
 
 func connParamsPath(contextName, stateDir string) string {
-	_ = os.MkdirAll(stateDir, 0o755)
+	_ = os.MkdirAll(stateDir, 0o700)
 	return filepath.Join(stateDir, contextName+".conn.json")
 }
 

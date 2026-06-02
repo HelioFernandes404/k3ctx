@@ -107,7 +107,7 @@ func TestLoadEffectiveConfig_BuildsCanonicalConfig(t *testing.T) {
 		"k3s_api_port":           7443,
 		"port_range_start":       20000,
 		"port_range_size":        5000,
-	}), 0o644))
+	}), 0o600))
 
 	t.Setenv("K3S_API_PORT", "8443")
 	t.Setenv("SSH_KEY_PATH", "~/.ssh/from-env")
@@ -126,7 +126,7 @@ func TestLoadEffectiveConfig_BuildsCanonicalConfig(t *testing.T) {
 func TestLoadEffectiveConfig_SSHUserEnvOverridesDefault(t *testing.T) {
 	tmp := t.TempDir()
 	cfgFile := filepath.Join(tmp, "config.yaml")
-	require.NoError(t, os.WriteFile(cfgFile, []byte("{}"), 0o644))
+	require.NoError(t, os.WriteFile(cfgFile, []byte("{}"), 0o600))
 	t.Setenv("SSH_USER", "deploy")
 
 	cfg, err := config.LoadEffectiveConfig(tmp, cfgFile)
@@ -141,7 +141,7 @@ func TestLoadEffectiveConfig_InvalidNumericEnvUsesDefault(t *testing.T) {
 		"k3s_api_port":     7443,
 		"port_range_start": 20000,
 		"port_range_size":  5000,
-	}), 0o644))
+	}), 0o600))
 	t.Setenv("K3S_API_PORT", "not-a-number")
 
 	cfg, err := config.LoadEffectiveConfig(tmp, cfgFile)
@@ -158,7 +158,7 @@ func TestLoadEffectiveConfig_InvalidNumericFileUsesDefault(t *testing.T) {
 		"k3s_api_port":     "broken",
 		"port_range_start": "also-broken",
 		"port_range_size":  5000,
-	}), 0o644))
+	}), 0o600))
 
 	cfg, err := config.LoadEffectiveConfig(tmp, cfgFile)
 	require.NoError(t, err)

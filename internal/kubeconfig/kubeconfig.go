@@ -70,7 +70,7 @@ func UpdateKubeconfigServer(yamlText, ip string, port int, useLocalhost bool, lo
 // MergeKubeconfig merges newConfigText into ~/.kube/config, renaming entries to contextName.
 func MergeKubeconfig(newConfigText, contextName string) (string, error) {
 	kubeconfigPath := defaultKubeconfigPath()
-	if err := os.MkdirAll(filepath.Dir(kubeconfigPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(kubeconfigPath), 0o700); err != nil {
 		return "", err
 	}
 
@@ -81,7 +81,7 @@ func MergeKubeconfig(newConfigText, contextName string) (string, error) {
 
 	// Load or create existing
 	existing := map[string]any{}
-	if data, err := os.ReadFile(kubeconfigPath); err == nil {
+	if data, err := os.ReadFile(kubeconfigPath); err == nil { //nolint:gosec // kubeconfigPath resolved from user home
 		_ = yaml.Unmarshal(data, &existing)
 	}
 	for _, key := range []string{"clusters", "contexts", "users"} {
@@ -91,7 +91,7 @@ func MergeKubeconfig(newConfigText, contextName string) (string, error) {
 	}
 
 	// Rename new entries to contextName
-	rename := func(list []any, nameKey string) []any {
+	rename := func(list []any, _ string) []any {
 		if len(list) == 0 {
 			return list
 		}
@@ -179,16 +179,18 @@ func marshalYAML(v any) (string, error) {
 }
 
 func copyFile(src, dst string) error {
-	in, err := os.Open(src)
+	in, err := os.Open(src) //nolint:gosec // src is the resolved kubeconfig path
 	if err != nil {
 		return err
 	}
-	defer in.Close()
-	out, err := os.Create(dst)
+	defer func() { _ = in.Close() }()
+	out, err := os.Create(dst) //nolint:gosec // dst is the resolved kubeconfig backup path
 	if err != nil {
 		return err
 	}
-	defer out.Close()
-	_, err = io.Copy(out, in)
-	return err
+	if _, err := io.Copy(out, in); err != nil {
+		_ = out.Close()
+		return err
+	}
+	return out.Close()
 }

@@ -37,15 +37,16 @@ func (r LocalStatusReader) portRangeSize() int {
 	return 10000
 }
 
+// ListContextStatus returns one status record per managed tunnel found in the state directory.
 func (r LocalStatusReader) ListContextStatus() ([]map[string]any, error) {
 	stateDir := r.stateDir()
 	entries, _ := filepath.Glob(filepath.Join(stateDir, "*.pid"))
-	var items []map[string]any
+	items := make([]map[string]any, 0, len(entries))
 	for _, pidFile := range entries {
 		base := filepath.Base(pidFile)
 		contextName := base[:len(base)-4] // strip .pid
 		localPort := tunnel.GetUniquePort(contextName, r.portRangeStart(), r.portRangeSize())
-		liveness := tunnel.TunnelLiveness(contextName, stateDir, localPort)
+		liveness := tunnel.Liveness(contextName, stateDir, localPort)
 		items = append(items, map[string]any{
 			"context_name":   contextName,
 			"tunnel_running": liveness != "dead",
@@ -55,6 +56,7 @@ func (r LocalStatusReader) ListContextStatus() ([]map[string]any, error) {
 	return items, nil
 }
 
+// ValidateContextNetwork inspects the persisted network metadata for a context.
 func (r LocalStatusReader) ValidateContextNetwork(contextName string) (map[string]any, error) {
 	result := network.ValidateContextNetworkDetails(contextName, r.stateDir(), nil)
 	return result, nil

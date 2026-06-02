@@ -51,6 +51,6 @@ func TestSetCurrentContext_PropagatesSwitcherError(t *testing.T) {
 
 func TestSetCurrentContext_DoesNotCallSwitcherWithoutConfirmation(t *testing.T) {
 	sw := &stubSwitcher{}
-	usecases.SetCurrentContext("acme-prod", sw, true, false)
+	_ = usecases.SetCurrentContext("acme-prod", sw, true, false)
 	assert.Empty(t, sw.calls)
 }

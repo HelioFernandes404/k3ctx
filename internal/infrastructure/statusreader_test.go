@@ -21,7 +21,7 @@ func TestLocalStatusReader_ListContextStatus_EmptyWhenNoPIDFiles(t *testing.T) {
 func TestLocalStatusReader_ListContextStatus_LivenessFieldPresent(t *testing.T) {
 	stateDir := t.TempDir()
 	pidFile := filepath.Join(stateDir, "acme-prod.pid")
-	require.NoError(t, os.WriteFile(pidFile, []byte(strconv.Itoa(os.Getpid())), 0o644))
+	require.NoError(t, os.WriteFile(pidFile, []byte(strconv.Itoa(os.Getpid())), 0o600))
 
 	r := infrastructure.LocalStatusReader{StateDir: stateDir}
 	items, err := r.ListContextStatus()
@@ -40,7 +40,7 @@ func TestLocalStatusReader_ListContextStatus_LivenessFieldPresent(t *testing.T) 
 func TestLocalStatusReader_ListContextStatus_DeadWhenStalePID(t *testing.T) {
 	stateDir := t.TempDir()
 	pidFile := filepath.Join(stateDir, "acme-prod.pid")
-	require.NoError(t, os.WriteFile(pidFile, []byte("99999"), 0o644))
+	require.NoError(t, os.WriteFile(pidFile, []byte("99999"), 0o600))
 
 	r := infrastructure.LocalStatusReader{StateDir: stateDir}
 	items, err := r.ListContextStatus()

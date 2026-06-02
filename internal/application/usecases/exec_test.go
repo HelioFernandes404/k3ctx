@@ -9,24 +9,24 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/systemframe/k3ctx/internal/application"
 	"github.com/systemframe/k3ctx/internal/application/usecases"
+	"github.com/systemframe/k3ctx/internal/domain"
 )
 
 type stubClusterExec struct {
 	mu      sync.Mutex
 	called  []string
-	results map[string]application.ExecResult
+	results map[string]domain.ExecResult
 }
 
-func (s *stubClusterExec) ExecOnContext(_ context.Context, contextName string, _ []string) application.ExecResult {
+func (s *stubClusterExec) ExecOnContext(_ context.Context, contextName string, _ []string) domain.ExecResult {
 	s.mu.Lock()
 	s.called = append(s.called, contextName)
 	s.mu.Unlock()
 	if r, ok := s.results[contextName]; ok {
 		return r
 	}
-	return application.ExecResult{Context: contextName, OK: true}
+	return domain.ExecResult{Context: contextName, OK: true}
 }
 
 func TestExecOnContexts_EmptyReturnsEmptySlice(t *testing.T) {
@@ -45,7 +45,7 @@ func TestExecOnContexts_CallsExecForEachContext(t *testing.T) {
 
 func TestExecOnContexts_ReturnsAllResultsOnPartialFailure(t *testing.T) {
 	stub := &stubClusterExec{
-		results: map[string]application.ExecResult{
+		results: map[string]domain.ExecResult{
 			"ctx-ok":  {Context: "ctx-ok", OK: true, Stdout: "v1.28"},
 			"ctx-bad": {Context: "ctx-bad", OK: false, ExitCode: 1},
 		},
@@ -53,7 +53,7 @@ func TestExecOnContexts_ReturnsAllResultsOnPartialFailure(t *testing.T) {
 	results := usecases.ExecOnContexts([]string{"ctx-ok", "ctx-bad"}, []string{"version"}, time.Second, stub)
 	require.Len(t, results, 2)
 
-	byCtx := map[string]application.ExecResult{}
+	byCtx := map[string]domain.ExecResult{}
 	for _, r := range results {
 		byCtx[r.Context] = r
 	}

@@ -112,7 +112,7 @@ func TestMergeKubeconfig_MergesIntoExisting(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
 	kubeDir := filepath.Join(tmp, ".kube")
-	require.NoError(t, os.Mkdir(kubeDir, 0o755))
+	require.NoError(t, os.Mkdir(kubeDir, 0o700))
 
 	existing := map[string]any{
 		"apiVersion":      "v1",
@@ -151,7 +151,7 @@ func TestMergeKubeconfig_ReplacesExistingContextWithSameName(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
 	kubeDir := filepath.Join(tmp, ".kube")
-	require.NoError(t, os.Mkdir(kubeDir, 0o755))
+	require.NoError(t, os.Mkdir(kubeDir, 0o700))
 
 	existing := map[string]any{
 		"apiVersion": "v1",
@@ -190,7 +190,7 @@ func TestMergeKubeconfig_CreatesBackupOfExistingConfig(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
 	kubeDir := filepath.Join(tmp, ".kube")
-	require.NoError(t, os.Mkdir(kubeDir, 0o755))
+	require.NoError(t, os.Mkdir(kubeDir, 0o700))
 
 	existing := map[string]any{"apiVersion": "v1", "clusters": []any{}, "contexts": []any{}, "users": []any{}}
 	writeYAML(t, filepath.Join(kubeDir, "config"), existing)
@@ -221,7 +221,7 @@ func TestGetCurrentContext_ReturnsCurrent(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
 	kubeDir := filepath.Join(tmp, ".kube")
-	require.NoError(t, os.Mkdir(kubeDir, 0o755))
+	require.NoError(t, os.Mkdir(kubeDir, 0o700))
 	writeYAML(t, filepath.Join(kubeDir, "config"), map[string]any{
 		"apiVersion":      "v1",
 		"current-context": "acme-prod",
@@ -245,7 +245,7 @@ func TestGetCurrentContext_EmptyWhenFieldAbsent(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("HOME", tmp)
 	kubeDir := filepath.Join(tmp, ".kube")
-	require.NoError(t, os.Mkdir(kubeDir, 0o755))
+	require.NoError(t, os.Mkdir(kubeDir, 0o700))
 	writeYAML(t, filepath.Join(kubeDir, "config"), map[string]any{"apiVersion": "v1"})
 
 	ctx, err := kubeconfig.GetCurrentContext()
@@ -255,7 +255,7 @@ func TestGetCurrentContext_EmptyWhenFieldAbsent(t *testing.T) {
 
 func loadYAML(t *testing.T, p string) map[string]any {
 	t.Helper()
-	data, err := os.ReadFile(p)
+	data, err := os.ReadFile(p) //nolint:gosec // test reads its own tempdir
 	require.NoError(t, err)
 	var out map[string]any
 	require.NoError(t, yaml.Unmarshal(data, &out))
@@ -266,5 +266,5 @@ func writeYAML(t *testing.T, p string, v any) {
 	t.Helper()
 	data, err := yaml.Marshal(v)
 	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(p, data, 0o644))
+	require.NoError(t, os.WriteFile(p, data, 0o600))
 }

@@ -1,12 +1,14 @@
 package network
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -88,11 +90,12 @@ func ValidateContextNetworkDetails(contextName, stateDir string, checkSshuttle f
 
 // CheckSshuttleActive uses pgrep to detect a running sshuttle process.
 func CheckSshuttleActive(networkRange string) bool {
-	specific := exec.Command("pgrep", "-f", "sshuttle.*"+networkRange)
+	ctx := context.Background()
+	specific := exec.CommandContext(ctx, "pgrep", "-f", "sshuttle.*"+networkRange) //nolint:gosec // pgrep with networkRange from config
 	if out, err := specific.Output(); err == nil && strings.TrimSpace(string(out)) != "" {
 		return true
 	}
-	generic := exec.Command("pgrep", "-f", "sshuttle")
+	generic := exec.CommandContext(ctx, "pgrep", "-f", "sshuttle")
 	if out, err := generic.Output(); err == nil && strings.TrimSpace(string(out)) != "" {
 		return true
 	}
@@ -101,18 +104,19 @@ func CheckSshuttleActive(networkRange string) bool {
 
 // ValidateNetworkAccess tests TCP connectivity to ip:6443.
 func ValidateNetworkAccess(ip string) bool {
-	conn, err := net.Dial("tcp", ip+":6443")
+	d := net.Dialer{Timeout: 5 * time.Second}
+	conn, err := d.DialContext(context.Background(), "tcp", ip+":6443")
 	if err != nil {
 		return false
 	}
-	conn.Close()
+	_ = conn.Close()
 	return true
 }
 
 // loadRawMetadata returns (data, corrupted, fileExists).
 func loadRawMetadata(contextName, stateDir string) (map[string]any, bool, bool) {
 	path := filepath.Join(stateDir, contextName+".network")
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(path) //nolint:gosec // path built from validated stateDir
 	if err != nil {
 		return nil, false, false
 	}

@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/systemframe/k3ctx/internal/application"
 	"github.com/systemframe/k3ctx/internal/domain"
 	"github.com/systemframe/k3ctx/internal/tunnel"
 )
@@ -18,7 +17,7 @@ const (
 	alertmanagerPortRangeSize  = 10000
 )
 
-// LocalAlertmanagerConnector implements application.AlertmanagerConnector using SSH tunnels or kubectl port-forward.
+// LocalAlertmanagerConnector implements domain.AlertmanagerConnector using SSH tunnels or kubectl port-forward.
 type LocalAlertmanagerConnector struct {
 	StateDir string
 
@@ -57,7 +56,7 @@ func (c *LocalAlertmanagerConnector) stateDir() string {
 	return filepath.Join(os.Getenv("HOME"), ".local", "state", "k3ctx-tunnels")
 }
 
-// Setup implements application.AlertmanagerConnector.
+// Setup implements domain.AlertmanagerConnector.
 func (c *LocalAlertmanagerConnector) Setup(
 	contextName string,
 	cfg domain.AlertmanagerConfig,
@@ -66,9 +65,9 @@ func (c *LocalAlertmanagerConnector) Setup(
 	port int,
 	proxycmd *string,
 	internalIP string,
-) (application.AlertmanagerResult, error) {
+) (domain.AlertmanagerResult, error) {
 	if !cfg.Enabled {
-		return application.AlertmanagerResult{
+		return domain.AlertmanagerResult{
 			Skipped: true,
 			Message: "Alertmanager not configured for this cluster",
 		}, nil
@@ -86,7 +85,7 @@ func (c *LocalAlertmanagerConnector) Setup(
 		}
 	}
 	if cfg.NodePort == nil {
-		return application.AlertmanagerResult{
+		return domain.AlertmanagerResult{
 			Skipped: true,
 			Message: "Alertmanager not discovered for this cluster",
 		}, nil
@@ -112,14 +111,14 @@ func (c *LocalAlertmanagerConnector) Setup(
 			pid, err = c.createTunnel(hostname, internalIP, localPort, *cfg.NodePort, opts)
 		}
 		if err != nil {
-			return application.AlertmanagerResult{
+			return domain.AlertmanagerResult{
 				Message: fmt.Sprintf("alertmanager tunnel failed: %v", err),
 			}, nil
 		}
 		c.saveTunnelPID(alertmanagerContext, pid, stateDir)
 	}
 
-	return application.AlertmanagerResult{
+	return domain.AlertmanagerResult{
 		LocalPort: &localPort,
 	}, nil
 }

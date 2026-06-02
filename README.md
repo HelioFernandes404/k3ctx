@@ -1,65 +1,27 @@
-# K3s Context Tunnel Manager
+# k3ctx
 
-Go CLI for managing SSH tunnels and kubeconfig contexts for K3s clusters.
+Go CLI for connecting to K3s clusters: discovers hosts via NetBird (or a legacy Ansible inventory), opens a managed SSH tunnel to the K3s API, merges the generated kubeconfig into `~/.kube/config`, and switches the active kubectl context.
 
-It discovers hosts via the NetBird peer list (or from a legacy Ansible inventory), opens a local SSH tunnel to the K3s API, merges the generated kubeconfig into `~/.kube/config`, and switches the active kubectl context.
-
-## Local Path
+## Install
 
 ```bash
-cd /home/helio/Obsidian/03-projetos/k3ctx
+make build      # writes bin/k3ctx
+make install    # installs to $(HOME)/.local/bin (override with PREFIX=...)
 ```
 
-## Project Structure
+The Makefile uses Go `1.25.0`. If `mise` is installed, builds run through `mise`; otherwise `go` from `PATH`.
 
-```text
-.
-├── cmd/k3ctx/                  # CLI entrypoint
-├── cli/                        # Cobra commands
-├── internal/application/        # Use cases and ports
-├── internal/domain/             # Core models and decisions
-├── internal/infrastructure/     # Local adapters
-├── internal/config/             # Config loading and env overlays
-├── internal/paths/              # XDG/local path resolution
-├── internal/netbird/            # NetBird CLI integration
-├── internal/inventory/          # Ansible inventory parsing (legacy)
-├── internal/kubeconfig/         # Kubeconfig helpers
-├── internal/network/            # Local port selection
-├── internal/ssh/                # SSH command helpers
-├── internal/tunnel/             # Tunnel process state
-└── examples/config/config.yaml  # Example config
-```
-
-## Build And Install
-
-```bash
-make build
-make install
-```
-
-`make build` writes `bin/k3ctx`.
-
-`make install` installs to `$(HOME)/.local/bin/k3ctx` by default. Override with `PREFIX=/some/path make install`.
-
-The Makefile uses Go `1.25.0`. If `mise` is available, it runs Go through `mise`; otherwise it uses `go` from `PATH`.
-
-## Main Flow
+## Main flow
 
 ```bash
 k3ctx init
 k3ctx clients
 k3ctx hosts acme
 k3ctx connect acme
-k3ctx tunnel-list
 k3ctx status
 ```
 
-From the repo without installing:
-
-```bash
-go run ./cmd/k3ctx --help
-go run ./cmd/k3ctx clients
-```
+Append `--json` to any command for machine-readable output.
 
 ## Commands
 
@@ -73,36 +35,24 @@ go run ./cmd/k3ctx clients
 | `k3ctx tunnel-kill CONTEXT` | Kill one managed tunnel. |
 | `k3ctx tunnel-kill-all` | Kill all managed tunnels. |
 | `k3ctx status` | Show active contexts and tunnel state. |
+| `k3ctx exec CTX -- CMD...` | Run a command against a connected context. |
+| `k3ctx --version` | Print version metadata as JSON. |
 
-Global flag:
-
-```bash
-k3ctx --json <command>
-```
-
-## Discovery Examples
+## Discovery
 
 ```bash
-k3ctx clients --limit 20
-k3ctx clients --cursor <cursor>
+k3ctx clients --limit 20 --cursor <cursor>
 k3ctx clients --refresh-inventory
 
 k3ctx hosts acme
-k3ctx hosts acme api
-k3ctx hosts acme --host api --limit 10
-k3ctx hosts acme --id sf-1042
-k3ctx hosts acme --ip 10.0.0.10
-k3ctx hosts acme --refresh-inventory
+k3ctx hosts acme --host api --id sf-1042 --ip 10.0.0.10
 ```
 
-Rules:
-
 - `clients` returns client names and host counts.
-- `hosts CLIENT` requires a client scope.
-- Pagination uses `--limit` and `--cursor`.
-- Inventory refresh is explicit with `--refresh-inventory`.
+- `hosts CLIENT` requires a client scope; `--limit`/`--cursor` paginate.
+- Inventory refresh is explicit with `--refresh-inventory` (NetBird repoll, or `git pull --ff-only` for the YAML catalog when clean).
 
-## Connect Examples
+## Connect
 
 ```bash
 k3ctx connect acme
@@ -112,35 +62,18 @@ k3ctx connect --context acme-prod
 k3ctx connect --id sf-1042 --json
 ```
 
-Rules:
-
 - `connect` succeeds only when the resolver finds one unique host.
-- Ambiguous matches exit with an error and list matching contexts.
-- No-match results exit with an error and a hint when available.
-- On success, the generated kubeconfig is merged into `~/.kube/config`.
-- The active kubectl context is switched to the connected context.
+- Ambiguous matches exit with an error and list the candidates.
+- On success: kubeconfig is merged into `~/.kube/config` and the active context is switched.
+- API readiness is verified by default. Disable with `K3CTX_VERIFY_API_READY=0`; tune with `K3CTX_API_READY_TIMEOUT_SECONDS`.
 
 ## Config
 
-`k3ctx init` creates:
+`k3ctx init` creates `~/.local/share/k3ctx/yaml/config/config.yaml`.
 
-```text
-~/.local/share/k3ctx/yaml/
-├── config/config.yaml
-└── kubeconfigs/
-```
+Lookup order: `CONFIG_FILE` → `$K3CTX_CONFIG_DIR/config.yaml` → `~/.local/share/k3ctx/yaml/config/config.yaml` → `./config.yaml` → `~/.k3ctx-config/config.yaml`. `XDG_DATA_HOME` rebases `~/.local/share`.
 
-Config lookup order:
-
-1. `CONFIG_FILE`, when set
-2. `K3CTX_CONFIG_DIR/config.yaml`, when `K3CTX_CONFIG_DIR` is set
-3. `~/.local/share/k3ctx/yaml/config/config.yaml`
-4. `config.yaml` in the current project directory
-5. `~/.k3ctx-config/config.yaml`
-
-`XDG_DATA_HOME` changes the base for `~/.local/share` paths.
-
-Example (NetBird discovery — recommended):
+Example (NetBird discovery — default):
 
 ```yaml
 ssh_key_path: ~/.ssh/id_ed25519
@@ -155,36 +88,20 @@ port_range_size: 10000
 Example (legacy YAML inventory):
 
 ```yaml
-inventory_path: /home/helio/Work/systemframe/ansible/inventory
+inventory_path: /path/to/ansible/inventory
 ssh_key_path: ~/.ssh/id_ed25519
 remote_k3s_config_path: /etc/rancher/k3s/k3s.yaml
-k3s_api_port: 6443
-port_range_start: 16443
-port_range_size: 10000
 ```
 
-Supported environment overlays:
+Environment overlay: any config key can be overridden via its uppercase env-var counterpart (`SSH_KEY_PATH`, `NETBIRD_HOST_FILTER`, `INVENTORY_PATH`, `K3S_API_PORT`, `PORT_RANGE_START`, `PORT_RANGE_SIZE`, etc.).
 
-| Config key | Environment variable |
-| --- | --- |
-| `inventory_path` | `INVENTORY_PATH` |
-| `netbird_bin_path` | `NETBIRD_BIN_PATH` |
-| `netbird_host_filter` | `NETBIRD_HOST_FILTER` |
-| `ssh_key_path` | `SSH_KEY_PATH` |
-| `remote_k3s_config_path` | `REMOTE_K3S_CONFIG_PATH` |
-| `k3s_api_port` | `K3S_API_PORT` |
-| `port_range_start` | `PORT_RANGE_START` |
-| `port_range_size` | `PORT_RANGE_SIZE` |
-
-`ssh_config_path` is currently fixed to `~/.ssh/config`.
-
-## Host Discovery
+## Host discovery
 
 ### NetBird (default)
 
-When `inventory_path` is not set, k3ctx discovers cluster hosts from the local NetBird peer list by running `netbird status --json`.
+When `inventory_path` is unset, k3ctx reads peers from `netbird status --json`.
 
-**FQDN convention** — peers must follow `{hostAlias}.{client}.{netbird-domain}`:
+Peers must follow `{hostAlias}.{client}.{netbird-domain}`:
 
 ```
 sf-prd-us-00001.systemframe.vpn
@@ -193,29 +110,13 @@ sf-prd-us-00001.systemframe.vpn
 └─ host alias = sf-prd-us-00001
 ```
 
-**Filter** — only peers whose hostname matches `netbird_host_filter` (default regex: `^sf-[a-z]{3}-(?:[a-z]{2}|us)-[0-9]{5}`) are included. Personal devices and laptops are excluded automatically.
+Only peers matching `netbird_host_filter` are included (default regex excludes personal devices and laptops). All matching peers are listed regardless of NetBird connectivity status — `hosts` shows the current status.
 
-**Status** — all matching peers are listed regardless of connectivity status. The `hosts` command shows the current NetBird status (`Connected`, `Connecting`, `Idle`) for each host.
+Requires the `netbird` daemon installed, authenticated, and running.
 
-Requirements:
-- `netbird` CLI must be installed and authenticated on the operator machine.
-- The NetBird daemon must be running (`netbird status`).
+### YAML inventory (legacy)
 
-### Migration from YAML Inventory
-
-1. Remove or comment out `inventory_path` from config.
-2. Ensure each K3s host is registered in NetBird with the FQDN convention above.
-3. Optionally override `netbird_host_filter` if your naming scheme differs.
-
-**Rollback**: restore `inventory_path` to reactivate the YAML catalog.
-
-### YAML Inventory (legacy)
-
-When `inventory_path` is set and the path exists, k3ctx reads Ansible YAML files matching `*_hosts.yml`.
-
-Unknown YAML tags, including `!vault`, are ignored.
-
-Expected host fields:
+When `inventory_path` is set and exists, k3ctx reads Ansible YAML files matching `*_hosts.yml`. Unknown YAML tags (including `!vault`) are ignored.
 
 ```yaml
 MY-HOST:
@@ -223,21 +124,19 @@ MY-HOST:
   systemframe_id: sf-1042
 ```
 
+To migrate to NetBird: remove `inventory_path`, register hosts in NetBird with the FQDN convention above. To roll back: restore `inventory_path`.
+
 ## ArgoCD
 
-During `connect`, k3ctx automatically looks for an ArgoCD NodePort Service in the connected Kubernetes context.
+During `connect`, k3ctx looks for an ArgoCD NodePort Service in the connected context. When found, it opens a managed tunnel for that NodePort and attempts `argocd login` using the initial admin secret. Cluster connection succeeds even if `argocd` is missing or login fails.
 
-When found, `connect` opens a managed tunnel for the discovered ArgoCD NodePort and attempts `argocd login` using the initial admin secret from the discovered namespace. No inventory fields are required.
-
-If the `argocd` CLI is missing or login fails, the cluster connection can still succeed. Use the reported local ArgoCD port for manual login.
-
-To kill only the ArgoCD tunnel:
+Kill only the ArgoCD tunnel:
 
 ```bash
 k3ctx tunnel-kill <context>-argocd
 ```
 
-## Runtime State
+## Runtime state
 
 | Path | Purpose |
 | --- | --- |
@@ -246,26 +145,17 @@ k3ctx tunnel-kill <context>-argocd
 | `~/.local/state/k3ctx-tunnels/` | Managed tunnel PID files. |
 | `~/.kube/config` | User kubeconfig updated by `connect`. |
 
-## Development
-
-```bash
-make test
-go test ./...
-go test ./internal/application/usecases -run TestName
-gofmt -w <files>
-```
-
-Useful Make targets:
-
-| Target | Action |
-| --- | --- |
-| `make test` | Run `go test ./...`. |
-| `make build` | Build `bin/k3ctx`. |
-| `make install` | Install the binary. |
-| `make clean` | Remove `bin/`. |
-
 ## Safety
 
 - `connect` opens SSH tunnels and modifies `~/.kube/config`.
-- `tunnel-kill` and `tunnel-kill-all` terminate managed tunnel processes.
-- Do not commit generated kubeconfigs, local config, SSH keys, inventory secrets, `.env`, or `bin/`.
+- `tunnel-kill` / `tunnel-kill-all` terminate managed tunnel processes.
+- Never commit generated kubeconfigs, local config, SSH keys, inventory secrets, `.env`, or `bin/`.
+
+## Contributing
+
+Architecture, code conventions, and the "adding a feature" checklist live under [`.specs/`](.specs/):
+
+- [`.specs/architecture/architecture.md`](.specs/architecture/architecture.md) — hexagonal layers and dependency rule.
+- [`.specs/code/code-conventions.md`](.specs/code/code-conventions.md) — formatting, lint, TDD, test layout.
+
+Read both before opening a PR.

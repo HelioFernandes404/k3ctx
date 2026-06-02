@@ -1,10 +1,6 @@
-package application
+package domain
 
-import (
-	"context"
-
-	"github.com/systemframe/k3ctx/internal/domain"
-)
+import "context"
 
 // ExecResult holds the outcome of running a kubectl command against one context.
 type ExecResult struct {
@@ -57,17 +53,17 @@ type VictoriaMetricsResult struct {
 
 // ClusterConnector opens a tunnel and prepares a cluster context.
 type ClusterConnector interface {
-	Connect(target domain.ClusterTarget, config domain.EffectiveConfig, req domain.NetworkRequirement) (ConnectionArtifacts, error)
+	Connect(target ClusterTarget, config EffectiveConfig, req NetworkRequirement) (ConnectionArtifacts, error)
 }
 
 // InventoryCatalog lists cluster targets from the configured source.
 type InventoryCatalog interface {
-	ListTargets() ([]domain.ClusterTarget, error)
+	ListTargets() ([]ClusterTarget, error)
 }
 
 // ContextSwitcher sets the active kubectl context.
 type ContextSwitcher interface {
-	SwitchContext(contextName string) *domain.OperationError
+	SwitchContext(contextName string) *OperationError
 }
 
 // StatusReader provides runtime cluster and tunnel state.
@@ -83,32 +79,26 @@ type TunnelManager interface {
 
 // TunnelReconnector re-establishes a broken managed tunnel using persisted SSH parameters.
 type TunnelReconnector interface {
-	// ReconnectTunnel kills any existing tunnel for contextName, opens a new one
-	// using stored ConnParams, and returns the local port on success.
 	ReconnectTunnel(contextName string) (int, error)
 }
 
 // ArgocdConnector sets up the ArgoCD tunnel and login.
 type ArgocdConnector interface {
-	Setup(contextName string, cfg domain.ArgocdConfig, hostname, username string, keyfile *string, port int, proxycmd *string, internalIP string) (ArgocdLoginResult, error)
+	Setup(contextName string, cfg ArgocdConfig, hostname, username string, keyfile *string, port int, proxycmd *string, internalIP string) (ArgocdLoginResult, error)
 }
 
 // AlertmanagerConnector sets up the Alertmanager tunnel.
 type AlertmanagerConnector interface {
-	Setup(contextName string, cfg domain.AlertmanagerConfig, hostname, username string, keyfile *string, port int, proxycmd *string, internalIP string) (AlertmanagerResult, error)
+	Setup(contextName string, cfg AlertmanagerConfig, hostname, username string, keyfile *string, port int, proxycmd *string, internalIP string) (AlertmanagerResult, error)
 }
 
 // VictoriaMetricsConnector sets up the VictoriaMetrics tunnel.
 type VictoriaMetricsConnector interface {
-	Setup(contextName string, cfg domain.VictoriaMetricsConfig, hostname, username string, keyfile *string, port int, proxycmd *string, internalIP string) (VictoriaMetricsResult, error)
+	Setup(contextName string, cfg VictoriaMetricsConfig, hostname, username string, keyfile *string, port int, proxycmd *string, internalIP string) (VictoriaMetricsResult, error)
 }
 
 // NetBirdPreflightChecker validates NetBird daemon and peer readiness before SSH.
 type NetBirdPreflightChecker interface {
-	// CheckDaemonReady verifies the local NetBird daemon is Connected.
-	// Returns nil when binary is absent (non-NetBird env) or skipCheck is true.
 	CheckDaemonReady(skipCheck bool) error
-	// CheckPeerReady verifies that the target FQDN peer is connected.
-	// Must be called after CheckDaemonReady; returns nil when skipped.
 	CheckPeerReady(fqdn string, skipCheck bool) error
 }

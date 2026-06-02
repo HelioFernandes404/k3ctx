@@ -70,14 +70,14 @@ func TestIsTunnelRunning_ReturnsFalseWhenPIDFileMissing(t *testing.T) {
 func TestIsTunnelRunning_ReturnsTrueWhenProcessRunning(t *testing.T) {
 	stateDir := t.TempDir()
 	pidFile := tunnel.GetTunnelPIDFile("test", stateDir)
-	require.NoError(t, os.WriteFile(pidFile, []byte(strconv.Itoa(os.Getpid())), 0o644))
+	require.NoError(t, os.WriteFile(pidFile, []byte(strconv.Itoa(os.Getpid())), 0o600))
 	assert.True(t, tunnel.IsTunnelRunning("test", stateDir))
 }
 
 func TestIsTunnelRunning_ReturnsFalseAndCleansStalePID(t *testing.T) {
 	stateDir := t.TempDir()
 	pidFile := tunnel.GetTunnelPIDFile("test", stateDir)
-	require.NoError(t, os.WriteFile(pidFile, []byte("99999"), 0o644))
+	require.NoError(t, os.WriteFile(pidFile, []byte("99999"), 0o600))
 	assert.False(t, tunnel.IsTunnelRunning("test", stateDir))
 	assert.NoFileExists(t, pidFile)
 }
@@ -85,7 +85,7 @@ func TestIsTunnelRunning_ReturnsFalseAndCleansStalePID(t *testing.T) {
 func TestIsTunnelRunning_InvalidPIDFormat(t *testing.T) {
 	stateDir := t.TempDir()
 	pidFile := tunnel.GetTunnelPIDFile("test", stateDir)
-	require.NoError(t, os.WriteFile(pidFile, []byte("not-a-number"), 0o644))
+	require.NoError(t, os.WriteFile(pidFile, []byte("not-a-number"), 0o600))
 	assert.False(t, tunnel.IsTunnelRunning("test", stateDir))
 }
 
@@ -99,14 +99,14 @@ func TestKillTunnel_DoesNothingWhenPIDFileMissing(t *testing.T) {
 func TestKillTunnel_RemovesPIDFileEvenIfKillFails(t *testing.T) {
 	stateDir := t.TempDir()
 	pidFile := tunnel.GetTunnelPIDFile("test", stateDir)
-	require.NoError(t, os.WriteFile(pidFile, []byte("99999"), 0o644))
+	require.NoError(t, os.WriteFile(pidFile, []byte("99999"), 0o600))
 	tunnel.KillTunnel("test", stateDir)
 	assert.NoFileExists(t, pidFile)
 }
 
 // --- KillAllTunnels ---
 
-func TestKillAllTunnels_DoesNothingWhenStateDirMissing(t *testing.T) {
+func TestKillAllTunnels_DoesNothingWhenStateDirMissing(_ *testing.T) {
 	tunnel.KillAllTunnels("/nonexistent/state/dir")
 }
 
@@ -114,7 +114,7 @@ func TestKillAllTunnels_KillsAllPIDFiles(t *testing.T) {
 	stateDir := t.TempDir()
 	for _, ctx := range []string{"ctx1", "ctx2"} {
 		pidFile := filepath.Join(stateDir, ctx+".pid")
-		require.NoError(t, os.WriteFile(pidFile, []byte("99999"), 0o644))
+		require.NoError(t, os.WriteFile(pidFile, []byte("99999"), 0o600))
 	}
 	tunnel.KillAllTunnels(stateDir)
 	entries, _ := filepath.Glob(filepath.Join(stateDir, "*.pid"))
@@ -128,7 +128,7 @@ func TestSaveTunnelPID_SavesPIDToFile(t *testing.T) {
 	tunnel.SaveTunnelPID("test-context", intPtr(12345), stateDir)
 	pidFile := filepath.Join(stateDir, "test-context.pid")
 	require.FileExists(t, pidFile)
-	data, _ := os.ReadFile(pidFile)
+	data, _ := os.ReadFile(pidFile) //nolint:gosec // test reads its own tempdir
 	assert.Equal(t, "12345", string(data))
 }
 
@@ -147,9 +147,9 @@ func TestIsPortLive_ReturnsFalseWhenNoListener(t *testing.T) {
 }
 
 func TestIsPortLive_ReturnsTrueWhenListening(t *testing.T) {
-	ln, err := net.Listen("tcp", "localhost:0")
+	ln, err := net.Listen("tcp", "localhost:0") //nolint:noctx // test listener, no context needed
 	require.NoError(t, err)
-	defer ln.Close()
+	defer func() { _ = ln.Close() }()
 	port := ln.Addr().(*net.TCPAddr).Port
 	assert.True(t, tunnel.IsPortLive(port, time.Second))
 }
@@ -157,14 +157,14 @@ func TestIsPortLive_ReturnsTrueWhenListening(t *testing.T) {
 // --- TunnelLiveness ---
 
 func TestTunnelLiveness_DeadWhenNoPIDFile(t *testing.T) {
-	assert.Equal(t, "dead", tunnel.TunnelLiveness("nonexistent", t.TempDir(), 19998))
+	assert.Equal(t, "dead", tunnel.Liveness("nonexistent", t.TempDir(), 19998))
 }
 
 func TestTunnelLiveness_StaleWhenPIDAliveButPortClosed(t *testing.T) {
 	stateDir := t.TempDir()
 	pidFile := tunnel.GetTunnelPIDFile("ctx", stateDir)
-	require.NoError(t, os.WriteFile(pidFile, []byte(strconv.Itoa(os.Getpid())), 0o644))
-	assert.Equal(t, "stale", tunnel.TunnelLiveness("ctx", stateDir, 19997))
+	require.NoError(t, os.WriteFile(pidFile, []byte(strconv.Itoa(os.Getpid())), 0o600))
+	assert.Equal(t, "stale", tunnel.Liveness("ctx", stateDir, 19997))
 }
 
 // --- SaveConnParams / LoadConnParams ---
@@ -196,13 +196,13 @@ func TestLoadConnParams_ErrorWhenMissing(t *testing.T) {
 // --- TunnelLiveness (continued) ---
 
 func TestTunnelLiveness_LiveWhenPIDAliveAndPortResponds(t *testing.T) {
-	ln, err := net.Listen("tcp", "localhost:0")
+	ln, err := net.Listen("tcp", "localhost:0") //nolint:noctx // test listener, no context needed
 	require.NoError(t, err)
-	defer ln.Close()
+	defer func() { _ = ln.Close() }()
 	port := ln.Addr().(*net.TCPAddr).Port
 
 	stateDir := t.TempDir()
 	pidFile := tunnel.GetTunnelPIDFile("ctx", stateDir)
-	require.NoError(t, os.WriteFile(pidFile, []byte(strconv.Itoa(os.Getpid())), 0o644))
-	assert.Equal(t, "live", tunnel.TunnelLiveness("ctx", stateDir, port))
+	require.NoError(t, os.WriteFile(pidFile, []byte(strconv.Itoa(os.Getpid())), 0o600))
+	assert.Equal(t, "live", tunnel.Liveness("ctx", stateDir, port))
 }

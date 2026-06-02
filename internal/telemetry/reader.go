@@ -123,14 +123,14 @@ func Aggregate(dir string) ([]CommandStat, error) {
 }
 
 func readValidLines(path string) ([]map[string]any, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // path is built from validated telemetry dir
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, fmt.Errorf("file not found: %s", path)
 		}
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var out []map[string]any
 	sc := bufio.NewScanner(f)

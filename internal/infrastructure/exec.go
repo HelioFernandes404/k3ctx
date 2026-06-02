@@ -5,15 +5,16 @@ import (
 	"context"
 	"os/exec"
 
-	"github.com/systemframe/k3ctx/internal/application"
+	"github.com/systemframe/k3ctx/internal/domain"
 )
 
 // LocalClusterExec runs kubectl commands against named contexts via os/exec.
 type LocalClusterExec struct{}
 
-func (LocalClusterExec) ExecOnContext(ctx context.Context, contextName string, args []string) application.ExecResult {
+// ExecOnContext runs `kubectl --context <contextName> <args...>` and returns its captured result.
+func (LocalClusterExec) ExecOnContext(ctx context.Context, contextName string, args []string) domain.ExecResult {
 	cmdArgs := append([]string{"--context", contextName}, args...)
-	cmd := exec.CommandContext(ctx, "kubectl", cmdArgs...)
+	cmd := exec.CommandContext(ctx, "kubectl", cmdArgs...) //nolint:gosec // kubectl with caller-provided args is the whole point of exec
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -29,7 +30,7 @@ func (LocalClusterExec) ExecOnContext(ctx context.Context, contextName string, a
 		}
 	}
 
-	return application.ExecResult{
+	return domain.ExecResult{
 		Context:  contextName,
 		OK:       err == nil,
 		Stdout:   stdout.String(),

@@ -129,3 +129,64 @@ func TestTunnelReconnect_EmitsJSON(t *testing.T) {
 	assert.Equal(t, "acme-prod", got["context_name"])
 	assert.Equal(t, float64(16500), got["local_port"])
 }
+
+func TestTunnelList_JSON_ReturnsOnlyRunningContexts(t *testing.T) {
+	jsonOutput = true
+	t.Cleanup(func() { jsonOutput = false })
+
+	svcs.Status = &mockStatusReader{items: []map[string]any{
+		{"context_name": "acme-prod", "tunnel_running": true},
+		{"context_name": "beta-dev", "tunnel_running": false},
+		{"context_name": "gamma-staging", "tunnel_running": true},
+	}}
+
+	var buf bytes.Buffer
+	tunnelCmd.SetOut(&buf)
+	t.Cleanup(func() { tunnelCmd.SetOut(nil) })
+
+	err := runTunnelList(tunnelCmd, nil)
+	require.NoError(t, err)
+
+	var got []string
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
+	assert.Equal(t, []string{"acme-prod", "gamma-staging"}, got)
+}
+
+func TestTunnelList_JSON_EmptyArrayWhenNoneRunning(t *testing.T) {
+	jsonOutput = true
+	t.Cleanup(func() { jsonOutput = false })
+
+	svcs.Status = &mockStatusReader{items: []map[string]any{
+		{"context_name": "beta-dev", "tunnel_running": false},
+	}}
+
+	var buf bytes.Buffer
+	tunnelCmd.SetOut(&buf)
+	t.Cleanup(func() { tunnelCmd.SetOut(nil) })
+
+	err := runTunnelList(tunnelCmd, nil)
+	require.NoError(t, err)
+
+	var got []string
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
+	assert.Empty(t, got)
+}
+
+func TestTunnelList_Text_PrintsOnlyRunningContextNames(t *testing.T) {
+	jsonOutput = false
+	svcs.Status = &mockStatusReader{items: []map[string]any{
+		{"context_name": "acme-prod", "tunnel_running": true},
+		{"context_name": "beta-dev", "tunnel_running": false},
+	}}
+
+	var buf bytes.Buffer
+	tunnelCmd.SetOut(&buf)
+	t.Cleanup(func() { tunnelCmd.SetOut(nil) })
+
+	err := runTunnelList(tunnelCmd, nil)
+	require.NoError(t, err)
+
+	out := buf.String()
+	assert.Contains(t, out, "acme-prod")
+	assert.NotContains(t, out, "beta-dev")
+}

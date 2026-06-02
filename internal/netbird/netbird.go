@@ -1,6 +1,7 @@
 package netbird
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os/exec"
@@ -48,7 +49,7 @@ func ParsePeers(data []byte) ([]Peer, error) {
 
 // RunStatus executes `netbird status --json` and returns raw JSON output.
 func RunStatus(binPath string) ([]byte, error) {
-	out, err := exec.Command(binPath, "status", "--json").Output()
+	out, err := exec.CommandContext(context.Background(), binPath, "status", "--json").Output() //nolint:gosec // binPath is the operator-configured netbird binary
 	if err != nil {
 		return nil, fmt.Errorf("netbird CLI unavailable or not authenticated: %w", err)
 	}

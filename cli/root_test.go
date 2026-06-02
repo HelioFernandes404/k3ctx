@@ -35,7 +35,7 @@ func TestRecordErrorTelemetry_CapturesCmdArgsAndFlags(t *testing.T) {
 
 	recordErrorTelemetry(errors.New("Cluster connection failed"))
 
-	data, err := os.ReadFile(filepath.Join(dir, "telemetry.jsonl"))
+	data, err := os.ReadFile(filepath.Join(dir, "telemetry.jsonl")) //nolint:gosec // test reads its own tempdir
 	require.NoError(t, err)
 
 	var evt map[string]any

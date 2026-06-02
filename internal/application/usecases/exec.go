@@ -5,16 +5,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/systemframe/k3ctx/internal/application"
+	"github.com/systemframe/k3ctx/internal/domain"
 )
 
 // ExecOnContexts runs args against each contextName in parallel with the given timeout per context.
-func ExecOnContexts(contextNames []string, args []string, timeout time.Duration, executer application.ClusterExec) []application.ExecResult {
+func ExecOnContexts(contextNames []string, args []string, timeout time.Duration, executer domain.ClusterExec) []domain.ExecResult {
 	if len(contextNames) == 0 {
-		return []application.ExecResult{}
+		return []domain.ExecResult{}
 	}
 
-	results := make([]application.ExecResult, len(contextNames))
+	results := make([]domain.ExecResult, len(contextNames))
 	var wg sync.WaitGroup
 	for i, name := range contextNames {
 		wg.Add(1)

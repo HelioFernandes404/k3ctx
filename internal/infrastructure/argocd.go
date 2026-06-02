@@ -1,6 +1,7 @@
 package infrastructure
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -11,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/systemframe/k3ctx/internal/application"
 	"github.com/systemframe/k3ctx/internal/domain"
 	"github.com/systemframe/k3ctx/internal/tunnel"
 )
@@ -21,7 +21,7 @@ const (
 	argocdPortRangeSize  = 10000
 )
 
-// LocalArgocdConnector implements application.ArgocdConnector using SSH tunnels
+// LocalArgocdConnector implements domain.ArgocdConnector using SSH tunnels
 // and the argocd CLI for login.
 type LocalArgocdConnector struct {
 	StateDir string
@@ -85,7 +85,9 @@ func NewLocalArgocdConnector() *LocalArgocdConnector {
 		return discoverArgocdService(contextName, defaultKubectlRun)
 	}
 	c.runArgocd = func(args []string, timeout time.Duration) error {
-		cmd := exec.Command("argocd", args...) //nolint:gosec
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, "argocd", args...) //nolint:gosec
 		cmd.Stdout = os.Stderr
 		cmd.Stderr = os.Stderr
 		return cmd.Run()
@@ -100,7 +102,7 @@ func (c *LocalArgocdConnector) stateDir() string {
 	return filepath.Join(os.Getenv("HOME"), ".local", "state", "k3ctx-tunnels")
 }
 
-// Setup implements application.ArgocdConnector.
+// Setup implements domain.ArgocdConnector.
 func (c *LocalArgocdConnector) Setup(
 	contextName string,
 	cfg domain.ArgocdConfig,
@@ -109,9 +111,9 @@ func (c *LocalArgocdConnector) Setup(
 	port int,
 	proxycmd *string,
 	internalIP string,
-) (application.ArgocdLoginResult, error) {
+) (domain.ArgocdLoginResult, error) {
 	if !cfg.Enabled {
-		return application.ArgocdLoginResult{
+		return domain.ArgocdLoginResult{
 			Skipped: true,
 			Message: "ArgoCD not configured for this cluster",
 		}, nil
@@ -126,7 +128,7 @@ func (c *LocalArgocdConnector) Setup(
 		}
 	}
 	if cfg.NodePort == nil {
-		return application.ArgocdLoginResult{
+		return domain.ArgocdLoginResult{
 			Skipped: true,
 			Message: "ArgoCD not discovered for this cluster",
 		}, nil
@@ -146,13 +148,13 @@ func (c *LocalArgocdConnector) Setup(
 		}
 		pid, err := c.createTunnel(hostname, internalIP, localPort, *cfg.NodePort, opts)
 		if err != nil {
-			return application.ArgocdLoginResult{}, fmt.Errorf("argocd tunnel: %w", err)
+			return domain.ArgocdLoginResult{}, fmt.Errorf("argocd tunnel: %w", err)
 		}
 		c.saveTunnelPID(argocdContext, pid, stateDir)
 	}
 
 	if c.which("argocd") == "" {
-		return application.ArgocdLoginResult{
+		return domain.ArgocdLoginResult{
 			LocalPort: &localPort,
 			Message:   fmt.Sprintf("argocd CLI not found in PATH; tunnel open at 127.0.0.1:%d", localPort),
 		}, nil
@@ -160,7 +162,7 @@ func (c *LocalArgocdConnector) Setup(
 
 	password := c.fetchPassword(contextName, cfg.Namespace)
 	if password == nil {
-		return application.ArgocdLoginResult{
+		return domain.ArgocdLoginResult{
 			LocalPort: &localPort,
 			Message:   fmt.Sprintf("argocd-initial-admin-secret not found in namespace %q; run: argocd login --insecure 127.0.0.1:%d", cfg.Namespace, localPort),
 		}, nil
@@ -183,13 +185,13 @@ func (c *LocalArgocdConnector) Setup(
 		loginErr = c.runArgocd(buildLoginArgs("--plaintext"), 30*time.Second)
 	}
 	if loginErr != nil {
-		return application.ArgocdLoginResult{
+		return domain.ArgocdLoginResult{
 			LocalPort: &localPort,
 			Message:   fmt.Sprintf("argocd login failed: %v", loginErr),
 		}, nil
 	}
 
-	return application.ArgocdLoginResult{
+	return domain.ArgocdLoginResult{
 		Success:   true,
 		LocalPort: &localPort,
 	}, nil
@@ -332,6 +334,6 @@ func argocdPortRank(port servicePort) int {
 }
 
 func defaultKubectlRun(args []string) (string, error) {
-	out, err := exec.Command(args[0], args[1:]...).Output() //nolint:gosec
+	out, err := exec.CommandContext(context.Background(), args[0], args[1:]...).Output() //nolint:gosec
 	return strings.TrimSpace(string(out)), err
 }

@@ -197,7 +197,7 @@ func TestGetInternalIP_ErrorWhenNoIPFound(t *testing.T) {
 	runCmd := func(_ string) (string, error) { return "", nil }
 	_, err := GetInternalIP(runCmd)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Could not detect internal IPv4")
+	assert.Contains(t, err.Error(), "could not detect internal IPv4")
 }
 
 // --- LocalFileHash ---
@@ -223,4 +223,207 @@ func TestLocalFileHash_DifferentContentDifferentHash(t *testing.T) {
 	require.NoError(t, os.WriteFile(f1, []byte("content-A"), 0o600))
 	require.NoError(t, os.WriteFile(f2, []byte("content-B"), 0o600))
 	assert.NotEqual(t, LocalFileHash(f1), LocalFileHash(f2))
+}
+
+// --- buildSSHArgs ---
+
+func TestBuildSSHArgs_MinimalArgs(t *testing.T) {
+	args := buildSSHArgs("host.example", "user", nil, 0, nil)
+	assert.Contains(t, args, "-o")
+	assert.Contains(t, args, "BatchMode=yes")
+	assert.Contains(t, args, "StrictHostKeyChecking=no")
+	assert.Equal(t, "user@host.example", args[len(args)-1])
+	assert.NotContains(t, args, "-i")
+	assert.NotContains(t, args, "-p")
+}
+
+func TestBuildSSHArgs_OmitsPortWhenDefault22(t *testing.T) {
+	args := buildSSHArgs("host", "user", nil, 22, nil)
+	assert.NotContains(t, args, "-p")
+}
+
+func TestBuildSSHArgs_IncludesPortWhenNonDefault(t *testing.T) {
+	args := buildSSHArgs("host", "user", nil, 2222, nil)
+	assert.Contains(t, args, "-p")
+	assert.Contains(t, args, "2222")
+}
+
+func TestBuildSSHArgs_IncludesKeyfileWhenSet(t *testing.T) {
+	key := "/home/u/.ssh/id_ed25519"
+	args := buildSSHArgs("host", "user", &key, 22, nil)
+	assert.Contains(t, args, "-i")
+	assert.Contains(t, args, key)
+}
+
+func TestBuildSSHArgs_OmitsEmptyKeyfile(t *testing.T) {
+	empty := ""
+	args := buildSSHArgs("host", "user", &empty, 22, nil)
+	assert.NotContains(t, args, "-i")
+}
+
+func TestBuildSSHArgs_IncludesProxyCommandWhenSet(t *testing.T) {
+	proxy := "ssh -W %h:%p bastion"
+	args := buildSSHArgs("host", "user", nil, 22, &proxy)
+	found := false
+	for _, a := range args {
+		if a == "ProxyCommand="+proxy {
+			found = true
+		}
+	}
+	assert.True(t, found, "ProxyCommand=... must be present in args")
+}
+
+func TestBuildSSHArgs_TargetIsLastArg(t *testing.T) {
+	args := buildSSHArgs("h", "u", nil, 2222, nil)
+	assert.Equal(t, "u@h", args[len(args)-1])
+}
+
+// --- FetchRemoteFile ---
+
+func TestFetchRemoteFile_ReturnsContent(t *testing.T) {
+	runCmd := func(cmd string) (string, error) {
+		assert.Equal(t, "cat /etc/k3s.yaml", cmd)
+		return "kubeconfig-content", nil
+	}
+	content, err := FetchRemoteFile(runCmd, "/etc/k3s.yaml")
+	require.NoError(t, err)
+	assert.Equal(t, "kubeconfig-content", content)
+}
+
+func TestFetchRemoteFile_WrapsRunnerError(t *testing.T) {
+	runCmd := func(_ string) (string, error) {
+		return "", assert.AnError
+	}
+	_, err := FetchRemoteFile(runCmd, "/x")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "/x")
+}
+
+// --- RemoteFileHash ---
+
+func TestRemoteFileHash_ReturnsSha256FromFirstCommand(t *testing.T) {
+	wantHash := "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+	runCmd := func(cmd string) (string, error) {
+		if cmd[:9] == "sha256sum" {
+			return wantHash + "\n", nil
+		}
+		return "", assert.AnError
+	}
+	got, err := RemoteFileHash(runCmd, "/etc/k3s.yaml")
+	require.NoError(t, err)
+	assert.Equal(t, wantHash, got)
+}
+
+func TestRemoteFileHash_FallsBackToShasum(t *testing.T) {
+	wantHash := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+	runCmd := func(cmd string) (string, error) {
+		if cmd[:9] == "sha256sum" {
+			return "", assert.AnError
+		}
+		return wantHash, nil
+	}
+	got, err := RemoteFileHash(runCmd, "/etc/k3s.yaml")
+	require.NoError(t, err)
+	assert.Equal(t, wantHash, got)
+}
+
+func TestRemoteFileHash_ErrorsWhenBothCommandsFail(t *testing.T) {
+	runCmd := func(_ string) (string, error) { return "", assert.AnError }
+	_, err := RemoteFileHash(runCmd, "/x")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "/x")
+}
+
+func TestRemoteFileHash_ErrorsWhenHashLengthInvalid(t *testing.T) {
+	runCmd := func(_ string) (string, error) { return "shorthash", nil }
+	_, err := RemoteFileHash(runCmd, "/x")
+	require.Error(t, err)
+}
+
+// --- FetchRemoteFileCached ---
+
+func TestFetchRemoteFileCached_UsesCacheWhenHashesMatch(t *testing.T) {
+	dir := t.TempDir()
+	cachePath := filepath.Join(dir, "ctx.yaml")
+	content := "cached-content"
+	require.NoError(t, os.WriteFile(cachePath, []byte(content), 0o600))
+	cachedHash := LocalFileHash(cachePath)
+
+	runCmd := func(cmd string) (string, error) {
+		// Only hash command should be called; cat must not happen
+		if cmd[:9] == "sha256sum" || cmd[:7] == "shasum " {
+			return cachedHash, nil
+		}
+		t.Fatalf("unexpected runCmd call after cache hit: %q", cmd)
+		return "", nil
+	}
+
+	got, usedCache, err := FetchRemoteFileCached(runCmd, "/etc/k3s.yaml", cachePath)
+	require.NoError(t, err)
+	assert.True(t, usedCache)
+	assert.Equal(t, content, got)
+}
+
+func TestFetchRemoteFileCached_FetchesWhenHashesDiffer(t *testing.T) {
+	dir := t.TempDir()
+	cachePath := filepath.Join(dir, "ctx.yaml")
+	require.NoError(t, os.WriteFile(cachePath, []byte("old-content"), 0o600))
+
+	remoteHash := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	runCmd := func(cmd string) (string, error) {
+		if cmd[:9] == "sha256sum" || cmd[:7] == "shasum " {
+			return remoteHash, nil
+		}
+		return "new-content", nil // cat
+	}
+
+	got, usedCache, err := FetchRemoteFileCached(runCmd, "/etc/k3s.yaml", cachePath)
+	require.NoError(t, err)
+	assert.False(t, usedCache)
+	assert.Equal(t, "new-content", got)
+
+	// Cache must be rewritten with new content
+	persisted, err := os.ReadFile(cachePath) //nolint:gosec // test reads its own tempdir
+	require.NoError(t, err)
+	assert.Equal(t, "new-content", string(persisted))
+}
+
+func TestFetchRemoteFileCached_FetchesWhenNoCacheExists(t *testing.T) {
+	dir := t.TempDir()
+	cachePath := filepath.Join(dir, "subdir", "ctx.yaml")
+
+	remoteHash := "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	runCmd := func(cmd string) (string, error) {
+		if cmd[:9] == "sha256sum" || cmd[:7] == "shasum " {
+			return remoteHash, nil
+		}
+		return "fresh-content", nil
+	}
+
+	got, usedCache, err := FetchRemoteFileCached(runCmd, "/etc/k3s.yaml", cachePath)
+	require.NoError(t, err)
+	assert.False(t, usedCache)
+	assert.Equal(t, "fresh-content", got)
+
+	// Parent directory must have been created and content persisted
+	persisted, err := os.ReadFile(cachePath) //nolint:gosec // test reads its own tempdir
+	require.NoError(t, err)
+	assert.Equal(t, "fresh-content", string(persisted))
+}
+
+func TestFetchRemoteFileCached_FallsBackToFetchWhenHashFails(t *testing.T) {
+	dir := t.TempDir()
+	cachePath := filepath.Join(dir, "ctx.yaml")
+
+	runCmd := func(cmd string) (string, error) {
+		if cmd[:9] == "sha256sum" || cmd[:7] == "shasum " {
+			return "", assert.AnError
+		}
+		return "fallback-content", nil
+	}
+
+	got, usedCache, err := FetchRemoteFileCached(runCmd, "/etc/k3s.yaml", cachePath)
+	require.NoError(t, err)
+	assert.False(t, usedCache)
+	assert.Equal(t, "fallback-content", got)
 }

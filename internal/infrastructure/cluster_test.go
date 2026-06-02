@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/systemframe/k3ctx/internal/application"
 	"github.com/systemframe/k3ctx/internal/domain"
 )
 
@@ -18,7 +17,7 @@ func makeTarget() domain.ClusterTarget {
 		map[string]any{"addr": "203.0.113.10"}, nil)
 }
 
-func makeEffectiveConfig(t *testing.T) domain.EffectiveConfig {
+func makeEffectiveConfig(_ *testing.T) domain.EffectiveConfig {
 	return domain.EffectiveConfig{
 		SSHConfigPath:       "~/.ssh/config",
 		SSHKeyPath:          "~/.ssh/id_ed25519",
@@ -30,7 +29,7 @@ func makeEffectiveConfig(t *testing.T) domain.EffectiveConfig {
 	}
 }
 
-func stubSSHConnect(target domain.ClusterTarget, config domain.EffectiveConfig) (string, string, *string, int, *string, func(string) (string, error), error) {
+func stubSSHConnect(_ domain.ClusterTarget, _ domain.EffectiveConfig) (string, string, *string, int, *string, func(string) (string, error), error) {
 	runner := func(_ string) (string, error) { return "", nil }
 	return "resolved.example.internal", "ec2-user", nil, 22, nil, runner, nil
 }
@@ -39,13 +38,15 @@ func stubPrepareKubeconfig(_ func(string) (string, error), _ domain.ClusterTarge
 	return "10.0.0.10", 16443, false, "apiVersion: v1\n", nil
 }
 
-func stubEnsureTunnel(pid int, reused bool) func(string, string, string, string, *string, int, int, int, *string, string) (*int, bool, error) {
+func stubEnsureTunnel(pid int) func(string, string, string, string, *string, int, int, int, *string, string) (*int, bool, error) {
 	return func(_, _, _, _ string, _ *string, _, _, _ int, _ *string, _ string) (*int, bool, error) {
-		return &pid, reused, nil
+		return &pid, false, nil
 	}
 }
 
-func noopMerge(content, contextName string) (string, error) { return "/tmp/.kube/config", nil }
+func noopMerge(_, _ string) (string, error) {
+	return "/tmp/.kube/config", nil
+}
 
 type stubArgocdConnector struct {
 	calls []domain.ArgocdConfig
@@ -53,9 +54,9 @@ type stubArgocdConnector struct {
 	port  *int
 }
 
-func (s *stubArgocdConnector) Setup(_ string, cfg domain.ArgocdConfig, _, _ string, _ *string, _ int, _ *string, _ string) (application.ArgocdLoginResult, error) {
+func (s *stubArgocdConnector) Setup(_ string, cfg domain.ArgocdConfig, _, _ string, _ *string, _ int, _ *string, _ string) (domain.ArgocdLoginResult, error) {
 	s.calls = append(s.calls, cfg)
-	return application.ArgocdLoginResult{LocalPort: s.port}, s.err
+	return domain.ArgocdLoginResult{LocalPort: s.port}, s.err
 }
 
 // --- Orchestration tests ---
@@ -68,7 +69,7 @@ func TestLocalClusterConnector_AbortsWhenAPICheckFailsOnFreshTunnel(t *testing.T
 	conn.StateDir = t.TempDir()
 	conn.sshConnect = stubSSHConnect
 	conn.prepareKubeconfig = stubPrepareKubeconfig
-	conn.ensureTunnel = stubEnsureTunnel(4242, false) // fresh tunnel
+	conn.ensureTunnel = stubEnsureTunnel(4242) // fresh tunnel
 	conn.pollAPIReady = func(_ int, _ string, _, _ time.Duration) error {
 		return &domain.OperationError{
 			Code:    "kubernetes_api_unreachable",
@@ -133,7 +134,7 @@ func TestLocalClusterConnector_MergesKubeconfigOnSuccess(t *testing.T) {
 	conn.StateDir = t.TempDir()
 	conn.sshConnect = stubSSHConnect
 	conn.prepareKubeconfig = stubPrepareKubeconfig
-	conn.ensureTunnel = stubEnsureTunnel(1234, false)
+	conn.ensureTunnel = stubEnsureTunnel(1234)
 	conn.pollAPIReady = func(_ int, _ string, _, _ time.Duration) error { return nil }
 	conn.killTunnel = func(_, _ string) {}
 	conn.mergeKubeconfig = func(content, ctx string) (string, error) {
@@ -158,7 +159,7 @@ func TestLocalClusterConnector_SkipsAPICheckWhenDisabled(t *testing.T) {
 	conn.VerifyAPIReady = false
 	conn.sshConnect = stubSSHConnect
 	conn.prepareKubeconfig = stubPrepareKubeconfig
-	conn.ensureTunnel = stubEnsureTunnel(1234, false)
+	conn.ensureTunnel = stubEnsureTunnel(1234)
 	conn.pollAPIReady = func(_ int, _ string, _, _ time.Duration) error {
 		apiCalled = true
 		return nil
@@ -191,7 +192,7 @@ func TestLocalClusterConnector_UsesAutoDiscoveryArgocdConfig(t *testing.T) {
 	conn.StateDir = t.TempDir()
 	conn.sshConnect = stubSSHConnect
 	conn.prepareKubeconfig = stubPrepareKubeconfig
-	conn.ensureTunnel = stubEnsureTunnel(1234, false)
+	conn.ensureTunnel = stubEnsureTunnel(1234)
 	conn.pollAPIReady = func(_ int, _ string, _, _ time.Duration) error { return nil }
 	conn.killTunnel = func(_, _ string) {}
 	conn.mergeKubeconfig = noopMerge
@@ -214,7 +215,7 @@ func TestLocalClusterConnector_IgnoresArgocdSetupError(t *testing.T) {
 	conn.StateDir = t.TempDir()
 	conn.sshConnect = stubSSHConnect
 	conn.prepareKubeconfig = stubPrepareKubeconfig
-	conn.ensureTunnel = stubEnsureTunnel(1234, false)
+	conn.ensureTunnel = stubEnsureTunnel(1234)
 	conn.pollAPIReady = func(_ int, _ string, _, _ time.Duration) error { return nil }
 	conn.killTunnel = func(_, _ string) {}
 	conn.mergeKubeconfig = noopMerge

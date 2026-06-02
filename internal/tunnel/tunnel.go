@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"context"
 	"crypto/md5" //nolint:gosec
 	"encoding/binary"
 	"fmt"
@@ -25,14 +26,14 @@ func GetUniquePort(contextName string, start, size int) int {
 
 // GetTunnelPIDFile returns the PID file path and ensures the state dir exists.
 func GetTunnelPIDFile(contextName, stateDir string) string {
-	_ = os.MkdirAll(stateDir, 0o755)
+	_ = os.MkdirAll(stateDir, 0o700)
 	return filepath.Join(stateDir, contextName+".pid")
 }
 
 // IsTunnelRunning checks whether the SSH tunnel process for contextName is alive.
 func IsTunnelRunning(contextName, stateDir string) bool {
 	pidFile := GetTunnelPIDFile(contextName, stateDir)
-	data, err := os.ReadFile(pidFile)
+	data, err := os.ReadFile(pidFile) //nolint:gosec // pidFile built from validated stateDir
 	if err != nil {
 		return false
 	}
@@ -58,7 +59,7 @@ func KillTunnel(contextName, stateDir string) {
 	pidFile := GetTunnelPIDFile(contextName, stateDir)
 	defer func() { _ = os.Remove(pidFile) }()
 
-	data, err := os.ReadFile(pidFile)
+	data, err := os.ReadFile(pidFile) //nolint:gosec // pidFile built from validated stateDir
 	if err != nil {
 		return
 	}
@@ -94,9 +95,8 @@ type CreateTunnelOptions struct {
 	ProxyCmd    string
 }
 
-// CreateTunnel opens a background SSH port-forward and returns the tunnel PID.
-// Returns nil PID when pgrep cannot locate the process (not an error).
-func CreateTunnel(sshHost, internalIP string, localPort, remotePort int, opts CreateTunnelOptions) (*int, error) {
+// buildSSHTunnelArgs builds the argv for `ssh -f -N` background port-forward.
+func buildSSHTunnelArgs(sshHost, internalIP string, localPort, remotePort int, opts CreateTunnelOptions) []string {
 	cmd := []string{
 		"ssh", "-f", "-N",
 		"-o", "ExitOnForwardFailure=yes",
@@ -118,15 +118,22 @@ func CreateTunnel(sshHost, internalIP string, localPort, remotePort int, opts Cr
 		"-L", fmt.Sprintf("%d:%s:%d", localPort, internalIP, remotePort),
 		sshHost,
 	)
+	return cmd
+}
 
-	if _, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput(); err != nil {
+// CreateTunnel opens a background SSH port-forward and returns the tunnel PID.
+// Returns nil PID when pgrep cannot locate the process (not an error).
+func CreateTunnel(sshHost, internalIP string, localPort, remotePort int, opts CreateTunnelOptions) (*int, error) {
+	cmd := buildSSHTunnelArgs(sshHost, internalIP, localPort, remotePort, opts)
+
+	if _, err := exec.CommandContext(context.Background(), cmd[0], cmd[1:]...).CombinedOutput(); err != nil { //nolint:gosec // SSH command built from validated config
 		return nil, fmt.Errorf("SSH tunnel process failed: %w", err)
 	}
 
 	time.Sleep(500 * time.Millisecond)
 
 	pattern := fmt.Sprintf("ssh.*%d:%s:%d", localPort, internalIP, remotePort)
-	pgrepOut, err := exec.Command("pgrep", "-f", pattern).Output()
+	pgrepOut, err := exec.CommandContext(context.Background(), "pgrep", "-f", pattern).Output() //nolint:gosec // pgrep pattern built from numeric ports and validated IP
 	if err != nil || len(strings.TrimSpace(string(pgrepOut))) == 0 {
 		return nil, nil
 	}
@@ -140,7 +147,8 @@ func CreateTunnel(sshHost, internalIP string, localPort, remotePort int, opts Cr
 // CreateKubectlPortForward opens a background kubectl port-forward and returns the process PID.
 // Returns nil PID when pgrep cannot locate the process (not an error).
 func CreateKubectlPortForward(contextName, namespace, serviceName string, localPort, remotePort int) (*int, error) {
-	cmd := exec.Command(
+	cmd := exec.CommandContext( //nolint:gosec // kubectl with validated args
+		context.Background(),
 		"kubectl", "port-forward",
 		"-n", namespace,
 		"--context", contextName,
@@ -157,7 +165,7 @@ func CreateKubectlPortForward(contextName, namespace, serviceName string, localP
 	time.Sleep(500 * time.Millisecond)
 
 	pattern := fmt.Sprintf("kubectl.*port-forward.*%d:%d", localPort, remotePort)
-	pgrepOut, err := exec.Command("pgrep", "-f", pattern).Output()
+	pgrepOut, err := exec.CommandContext(context.Background(), "pgrep", "-f", pattern).Output() //nolint:gosec // pgrep pattern built from numeric ports
 	if err != nil || len(strings.TrimSpace(string(pgrepOut))) == 0 {
 		return nil, nil
 	}
@@ -174,12 +182,13 @@ func SaveTunnelPID(contextName string, pid *int, stateDir string) {
 		return
 	}
 	pidFile := GetTunnelPIDFile(contextName, stateDir)
-	_ = os.WriteFile(pidFile, []byte(strconv.Itoa(*pid)), 0o644)
+	_ = os.WriteFile(pidFile, []byte(strconv.Itoa(*pid)), 0o600)
 }
 
 // IsPortLive reports whether localhost:<localPort> accepts a TCP connection within timeout.
 func IsPortLive(localPort int, timeout time.Duration) bool {
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", localPort), timeout)
+	d := net.Dialer{Timeout: timeout}
+	conn, err := d.DialContext(context.Background(), "tcp", fmt.Sprintf("localhost:%d", localPort))
 	if err != nil {
 		return false
 	}
@@ -187,11 +196,11 @@ func IsPortLive(localPort int, timeout time.Duration) bool {
 	return true
 }
 
-// TunnelLiveness returns the liveness state of a managed tunnel:
+// Liveness returns the liveness state of a managed tunnel:
 //   - "live"  — process running and local port responds
 //   - "stale" — process running but local port is unresponsive
 //   - "dead"  — no running process (PID file absent or process gone)
-func TunnelLiveness(contextName, stateDir string, localPort int) string {
+func Liveness(contextName, stateDir string, localPort int) string {
 	if !IsTunnelRunning(contextName, stateDir) {
 		return "dead"
 	}

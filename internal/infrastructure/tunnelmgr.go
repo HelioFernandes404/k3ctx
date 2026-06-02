@@ -20,11 +20,13 @@ func (m LocalTunnelManager) stateDir() string {
 	return filepath.Join(os.Getenv("HOME"), ".local", "state", "k3ctx-tunnels")
 }
 
+// KillTunnel terminates the managed tunnel process for the given context.
 func (m LocalTunnelManager) KillTunnel(contextName string) error {
 	tunnel.KillTunnel(contextName, m.stateDir())
 	return nil
 }
 
+// ReconnectTunnel kills the existing tunnel and restarts it from persisted connection params.
 func (m LocalTunnelManager) ReconnectTunnel(contextName string) (int, error) {
 	stateDir := m.stateDir()
 	params, err := tunnel.LoadConnParams(contextName, stateDir)
