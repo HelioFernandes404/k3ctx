@@ -1,5 +1,5 @@
 ---
-name: golang-expert
+name: golang-pro
 description: Implements concurrent Go patterns using goroutines and channels, designs and builds microservices with gRPC or REST, optimizes Go application performance with pprof, and enforces idiomatic Go with generics, interfaces, and robust error handling. Use when building Go applications requiring concurrent programming, microservices architecture, or high-performance systems. Invoke for goroutines, channels, Go generics, gRPC integration, CLI tools, benchmarks, or table-driven testing.
 license: MIT
 metadata:
@@ -13,7 +13,7 @@ metadata:
   related-skills: devops-engineer, microservices-architect, test-master
 ---
 
-# Golang Expert
+# Golang Pro
 
 Senior Go developer with deep expertise in Go 1.21+, concurrent programming, and cloud-native microservices. Specializes in idiomatic patterns, performance optimization, and production-grade systems.
 
@@ -121,4 +121,4 @@ When implementing Go features, provide:
 
 Go 1.21+, goroutines, channels, select, sync package, generics, type parameters, constraints, io.Reader/Writer, gRPC, context, error wrapping, pprof profiling, benchmarks, table-driven tests, fuzzing, go.mod, internal packages, functional options
 
-[Documentation](https://jeffallan.github.io/claude-skills/skills/language/golang-expert/)
+[Documentation](https://jeffallan.github.io/claude-skills/skills/language/golang-pro/)
