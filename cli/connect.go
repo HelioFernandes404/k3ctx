@@ -106,13 +106,13 @@ func runConnect(cmd *cobra.Command, args []string) error {
 		addr, _ := target.HostConfig()["addr"].(string)
 		if jsonOutput {
 			enc := json.NewEncoder(cmd.OutOrStdout())
-			return enc.Encode(jsonEnvelope(cmd, map[string]any{
+			return enc.Encode(map[string]any{
 				"dry_run":      true,
 				"context_name": target.ContextName(),
 				"client":       target.Company(),
 				"host":         target.HostAlias(),
 				"addr":         addr,
-			}))
+			})
 		}
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Would connect: %s\n", target.ContextName())
 		return nil
@@ -133,7 +133,7 @@ func runConnect(cmd *cobra.Command, args []string) error {
 
 	if jsonOutput {
 		enc := json.NewEncoder(cmd.OutOrStdout())
-		return enc.Encode(jsonEnvelope(cmd, result.ToPublicDict()))
+		return enc.Encode(result.ToPublicDict())
 	}
 
 	localPort := ""
@@ -192,7 +192,7 @@ func runConnectAllHosts(cmd *cobra.Command) error {
 			dicts[i] = r.ToPublicDict()
 		}
 		enc := json.NewEncoder(cmd.OutOrStdout())
-		return enc.Encode(jsonEnvelope(cmd, dicts))
+		return enc.Encode(dicts)
 	}
 
 	for _, r := range results {

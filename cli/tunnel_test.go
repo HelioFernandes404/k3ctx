@@ -83,11 +83,8 @@ func TestTunnelKill_WithYes_EmitsJSONOnSuccess(t *testing.T) {
 
 	var got map[string]any
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
-	assert.Equal(t, true, got["ok"])
-	assert.Equal(t, "tunnel-kill", got["command"])
-	data := got["data"].(map[string]any)
-	assert.Equal(t, "acme-prod", data["context_name"])
-	assert.Equal(t, true, data["killed"])
+	assert.Equal(t, "acme-prod", got["context_name"])
+	assert.Equal(t, true, got["killed"])
 }
 
 func TestTunnelKillAll_WithYes_EmitsJSONKilledList(t *testing.T) {
@@ -110,14 +107,12 @@ func TestTunnelKillAll_WithYes_EmitsJSONKilledList(t *testing.T) {
 
 	var got map[string]any
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
-	assert.Equal(t, true, got["ok"])
-	data := got["data"].(map[string]any)
-	killed := data["killed"].([]any)
+	killed := got["killed"].([]any)
 	require.Len(t, killed, 1)
 	assert.Equal(t, "acme-prod", killed[0])
 }
 
-func TestTunnelReconnect_EmitsJSONEnvelope(t *testing.T) {
+func TestTunnelReconnect_EmitsJSON(t *testing.T) {
 	jsonOutput = true
 	t.Cleanup(func() { jsonOutput = false })
 	svcs.Reconnector = &mockReconnector{port: 16500}
@@ -131,9 +126,6 @@ func TestTunnelReconnect_EmitsJSONEnvelope(t *testing.T) {
 
 	var got map[string]any
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
-	assert.Equal(t, true, got["ok"])
-	assert.Equal(t, "tunnel-reconnect", got["command"])
-	data := got["data"].(map[string]any)
-	assert.Equal(t, "acme-prod", data["context_name"])
-	assert.Equal(t, float64(16500), data["local_port"])
+	assert.Equal(t, "acme-prod", got["context_name"])
+	assert.Equal(t, float64(16500), got["local_port"])
 }

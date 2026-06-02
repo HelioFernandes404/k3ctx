@@ -30,7 +30,7 @@ func runInit(cmd *cobra.Command, _ []string) error {
 	}
 	if jsonOutput {
 		enc := json.NewEncoder(cmd.OutOrStdout())
-		return enc.Encode(jsonEnvelope(cmd, map[string]any{"initialized": true}))
+		return enc.Encode(map[string]any{"initialized": true})
 	}
 	_, _ = fmt.Fprintln(cmd.OutOrStdout(), "k3ctx initialized.")
 	return nil

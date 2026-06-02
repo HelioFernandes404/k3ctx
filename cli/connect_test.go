@@ -78,12 +78,10 @@ func TestRunConnect_DryRun_ReturnsResolutionWithoutConnecting(t *testing.T) {
 
 	var got map[string]any
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
-	assert.Equal(t, true, got["ok"])
-	data := got["data"].(map[string]any)
-	assert.Equal(t, true, data["dry_run"])
-	assert.Equal(t, "acme-prod", data["context_name"])
-	assert.Equal(t, "acme", data["client"])
-	assert.Equal(t, "prod", data["host"])
+	assert.Equal(t, true, got["dry_run"])
+	assert.Equal(t, "acme-prod", got["context_name"])
+	assert.Equal(t, "acme", got["client"])
+	assert.Equal(t, "prod", got["host"])
 }
 
 func TestRunConnect_DryRun_NoMatch_ReturnsError(t *testing.T) {
@@ -134,8 +132,7 @@ func TestRunConnect_TwoArgs_ResolvesSpecificHostBySfID(t *testing.T) {
 
 	var got map[string]any
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
-	data := got["data"].(map[string]any)
-	assert.Equal(t, "systemframe-sf-tst-sp-00003", data["context_name"])
+	assert.Equal(t, "systemframe-sf-tst-sp-00003", got["context_name"])
 }
 
 func TestRunConnect_AllHosts_NoMatch(t *testing.T) {
@@ -189,8 +186,7 @@ func TestRunConnect_AllHosts_MultiResultJSON(t *testing.T) {
 	err := runConnect(connectCmd, nil)
 	require.NoError(t, err)
 
-	var envelope map[string]any
-	require.NoError(t, json.Unmarshal(buf.Bytes(), &envelope))
-	data, _ := envelope["data"].([]any)
+	var data []any
+	require.NoError(t, json.Unmarshal(buf.Bytes(), &data))
 	assert.Len(t, data, 2)
 }

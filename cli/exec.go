@@ -48,7 +48,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 	if len(liveContexts) == 0 {
 		if jsonOutput {
 			enc := json.NewEncoder(cmd.OutOrStdout())
-			return enc.Encode(jsonEnvelope(cmd, []any{}))
+			return enc.Encode([]any{})
 		}
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No live tunnels.")
 		return nil
@@ -69,7 +69,7 @@ func runExec(cmd *cobra.Command, args []string) error {
 			}
 		}
 		enc := json.NewEncoder(cmd.OutOrStdout())
-		return enc.Encode(jsonEnvelope(cmd, dicts))
+		return enc.Encode(dicts)
 	}
 
 	for _, r := range results {

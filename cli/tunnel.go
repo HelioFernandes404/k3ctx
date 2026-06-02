@@ -66,7 +66,7 @@ func runTunnelList(cmd *cobra.Command, _ []string) error {
 			}
 		}
 		enc := json.NewEncoder(cmd.OutOrStdout())
-		return enc.Encode(jsonEnvelope(cmd, names))
+		return enc.Encode(names)
 	}
 
 	for _, item := range items {
@@ -88,10 +88,10 @@ func runTunnelKill(cmd *cobra.Command, args []string) error {
 	}
 	if jsonOutput {
 		enc := json.NewEncoder(cmd.OutOrStdout())
-		return enc.Encode(jsonEnvelope(cmd, map[string]any{
+		return enc.Encode(map[string]any{
 			"context_name": args[0],
 			"killed":       true,
-		}))
+		})
 	}
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Killed: %s\n", args[0])
 	return nil
@@ -105,10 +105,10 @@ func runTunnelReconnect(cmd *cobra.Command, args []string) error {
 	}
 	if jsonOutput {
 		enc := json.NewEncoder(cmd.OutOrStdout())
-		return enc.Encode(jsonEnvelope(cmd, map[string]any{
+		return enc.Encode(map[string]any{
 			"context_name": contextName,
 			"local_port":   localPort,
-		}))
+		})
 	}
 	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s reconnected on localhost:%d\n", contextName, localPort)
 	return nil
@@ -126,7 +126,7 @@ func runTunnelKillAll(cmd *cobra.Command, _ []string) error {
 	}
 	if jsonOutput {
 		enc := json.NewEncoder(cmd.OutOrStdout())
-		return enc.Encode(jsonEnvelope(cmd, map[string]any{"killed": killed}))
+		return enc.Encode(map[string]any{"killed": killed})
 	}
 	for _, name := range killed {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Killed: %s\n", name)

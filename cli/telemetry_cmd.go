@@ -45,7 +45,7 @@ func runTelemetryTail(cmd *cobra.Command, _ []string) error {
 	if len(events) == 0 {
 		if jsonOutput {
 			enc := json.NewEncoder(cmd.OutOrStdout())
-			return enc.Encode(jsonEnvelope(cmd, []any{}))
+			return enc.Encode([]any{})
 		}
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No telemetry data.")
 		return nil
@@ -53,7 +53,7 @@ func runTelemetryTail(cmd *cobra.Command, _ []string) error {
 
 	if jsonOutput {
 		enc := json.NewEncoder(cmd.OutOrStdout())
-		return enc.Encode(jsonEnvelope(cmd, events))
+		return enc.Encode(events)
 	}
 
 	enc := json.NewEncoder(cmd.OutOrStdout())
@@ -73,7 +73,7 @@ func runTelemetryStats(cmd *cobra.Command, _ []string) error {
 	if len(stats) == 0 {
 		if jsonOutput {
 			enc := json.NewEncoder(cmd.OutOrStdout())
-			return enc.Encode(jsonEnvelope(cmd, []any{}))
+			return enc.Encode([]any{})
 		}
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), "No telemetry data.")
 		return nil
@@ -81,7 +81,7 @@ func runTelemetryStats(cmd *cobra.Command, _ []string) error {
 
 	if jsonOutput {
 		enc := json.NewEncoder(cmd.OutOrStdout())
-		return enc.Encode(jsonEnvelope(cmd, stats))
+		return enc.Encode(stats)
 	}
 
 	for _, s := range stats {

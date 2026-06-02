@@ -29,10 +29,10 @@ func runStatus(cmd *cobra.Command, _ []string) error {
 	if jsonOutput {
 		enc := json.NewEncoder(cmd.OutOrStdout())
 		enc.SetIndent("", "  ")
-		return enc.Encode(jsonEnvelope(cmd, map[string]any{
+		return enc.Encode(map[string]any{
 			"current_context": currentCtx,
 			"tunnels":         items,
-		}))
+		})
 	}
 
 	if currentCtx != "" {

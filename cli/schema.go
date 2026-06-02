@@ -20,11 +20,11 @@ func init() { rootCmd.AddCommand(schemaCmd) }
 func runSchema(cmd *cobra.Command, _ []string) error {
 	enc := json.NewEncoder(cmd.OutOrStdout())
 	enc.SetIndent("", "  ")
-	return enc.Encode(jsonEnvelope(cmd, map[string]any{
+	return enc.Encode(map[string]any{
 		"version": buildversion.Version,
 		"behavior": map[string]any{
 			"json_auto": "JSON output is enabled automatically when stdout is not a TTY",
-			"envelope":  "success: {ok,command,data}  error: {ok,error:{code,message,hint,retryable}}",
+			"format":    "success: pure JSON data  error: {error:{code,message,hint}} on stderr",
 		},
 		"exit_codes": map[string]string{
 			"0": "success",
@@ -44,7 +44,7 @@ func runSchema(cmd *cobra.Command, _ []string) error {
 			"COMMAND_ERROR",
 		},
 		"commands": buildCommandList(rootCmd),
-	}))
+	})
 }
 
 func buildCommandList(root *cobra.Command) []map[string]any {

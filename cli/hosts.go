@@ -61,7 +61,7 @@ func runHosts(cmd *cobra.Command, args []string) error {
 		items := hostItemsToMaps(page.Items)
 		if jsonOutput {
 			enc := json.NewEncoder(cmd.OutOrStdout())
-			return enc.Encode(jsonEnvelope(cmd, map[string]any{"items": items}))
+			return enc.Encode(map[string]any{"items": items})
 		}
 		for _, item := range page.Items {
 			printHostLine(cmd, item)
@@ -77,7 +77,7 @@ func runHosts(cmd *cobra.Command, args []string) error {
 	if jsonOutput {
 		enc := json.NewEncoder(cmd.OutOrStdout())
 		enc.SetIndent("", "  ")
-		return enc.Encode(jsonEnvelope(cmd, hostPageToMap(page)))
+		return enc.Encode(hostPageToMap(page))
 	}
 
 	for _, item := range page.Items {

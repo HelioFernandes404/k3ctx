@@ -97,7 +97,7 @@ will work.
 
 **`status` JSON shape:**
 ```json
-{"ok": true, "command": "status", "data": {"current_context": "acme-prod", "tunnels": [...]}}
+{"current_context": "acme-prod", "tunnels": [...]}
 ```
 Each tunnel item has: `context_name`, `tunnel_running` (bool), `liveness` (`"live"` / `"stale"` / `"dead"`).
 
@@ -127,7 +127,7 @@ All secondary tunnel ports (ArgoCD, Alertmanager) are dynamic — do not hardcod
 
 ```bash
 # Get port from connect output (preferred — capture at connect time)
-port=$(k3ctx connect --context <context> --json | jq '.data.alertmanager_local_port')
+port=$(k3ctx connect --context <context> --json | jq '.alertmanager_local_port')
 
 # Get port for an already-running tunnel
 port=$(pid=$(cat ~/.local/state/k3ctx-tunnels/<context>-alertmanager.pid); tr '\0' ' ' < /proc/$pid/cmdline | grep -oP '\d+(?=:9093)')
@@ -142,7 +142,7 @@ The Alertmanager service in systemframe clusters is ClusterIP — k3ctx opens a 
 
 **`schema` command:** returns a full JSON manifest of all commands, flags, exit codes, and error codes. Call it once to orient before using other commands:
 ```bash
-k3ctx schema | jq .data.commands
+k3ctx schema | jq .commands
 ```
 
 ---

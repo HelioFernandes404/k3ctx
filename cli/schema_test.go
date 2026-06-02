@@ -19,15 +19,11 @@ func TestRunSchema_TopLevelKeys(t *testing.T) {
 
 	var got map[string]any
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
-	assert.Equal(t, true, got["ok"])
-	assert.Equal(t, "schema", got["command"])
-
-	data := got["data"].(map[string]any)
-	assert.NotEmpty(t, data["version"])
-	assert.NotEmpty(t, data["behavior"])
-	assert.NotEmpty(t, data["exit_codes"])
-	assert.NotEmpty(t, data["error_codes"])
-	assert.NotEmpty(t, data["commands"])
+	assert.NotEmpty(t, got["version"])
+	assert.NotEmpty(t, got["behavior"])
+	assert.NotEmpty(t, got["exit_codes"])
+	assert.NotEmpty(t, got["error_codes"])
+	assert.NotEmpty(t, got["commands"])
 }
 
 func TestRunSchema_ContainsConnectWithDryRunFlag(t *testing.T) {
@@ -39,8 +35,7 @@ func TestRunSchema_ContainsConnectWithDryRunFlag(t *testing.T) {
 
 	var got map[string]any
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
-	data := got["data"].(map[string]any)
-	commands := data["commands"].([]any)
+	commands := got["commands"].([]any)
 
 	var connectEntry map[string]any
 	for _, c := range commands {
@@ -71,8 +66,7 @@ func TestRunSchema_ErrorCodesIncludeKnownCodes(t *testing.T) {
 
 	var got map[string]any
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
-	data := got["data"].(map[string]any)
-	codes := data["error_codes"].([]any)
+	codes := got["error_codes"].([]any)
 
 	codeStrings := make([]string, 0, len(codes))
 	for _, c := range codes {

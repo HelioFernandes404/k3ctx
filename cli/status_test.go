@@ -37,10 +37,8 @@ func TestRunStatus_JSON_IncludesCurrentContext(t *testing.T) {
 
 	var got map[string]any
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
-	assert.Equal(t, true, got["ok"])
-	data2 := got["data"].(map[string]any)
-	assert.Equal(t, "acme-prod", data2["current_context"])
-	tunnels := data2["tunnels"].([]any)
+	assert.Equal(t, "acme-prod", got["current_context"])
+	tunnels := got["tunnels"].([]any)
 	assert.Len(t, tunnels, 1)
 }
 
@@ -62,6 +60,5 @@ func TestRunStatus_JSON_CurrentContextEmptyWhenNoKubeconfig(t *testing.T) {
 
 	var got map[string]any
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
-	data := got["data"].(map[string]any)
-	assert.Equal(t, "", data["current_context"])
+	assert.Equal(t, "", got["current_context"])
 }

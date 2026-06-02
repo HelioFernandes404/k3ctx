@@ -41,12 +41,11 @@ func newExitErr(code int, ecode, msg, hint string) *ExitErr {
 	return &ExitErr{Code: code, ECode: ecode, Msg: msg, Hint: hint}
 }
 
-// writeError prints a structured error to out — JSON envelope when jsonOutput, plain text otherwise.
+// writeError prints a structured error to out — JSON when jsonOutput, plain text otherwise.
 func writeError(out io.Writer, ecode, msg, hint string) {
 	if jsonOutput {
 		enc := json.NewEncoder(out)
 		_ = enc.Encode(map[string]any{
-			"ok": false,
 			"error": map[string]any{
 				"code":    ecode,
 				"message": msg,
@@ -59,15 +58,6 @@ func writeError(out io.Writer, ecode, msg, hint string) {
 		_, _ = fmt.Fprintf(out, "%s\n%s\n", msg, hint)
 	} else {
 		_, _ = fmt.Fprintln(out, msg)
-	}
-}
-
-// jsonEnvelope wraps a success payload in the standard {"ok":true,"command":"...","data":...} envelope.
-func jsonEnvelope(cmd *cobra.Command, data any) map[string]any {
-	return map[string]any{
-		"ok":      true,
-		"command": cmd.Name(),
-		"data":    data,
 	}
 }
 
@@ -130,10 +120,10 @@ func Execute() {
 		recordErrorTelemetry(err)
 		var exitErr *ExitErr
 		if errors.As(err, &exitErr) {
-			writeError(os.Stdout, exitErr.ECode, exitErr.Msg, exitErr.Hint)
+			writeError(os.Stderr, exitErr.ECode, exitErr.Msg, exitErr.Hint)
 			os.Exit(exitErr.Code)
 		}
-		writeError(os.Stdout, "COMMAND_ERROR", err.Error(), "")
+		writeError(os.Stderr, "COMMAND_ERROR", err.Error(), "")
 		os.Exit(1)
 	}
 }

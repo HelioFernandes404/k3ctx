@@ -47,7 +47,7 @@ func runClients(cmd *cobra.Command, args []string) error {
 		}
 		if jsonOutput {
 			enc := json.NewEncoder(cmd.OutOrStdout())
-			return enc.Encode(jsonEnvelope(cmd, map[string]any{"items": items}))
+			return enc.Encode(map[string]any{"items": items})
 		}
 		for _, item := range page.Items {
 			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%-30s  %d hosts\n", item.Client, item.HostCount)
@@ -63,7 +63,7 @@ func runClients(cmd *cobra.Command, args []string) error {
 	if jsonOutput {
 		enc := json.NewEncoder(cmd.OutOrStdout())
 		enc.SetIndent("", "  ")
-		return enc.Encode(jsonEnvelope(cmd, clientPageToMap(page)))
+		return enc.Encode(clientPageToMap(page))
 	}
 
 	for _, item := range page.Items {

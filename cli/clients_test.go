@@ -31,11 +31,9 @@ func TestRunClients_All_ReturnsAllItems(t *testing.T) {
 
 	var got map[string]any
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
-	assert.Equal(t, true, got["ok"])
-	data := got["data"].(map[string]any)
-	items := data["items"].([]any)
+	items := got["items"].([]any)
 	assert.Len(t, items, 3)
-	_, hasPage := data["page"]
+	_, hasPage := got["page"]
 	assert.False(t, hasPage, "all mode should omit pagination metadata")
 }
 
@@ -55,7 +53,6 @@ func TestRunClients_All_EmptyWhenNoTargets(t *testing.T) {
 
 	var got map[string]any
 	require.NoError(t, json.Unmarshal(buf.Bytes(), &got))
-	data := got["data"].(map[string]any)
-	items := data["items"].([]any)
+	items := got["items"].([]any)
 	assert.Empty(t, items)
 }
