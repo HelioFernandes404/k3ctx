@@ -23,12 +23,13 @@ type LocalClusterConnector struct {
 	VictoriaMetricsAdapter domain.VictoriaMetricsConnector
 
 	// Injectable for testing:
-	sshConnect        func(target domain.ClusterTarget, cfg domain.EffectiveConfig) (hostname, username string, keyfile *string, sshPort int, proxycmd *string, runner func(string) (string, error), err error)
-	prepareKubeconfig func(runner func(string) (string, error), target domain.ClusterTarget, cfg domain.EffectiveConfig) (internalIP string, localPort int, usedCache bool, content string, err error)
-	ensureTunnel      func(contextName, hostname, internalIP, username string, keyfile *string, sshPort, localPort, k3sPort int, proxycmd *string, stateDir string) (pid *int, reused bool, err error)
-	killTunnel        func(contextName, stateDir string)
-	pollAPIReady      func(localPort int, kubeconfigText string, timeout, interval time.Duration) error
-	mergeKubeconfig   func(content, contextName string) (string, error)
+	checkAlreadyConnected func(contextName, stateDir string, cfg domain.EffectiveConfig) (domain.ConnectionArtifacts, bool)
+	sshConnect            func(target domain.ClusterTarget, cfg domain.EffectiveConfig) (hostname, username string, keyfile *string, sshPort int, proxycmd *string, runner func(string) (string, error), err error)
+	prepareKubeconfig     func(runner func(string) (string, error), target domain.ClusterTarget, cfg domain.EffectiveConfig) (internalIP string, localPort int, usedCache bool, content string, err error)
+	ensureTunnel          func(contextName, hostname, internalIP, username string, keyfile *string, sshPort, localPort, k3sPort int, proxycmd *string, stateDir string) (pid *int, reused bool, err error)
+	killTunnel            func(contextName, stateDir string)
+	pollAPIReady          func(localPort int, kubeconfigText string, timeout, interval time.Duration) error
+	mergeKubeconfig       func(content, contextName string) (string, error)
 }
 
 // NewLocalClusterConnector returns a connector with real subprocess defaults.
@@ -53,6 +54,7 @@ func NewLocalClusterConnector(argocd domain.ArgocdConnector, alertmanager domain
 		AlertmanagerAdapter:    alertmanager,
 		VictoriaMetricsAdapter: victoriaMetrics,
 	}
+	c.checkAlreadyConnected = defaultCheckAlreadyConnected
 	c.sshConnect = defaultSSHConnect
 	c.prepareKubeconfig = defaultPrepareKubeconfig
 	c.ensureTunnel = defaultEnsureTunnel
@@ -76,6 +78,12 @@ func (c *LocalClusterConnector) Connect(
 	_ domain.NetworkRequirement,
 ) (domain.ConnectionArtifacts, error) {
 	stateDir := c.stateDir()
+
+	if c.checkAlreadyConnected != nil {
+		if artifacts, ok := c.checkAlreadyConnected(target.ContextName(), stateDir, cfg); ok {
+			return artifacts, nil
+		}
+	}
 
 	hostname, username, keyfile, sshPort, proxycmd, runner, err := c.sshConnect(target, cfg)
 	if err != nil {

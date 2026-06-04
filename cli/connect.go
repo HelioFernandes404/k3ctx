@@ -140,7 +140,11 @@ func runConnect(cmd *cobra.Command, args []string) error {
 	if result.LocalPort() != nil {
 		localPort = fmt.Sprintf(" (local port %d)", *result.LocalPort())
 	}
-	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "Connected: %s%s\n", result.ContextName(), localPort)
+	label := "Connected"
+	if result.AlreadyConnected() {
+		label = "Already connected"
+	}
+	_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s: %s%s\n", label, result.ContextName(), localPort)
 	if result.ArgocdLocalPort() != nil {
 		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "ArgoCD:            http://127.0.0.1:%d\n", *result.ArgocdLocalPort())
 		if !result.ArgocdLoginSuccess() && result.ArgocdLoginMessage() != "" {

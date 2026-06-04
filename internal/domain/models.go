@@ -94,6 +94,7 @@ type ConnectResult struct {
 	internalIP               *string
 	tunnelPID                *int
 	usedCache                bool
+	alreadyConnected         bool
 	networkRequirement       NetworkRequirement
 	err                      *OperationError
 	argocdLocalPort          *int
@@ -111,6 +112,7 @@ type ConnectResultParams struct {
 	InternalIP               *string
 	TunnelPID                *int
 	UsedCache                bool
+	AlreadyConnected         bool
 	NetworkRequirement       NetworkRequirement
 	Error                    *OperationError
 	ArgocdLocalPort          *int
@@ -135,6 +137,7 @@ func NewConnectResult(p ConnectResultParams) (ConnectResult, error) {
 		internalIP:               p.InternalIP,
 		tunnelPID:                p.TunnelPID,
 		usedCache:                p.UsedCache,
+		alreadyConnected:         p.AlreadyConnected,
 		networkRequirement:       p.NetworkRequirement,
 		err:                      p.Error,
 		argocdLocalPort:          p.ArgocdLocalPort,
@@ -162,6 +165,9 @@ func (r ConnectResult) TunnelPID() *int { return r.tunnelPID }
 
 // UsedCache reports whether the remote kubeconfig was served from the local cache.
 func (r ConnectResult) UsedCache() bool { return r.usedCache }
+
+// AlreadyConnected reports whether the full connect flow was skipped because the tunnel was already live.
+func (r ConnectResult) AlreadyConnected() bool { return r.alreadyConnected }
 
 // NetworkRequirement returns the network access path detected for this target.
 func (r ConnectResult) NetworkRequirement() NetworkRequirement { return r.networkRequirement }
@@ -214,12 +220,13 @@ func (r ConnectResult) ToPublicDict() map[string]any {
 	}
 
 	return map[string]any{
-		"success":      r.success,
-		"context_name": r.contextName,
-		"local_port":   localPort,
-		"internal_ip":  internalIP,
-		"tunnel_pid":   tunnelPID,
-		"used_cache":   r.usedCache,
+		"success":           r.success,
+		"context_name":      r.contextName,
+		"local_port":        localPort,
+		"internal_ip":       internalIP,
+		"tunnel_pid":        tunnelPID,
+		"used_cache":        r.usedCache,
+		"already_connected": r.alreadyConnected,
 		"network_requirement": map[string]any{
 			"type":          r.networkRequirement.Type,
 			"network_range": r.networkRequirement.NetworkRange,

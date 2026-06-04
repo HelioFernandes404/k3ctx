@@ -253,6 +253,44 @@ func TestGetCurrentContext_EmptyWhenFieldAbsent(t *testing.T) {
 	assert.Equal(t, "", ctx)
 }
 
+// --- ContextExists ---
+
+func TestContextExists_ReturnsTrueWhenContextPresent(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	require.NoError(t, os.MkdirAll(filepath.Join(tmp, ".kube"), 0o700))
+	cfg := map[string]any{
+		"apiVersion": "v1",
+		"contexts": []any{
+			map[string]any{"name": "acme-prod"},
+			map[string]any{"name": "acme-staging"},
+		},
+	}
+	writeYAML(t, filepath.Join(tmp, ".kube", "config"), cfg)
+
+	assert.True(t, kubeconfig.ContextExists("acme-prod"))
+	assert.True(t, kubeconfig.ContextExists("acme-staging"))
+}
+
+func TestContextExists_ReturnsFalseWhenContextAbsent(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	require.NoError(t, os.MkdirAll(filepath.Join(tmp, ".kube"), 0o700))
+	cfg := map[string]any{
+		"apiVersion": "v1",
+		"contexts":   []any{map[string]any{"name": "acme-prod"}},
+	}
+	writeYAML(t, filepath.Join(tmp, ".kube", "config"), cfg)
+
+	assert.False(t, kubeconfig.ContextExists("acme-staging"))
+}
+
+func TestContextExists_ReturnsFalseWhenFileAbsent(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	assert.False(t, kubeconfig.ContextExists("any-context"))
+}
+
 func loadYAML(t *testing.T, p string) map[string]any {
 	t.Helper()
 	data, err := os.ReadFile(p) //nolint:gosec // test reads its own tempdir

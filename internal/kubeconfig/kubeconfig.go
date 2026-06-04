@@ -13,6 +13,26 @@ func defaultKubeconfigPath() string {
 	return filepath.Join(os.Getenv("HOME"), ".kube", "config")
 }
 
+// ContextExists reports whether contextName appears in the contexts list of ~/.kube/config.
+func ContextExists(contextName string) bool {
+	data, err := os.ReadFile(defaultKubeconfigPath())
+	if err != nil {
+		return false
+	}
+	var cfg map[string]any
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return false
+	}
+	contexts, _ := cfg["contexts"].([]any)
+	for _, c := range contexts {
+		m, _ := c.(map[string]any)
+		if m != nil && m["name"] == contextName {
+			return true
+		}
+	}
+	return false
+}
+
 // GetCurrentContext returns the active kubectl context name from ~/.kube/config.
 // Returns ("", nil) when the file is absent or the field is missing.
 func GetCurrentContext() (string, error) {

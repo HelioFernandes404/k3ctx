@@ -227,6 +227,64 @@ func TestLocalClusterConnector_IgnoresArgocdSetupError(t *testing.T) {
 	require.Len(t, argocd.calls, 1)
 }
 
+// --- fast-path (checkAlreadyConnected) ---
+
+func TestLocalClusterConnector_FastPathSkipsFullConnect(t *testing.T) {
+	sshCalled := false
+	mergeCalled := false
+
+	conn := NewLocalClusterConnector(nil, nil, nil)
+	conn.StateDir = t.TempDir()
+	conn.checkAlreadyConnected = func(_, _ string, _ domain.EffectiveConfig) (domain.ConnectionArtifacts, bool) {
+		return domain.ConnectionArtifacts{
+			LocalPort:        16443,
+			InternalIP:       "10.0.0.10",
+			AlreadyConnected: true,
+			UsedCache:        true,
+		}, true
+	}
+	conn.sshConnect = func(_ domain.ClusterTarget, _ domain.EffectiveConfig) (string, string, *string, int, *string, func(string) (string, error), error) {
+		sshCalled = true
+		return "", "", nil, 0, nil, nil, nil
+	}
+	conn.mergeKubeconfig = func(_, _ string) (string, error) {
+		mergeCalled = true
+		return "", nil
+	}
+
+	artifacts, err := conn.Connect(makeTarget(), makeEffectiveConfig(t), domain.NoNetworkRequirement())
+
+	require.NoError(t, err)
+	assert.False(t, sshCalled, "SSH should not be called on fast-path")
+	assert.False(t, mergeCalled, "mergeKubeconfig should not be called on fast-path")
+	assert.True(t, artifacts.AlreadyConnected)
+	assert.Equal(t, 16443, artifacts.LocalPort)
+}
+
+func TestLocalClusterConnector_FastPathMissProceeds(t *testing.T) {
+	sshCalled := false
+
+	conn := NewLocalClusterConnector(nil, nil, nil)
+	conn.StateDir = t.TempDir()
+	conn.checkAlreadyConnected = func(_, _ string, _ domain.EffectiveConfig) (domain.ConnectionArtifacts, bool) {
+		return domain.ConnectionArtifacts{}, false
+	}
+	conn.sshConnect = func(_ domain.ClusterTarget, _ domain.EffectiveConfig) (string, string, *string, int, *string, func(string) (string, error), error) {
+		sshCalled = true
+		return stubSSHConnect(makeTarget(), makeEffectiveConfig(t))
+	}
+	conn.prepareKubeconfig = stubPrepareKubeconfig
+	conn.ensureTunnel = stubEnsureTunnel(1234)
+	conn.pollAPIReady = func(_ int, _ string, _, _ time.Duration) error { return nil }
+	conn.killTunnel = func(_, _ string) {}
+	conn.mergeKubeconfig = noopMerge
+
+	_, err := conn.Connect(makeTarget(), makeEffectiveConfig(t), domain.NoNetworkRequirement())
+
+	require.NoError(t, err)
+	assert.True(t, sshCalled, "SSH must be called when fast-path misses")
+}
+
 // --- pollAPIReadyWithDoer ---
 
 func TestPollAPIReadyWithDoer_PerRequestTimeoutAtLeast2s(t *testing.T) {

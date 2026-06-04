@@ -88,6 +88,7 @@ func ConnectCluster(
 		InternalIP:               &artifacts.InternalIP,
 		TunnelPID:                artifacts.TunnelPID,
 		UsedCache:                artifacts.UsedCache,
+		AlreadyConnected:         artifacts.AlreadyConnected,
 		NetworkRequirement:       req,
 		ArgocdLocalPort:          artifacts.ArgocdLocalPort,
 		ArgocdLoginSuccess:       artifacts.ArgocdLoginSuccess,

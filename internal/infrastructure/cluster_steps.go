@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/systemframe/k3ctx/internal/domain"
 	"github.com/systemframe/k3ctx/internal/kubeconfig"
@@ -12,6 +13,46 @@ import (
 	sshpkg "github.com/systemframe/k3ctx/internal/ssh"
 	"github.com/systemframe/k3ctx/internal/tunnel"
 )
+
+// defaultCheckAlreadyConnected returns cached ConnectionArtifacts when the tunnel is already live and the
+// kubeconfig context exists, allowing Connect to skip SSH, remote kubeconfig fetch, and API verification.
+func defaultCheckAlreadyConnected(contextName, stateDir string, cfg domain.EffectiveConfig) (domain.ConnectionArtifacts, bool) {
+	localPort := tunnel.GetUniquePort(contextName, cfg.PortRangeStart, cfg.PortRangeSize)
+	if tunnel.Liveness(contextName, stateDir, localPort) != "live" {
+		return domain.ConnectionArtifacts{}, false
+	}
+	if !kubeconfig.ContextExists(contextName) {
+		return domain.ConnectionArtifacts{}, false
+	}
+	params, err := tunnel.LoadConnParams(contextName, stateDir)
+	if err != nil {
+		return domain.ConnectionArtifacts{}, false
+	}
+	pid := readTunnelPID(contextName, stateDir)
+	return domain.ConnectionArtifacts{
+		LocalPort:                localPort,
+		InternalIP:               params.InternalIP,
+		TunnelPID:                pid,
+		UsedCache:                true,
+		AlreadyConnected:         true,
+		ArgocdLocalPort:          secondaryLivePort(contextName+"-argocd", stateDir, argocdPortRangeStart, argocdPortRangeSize),
+		AlertmanagerLocalPort:    secondaryLivePort(contextName+"-alertmanager", stateDir, alertmanagerPortRangeStart, alertmanagerPortRangeSize),
+		VictoriaMetricsLocalPort: secondaryLivePort(contextName+"-victoriametrics", stateDir, victoriaMetricsPortRangeStart, victoriaMetricsPortRangeSize),
+	}, true
+}
+
+// secondaryLivePort returns a pointer to the deterministic local port for a secondary tunnel context
+// when that tunnel process is running and its port accepts connections, or nil otherwise.
+func secondaryLivePort(contextName, stateDir string, portStart, portSize int) *int {
+	if !tunnel.IsTunnelRunning(contextName, stateDir) {
+		return nil
+	}
+	port := tunnel.GetUniquePort(contextName, portStart, portSize)
+	if !tunnel.IsPortLive(port, 2*time.Second) {
+		return nil
+	}
+	return &port
+}
 
 // defaultSSHConnect resolves the SSH connection target from inventory + ssh config and returns a remote runner.
 func defaultSSHConnect(target domain.ClusterTarget, cfg domain.EffectiveConfig) (string, string, *string, int, *string, func(string) (string, error), error) {

@@ -22,6 +22,7 @@ type ConnectionArtifacts struct {
 	InternalIP               string
 	TunnelPID                *int
 	UsedCache                bool
+	AlreadyConnected         bool // true when tunnel was already live and kubeconfig existed; full connect was skipped
 	ArgocdLocalPort          *int
 	ArgocdLoginSuccess       bool
 	ArgocdLoginMessage       string
